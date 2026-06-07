@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>見積書 - 株式会社Rayzy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #f0f0f0;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: white;
+      padding: 14mm 16mm;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+    }
+
+    /* タイトル行 */
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #1a1a1a;
+      margin-bottom: 14px;
+    }
+    .title-left {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    .doc-title {
+      font-size: 26px;
+      font-weight: bold;
+      letter-spacing: 10px;
+    }
+    .doc-subtitle {
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #555;
+    }
+    .issue-date {
+      font-size: 12px;
+    }
+
+    /* ヘッダー */
+    .header-grid {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .client-section { flex: 1; }
+    .client-name-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .client-name {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .client-honorific { font-size: 14px; }
+    .client-greeting {
+      font-size: 12px;
+      color: #333;
+      margin-top: 10px;
+    }
+
+    .issuer-section {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .issuer-logo {
+      height: 52px;
+      width: auto;
+      display: block;
+      margin-left: auto;
+      margin-bottom: 4px;
+    }
+    .issuer-name {
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 2px;
+      margin-bottom: 4px;
+    }
+    .issuer-address {
+      font-size: 11px;
+      line-height: 1.9;
+      color: #333;
+    }
+
+    /* 件名・条件 */
+    .meta-wrap { margin-bottom: 14px; }
+    .meta-row {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+      padding: 5px 0;
+      font-size: 12px;
+    }
+    .meta-label {
+      width: 72px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* 合計金額 */
+    .total-main {
+      display: flex;
+      align-items: baseline;
+      gap: 12px;
+      border-top: 1px solid #aaa;
+      border-bottom: 1px solid #aaa;
+      padding: 9px 0;
+      margin-bottom: 18px;
+    }
+    .total-main-label {
+      font-size: 14px;
+      font-weight: bold;
+      width: 80px;
+    }
+    .total-main-amount {
+      font-size: 26px;
+      font-weight: bold;
+    }
+    .total-main-note {
+      font-size: 13px;
+      color: #555;
+    }
+
+    /* 明細テーブル */
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 14px;
+      font-size: 12px;
+    }
+    .detail-table thead th {
+      text-align: center;
+      padding: 6px 8px;
+      border-top: 1.5px solid #1a1a1a;
+      border-bottom: 1.5px solid #1a1a1a;
+      font-weight: normal;
+    }
+    .detail-table thead th.left { text-align: left; }
+    .detail-table thead th.right { text-align: right; }
+
+    .detail-table .cat-row td {
+      padding: 7px 8px 3px;
+      font-weight: bold;
+    }
+    .detail-table .item-row td {
+      padding: 4px 8px;
+      border-bottom: 1px solid #e8e8e8;
+    }
+    .detail-table .subtotal-row td {
+      padding: 4px 8px;
+      font-weight: bold;
+      border-top: 1px solid #bbb;
+      border-bottom: 1.5px solid #bbb;
+    }
+    .detail-table td.right { text-align: right; }
+    .detail-table td.center { text-align: center; }
+    .item-desc {
+      font-size: 10px;
+      color: #888;
+      margin-top: 1px;
+    }
+
+    /* 備考・合計 */
+    .bottom-row {
+      display: flex;
+      gap: 24px;
+      margin-bottom: 18px;
+      align-items: flex-start;
+    }
+    .remarks-box { flex: 1; }
+    .remarks-label {
+      font-size: 12px;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 3px;
+      margin-bottom: 6px;
+    }
+    .remarks-text {
+      font-size: 11px;
+      line-height: 1.9;
+      color: #444;
+      min-height: 60px;
+    }
+
+    .totals-box { min-width: 270px; }
+    .totals-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .totals-table td {
+      padding: 4px 10px;
+      border-bottom: 1px dotted #ccc;
+    }
+    .totals-table td.right { text-align: right; }
+    .totals-table .final-row td {
+      padding: 6px 10px;
+      font-weight: bold;
+      font-size: 14px;
+      border-top: 1.5px solid #1a1a1a;
+      border-bottom: 1.5px solid #1a1a1a;
+    }
+
+    /* 納品・その他 */
+    .doc-section { margin-bottom: 14px; }
+    .doc-section-title {
+      font-size: 12px;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 3px;
+      margin-bottom: 8px;
+    }
+    .doc-subsection-title {
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 3px;
+    }
+    .doc-subsection-body {
+      font-size: 12px;
+      line-height: 1.7;
+      color: #333;
+      border-bottom: 1px dotted #ccc;
+      padding-bottom: 8px;
+      min-height: 28px;
+    }
+    .doc-empty {
+      border-bottom: 1px dotted #ccc;
+      min-height: 36px;
+    }
+
+    .footer-note {
+      font-size: 11px;
+      color: #555;
+      padding-top: 8px;
+      border-top: 1px dotted #ccc;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { margin: 0; box-shadow: none; padding: 12mm 14mm; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="title-row">
+    <div class="title-left">
+      <span class="doc-title">見　積　書</span>
+      <span class="doc-subtitle">ESTIMATE</span>
+    </div>
+    <div class="issue-date">発行日　2026年5月26日</div>
+  </div>
+
+  <div class="header-grid">
+    <div class="client-section">
+      <div class="client-name-row">
+        <span class="client-name">[宛先会社名]</span>
+        <span class="client-honorific">御中</span>
+      </div>
+      <div class="client-greeting">下記の通り御見積申し上げます。</div>
+    </div>
+    <div class="issuer-section">
+      <img class="issuer-logo" src="Rayzy_logo.png" alt="Rayzy">
+      <div class="issuer-name">株式会社Rayzy</div>
+      <div class="issuer-address">
+        〒161-0033<br>
+        東京都新宿区下落合1丁目14-4<br>
+        TEL: 03-6824-7885
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-wrap">
+    <div class="meta-row">
+      <span class="meta-label">件名</span>
+      <span>業務管理システム（シフト・報酬・キャスト管理）開発 一式</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">納期</span>
+      <span>別途協議</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">支払条件</span>
+      <span>銀行振り込み（着手時50%・納品時50%）</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">有効期限</span>
+      <span>2026年6月25日</span>
+    </div>
+  </div>
+
+  <div class="total-main">
+    <div class="total-main-label">合計金額</div>
+    <div class="total-main-amount">1,300,200円</div>
+    <div class="total-main-note">（税込）</div>
+  </div>
+
+  <table class="detail-table">
+    <thead>
+      <tr>
+        <th class="left" style="width:50%;">概要</th>
+        <th style="width:7%;">数量</th>
+        <th style="width:7%;">単位</th>
+        <th class="right" style="width:16%;">単価</th>
+        <th class="right" style="width:20%;">金額（円）</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <tr class="cat-row"><td colspan="5">設計</td></tr>
+      <tr class="item-row">
+        <td>要件定義・設計・ドキュメント整備<div class="item-desc">機能仕様書、DB設計、画面設計、技術選定</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">100,000</td><td class="right">100,000</td>
+      </tr>
+      <tr class="subtotal-row">
+        <td colspan="4" class="right">小計</td><td class="right">100,000</td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="5">環境構築</td></tr>
+      <tr class="item-row">
+        <td>環境構築・インフラ設定<div class="item-desc">Next.js / Supabase / Vercel セットアップ、CI/CD設定</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">60,000</td><td class="right">60,000</td>
+      </tr>
+      <tr class="subtotal-row">
+        <td colspan="4" class="right">小計</td><td class="right">60,000</td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="5">機能開発</td></tr>
+      <tr class="item-row">
+        <td>認証機能（ログイン・ロール管理）<div class="item-desc">管理者 / キャスト ロール分離、セッション管理、パスワードリセット</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">80,000</td><td class="right">80,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>店舗・キャスト・ルーム管理<div class="item-desc">多店舗対応、キャスト招待・報酬率設定、ルーム登録・編集</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">150,000</td><td class="right">150,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>シフト提出・確認機能（キャスト）<div class="item-desc">日付・時間・備考入力、提出済みシフト一覧、締切前の自由修正</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">120,000</td><td class="right">120,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>シフト確定・ルーム被りチェック（管理者）<div class="item-desc">シフト一覧・確定・差し戻し、同時間帯ルーム重複の自動検知・警告</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">100,000</td><td class="right">100,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>シフト修正申請・承認フロー<div class="item-desc">締切後の修正申請、管理者による承認・却下、ステータス管理</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">90,000</td><td class="right">90,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>空き枠管理・申請機能<div class="item-desc">管理者による空き枠登録・公開、キャストからの申請・承認フロー</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">90,000</td><td class="right">90,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>売上手入力機能<div class="item-desc">キャスト別・日別売上入力、月次・日次集計表示</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">70,000</td><td class="right">70,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>報酬計算・明細機能<div class="item-desc">月次報酬計算（売上×報酬率＋ボーナス−控除）、明細確定・キャスト向け表示</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">110,000</td><td class="right">110,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>通知機能（アプリ内・メール）<div class="item-desc">Supabase Realtime によるリアルタイム通知、Resend によるメール通知</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">80,000</td><td class="right">80,000</td>
+      </tr>
+      <tr class="item-row">
+        <td>管理画面・店舗設定<div class="item-desc">ダッシュボード、締切ルール設定、各種管理画面</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">72,000</td><td class="right">72,000</td>
+      </tr>
+      <tr class="subtotal-row">
+        <td colspan="4" class="right">小計</td><td class="right">962,000</td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="5">テスト・デプロイ</td></tr>
+      <tr class="item-row">
+        <td>テスト・デプロイ・納品対応<div class="item-desc">動作確認、本番環境デプロイ、初期データ設定サポート</div></td>
+        <td class="center">1</td><td class="center">式</td>
+        <td class="right">60,000</td><td class="right">60,000</td>
+      </tr>
+      <tr class="subtotal-row">
+        <td colspan="4" class="right">小計</td><td class="right">60,000</td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <div class="bottom-row">
+    <div class="remarks-box">
+      <div class="remarks-label">備考</div>
+      <div class="remarks-text">
+        ・サーバー・各種SaaSの利用料（Supabase、Vercel、Resend等）は別途実費となります。<br>
+        ・仕様変更・追加開発が発生した場合は、別途お見積りいたします。<br>
+        ・保守・運用サポートについては別途ご相談ください。
+      </div>
+    </div>
+    <div class="totals-box">
+      <table class="totals-table">
+        <tr><td>小計</td><td class="right">1,182,000円</td></tr>
+        <tr><td>消費税</td><td class="right">10%対象　1,182,000円</td></tr>
+        <tr><td>税額</td><td class="right">118,200円</td></tr>
+        <tr class="final-row"><td>合計</td><td class="right">1,300,200円</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <div class="doc-section-title">納品について</div>
+    <div class="doc-subsection-title">納品成果物</div>
+    <div class="doc-subsection-body">
+      Next.js アプリケーション一式、Supabase データベーススキーマ・設定、本番環境デプロイ済み URL、管理者アカウント初期設定
+    </div>
+  </div>
+
+  <div class="doc-section">
+    <div class="doc-section-title">その他</div>
+    <div class="doc-empty"></div>
+  </div>
+
+  <div class="footer-note">
+    ※ご不明な点がございましたら、ご遠慮なくお問い合わせください
+  </div>
+
+</div>
+</body>
+</html>
