@@ -95,7 +95,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
   return (
     <div className="flex flex-col">
       {tabs.length > 0 && (
-        <div className="flex border-b overflow-x-auto shrink-0 bg-white">
+        <div className="flex border-b overflow-x-auto shrink-0 bg-card">
           {tabs.map(tab => (
             <button
               key={tab.id}
@@ -103,8 +103,8 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
               className={cn(
                 'px-4 py-2.5 text-sm whitespace-nowrap border-b-2 -mb-px transition-colors',
                 activeTab === tab.id
-                  ? 'border-gray-900 text-gray-900 font-medium'
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'border-foreground text-foreground font-medium'
+                  : 'border-transparent text-muted-foreground hover:text-foreground'
               )}
             >
               {tab.name}
@@ -113,20 +113,20 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
         </div>
       )}
 
-      <div className="flex items-center justify-between px-3 py-2 border-b bg-white shrink-0">
+      <div className="flex items-center justify-between px-3 py-2 border-b bg-card shrink-0">
         <button
           onClick={() => setStartDate(d => addDays(d, -7))}
-          className="flex items-center gap-1 px-2 py-1 text-sm rounded hover:bg-gray-100"
+          className="flex items-center gap-1 px-2 py-1 text-sm rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         >
           <ChevronLeft className="h-4 w-4" />
           前の週
         </button>
-        <span className="text-xs text-gray-500">
+        <span className="text-xs text-muted-foreground">
           {format(days[0], 'M/d', { locale: ja })} 〜 {format(days[6], 'M/d', { locale: ja })}
         </span>
         <button
           onClick={() => setStartDate(d => addDays(d, 7))}
-          className="flex items-center gap-1 px-2 py-1 text-sm rounded hover:bg-gray-100"
+          className="flex items-center gap-1 px-2 py-1 text-sm rounded text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         >
           次の週
           <ChevronRight className="h-4 w-4" />
@@ -136,12 +136,12 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
       <div className="overflow-auto">
         <div style={{ width: totalWidth }}>
           {/* Time header */}
-          <div className="flex sticky top-0 z-20 bg-white border-b" style={{ height: HEADER_H }}>
-            <div className="shrink-0 sticky left-0 z-30 bg-white border-r" style={{ width: DATE_W }} />
+          <div className="flex sticky top-0 z-20 bg-card border-b" style={{ height: HEADER_H }}>
+            <div className="shrink-0 sticky left-0 z-30 bg-card border-r" style={{ width: DATE_W }} />
             {hours.map(h => (
               <div
                 key={h}
-                className="shrink-0 border-r text-[11px] text-gray-400 flex items-end pb-0.5 pl-1 font-mono"
+                className="shrink-0 border-r text-[11px] text-muted-foreground flex items-end pb-0.5 pl-1 font-mono"
                 style={{ width: HOUR_W }}
               >
                 {String(h % 24).padStart(2, '0')}:00
@@ -159,13 +159,13 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
             return (
               <div
                 key={dateStr}
-                className={cn('flex border-b', isWeekend ? 'bg-slate-50' : 'bg-white')}
+                className={cn('flex border-b', isWeekend ? 'bg-muted/40' : 'bg-card')}
                 style={{ height: ROW_H }}
               >
                 <div
                   className={cn(
                     'shrink-0 sticky left-0 z-10 border-r flex items-center justify-center',
-                    isWeekend ? 'bg-slate-50' : 'bg-white'
+                    isWeekend ? 'bg-muted/40' : 'bg-card'
                   )}
                   style={{ width: DATE_W }}
                 >
@@ -183,7 +183,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                   {hours.map(h => (
                     <div
                       key={h}
-                      className="absolute top-0 bottom-0 border-r border-gray-100"
+                      className="absolute top-0 bottom-0 border-r border-border"
                       style={{ left: (h - startHour) * HOUR_W, width: HOUR_W }}
                     />
                   ))}

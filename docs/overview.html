@@ -1,0 +1,501 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CalendarApp — プロジェクト概要</title>
+<style>
+  :root {
+    --admin: #6366f1;
+    --cast: #ec4899;
+    --db: #0ea5e9;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); line-height: 1.6; }
+
+  /* Layout */
+  .page { max-width: 1100px; margin: 0 auto; padding: 40px 24px 80px; }
+  h1 { font-size: 2rem; font-weight: 800; }
+  h2 { font-size: 1.25rem; font-weight: 700; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border); }
+  h3 { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+  p  { color: var(--muted); font-size: 0.9rem; }
+  section { margin-bottom: 56px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 48px 0 40px; }
+  .hero .badge { display: inline-block; background: #fef3c7; color: #92400e; font-size: 0.75rem; font-weight: 600; padding: 3px 10px; border-radius: 99px; margin-bottom: 12px; }
+  .hero p { font-size: 1rem; margin-top: 8px; color: var(--muted); }
+
+  /* Cards */
+  .cards { display: grid; gap: 16px; }
+  .cards-2 { grid-template-columns: repeat(2, 1fr); }
+  .cards-3 { grid-template-columns: repeat(3, 1fr); }
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+
+  /* Tech stack */
+  .tech-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 4px; }
+  .tech-badge { font-size: 0.78rem; font-weight: 600; padding: 4px 10px; border-radius: 6px; }
+  .tech-fe  { background: #eff6ff; color: #1d4ed8; }
+  .tech-ui  { background: #f0fdf4; color: #166534; }
+  .tech-db  { background: #f0f9ff; color: #0369a1; }
+  .tech-dep { background: #faf5ff; color: #6b21a8; }
+
+  /* Role cards */
+  .role-admin { border-top: 3px solid var(--admin); }
+  .role-cast  { border-top: 3px solid var(--cast); }
+  .role-label { font-size: 0.7rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; margin-bottom: 6px; }
+  .role-admin .role-label { color: var(--admin); }
+  .role-cast  .role-label { color: var(--cast); }
+  .feat-list { list-style: none; margin-top: 8px; }
+  .feat-list li { font-size: 0.83rem; padding: 4px 0; border-bottom: 1px solid var(--border); color: var(--text); display: flex; align-items: center; gap: 6px; }
+  .feat-list li:last-child { border-bottom: none; }
+  .feat-list li::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--border); flex-shrink: 0; }
+  .role-admin .feat-list li::before { background: var(--admin); }
+  .role-cast  .feat-list li::before { background: var(--cast); }
+
+  /* Architecture diagram */
+  .arch { display: grid; grid-template-columns: 1fr 80px 1fr; align-items: start; gap: 0; }
+  .arch-col { display: flex; flex-direction: column; gap: 8px; }
+  .arch-box { border-radius: 8px; padding: 10px 14px; font-size: 0.82rem; font-weight: 600; text-align: center; }
+  .arch-browser { background: #eff6ff; border: 1.5px solid #bfdbfe; color: #1d4ed8; }
+  .arch-next    { background: #f0fdf4; border: 1.5px solid #86efac; color: #166534; }
+  .arch-supa    { background: #f0f9ff; border: 1.5px solid #7dd3fc; color: #0369a1; }
+  .arch-ext     { background: #faf5ff; border: 1.5px solid #d8b4fe; color: #6b21a8; }
+  .arch-arrows  { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; padding-top: 10px; }
+  .arrow-v { width: 2px; background: #cbd5e1; flex: 1; max-height: 24px; }
+  .arrow-h { font-size: 1.2rem; color: #94a3b8; }
+  .arch-sub { font-size: 0.7rem; font-weight: 400; color: var(--muted); margin-top: 2px; }
+
+  /* Flow */
+  .flow { display: flex; align-items: flex-start; gap: 0; flex-wrap: wrap; }
+  .flow-step { display: flex; align-items: center; gap: 0; }
+  .flow-box { border-radius: 8px; padding: 8px 14px; font-size: 0.82rem; font-weight: 600; white-space: nowrap; }
+  .flow-arrow { font-size: 1.1rem; color: #94a3b8; padding: 0 4px; }
+  .flow-cast  { background: #fdf2f8; border: 1.5px solid #f9a8d4; color: #9d174d; }
+  .flow-admin { background: #eef2ff; border: 1.5px solid #a5b4fc; color: #3730a3; }
+  .flow-sys   { background: #f8fafc; border: 1.5px solid #cbd5e1; color: #475569; }
+  .flow-group { margin-bottom: 12px; }
+  .flow-label { font-size: 0.72rem; font-weight: 700; color: var(--muted); margin-bottom: 6px; }
+
+  /* DB Schema */
+  .schema-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .table-card { background: var(--card); border: 1px solid var(--border); border-radius: 10px; overflow: hidden; }
+  .table-head { padding: 8px 12px; font-size: 0.8rem; font-weight: 700; }
+  .table-head-store { background: #fef3c7; color: #92400e; }
+  .table-head-user  { background: #ede9fe; color: #5b21b6; }
+  .table-head-shift { background: #d1fae5; color: #065f46; }
+  .table-head-sales { background: #dbeafe; color: #1e40af; }
+  .table-head-misc  { background: #fce7f3; color: #9d174d; }
+  .table-body { padding: 8px 12px; }
+  .col-row { font-size: 0.75rem; padding: 3px 0; display: flex; justify-content: space-between; border-bottom: 1px dashed var(--border); }
+  .col-row:last-child { border-bottom: none; }
+  .col-name { font-weight: 600; color: var(--text); }
+  .col-type { color: var(--muted); font-family: monospace; }
+
+  /* Priority */
+  .priority-list { list-style: none; }
+  .priority-list li { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--border); font-size: 0.85rem; }
+  .priority-list li:last-child { border-bottom: none; }
+  .pri-badge { font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; flex-shrink: 0; width: 40px; text-align: center; }
+  .pri-high { background: #fee2e2; color: #991b1b; }
+  .pri-mid  { background: #fef3c7; color: #92400e; }
+  .pri-low  { background: #f1f5f9; color: #475569; }
+
+  /* Shift status */
+  .status-flow { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .status-box { border-radius: 6px; padding: 6px 12px; font-size: 0.8rem; font-weight: 600; }
+  .s-draft     { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
+  .s-submitted { background: #fffbeb; color: #92400e; border: 1.5px solid #fcd34d; }
+  .s-confirmed { background: #d1fae5; color: #065f46; border: 1.5px solid #6ee7b7; }
+  .s-rejected  { background: #fee2e2; color: #991b1b; border: 1.5px solid #fca5a5; }
+  .s-arrow { color: #94a3b8; font-size: 1rem; }
+
+  /* Notification table */
+  .notif-table { width: 100%; border-collapse: collapse; font-size: 0.82rem; }
+  .notif-table th { background: var(--bg); font-weight: 700; padding: 8px 12px; text-align: left; border-bottom: 2px solid var(--border); color: var(--muted); font-size: 0.75rem; text-transform: uppercase; letter-spacing: .04em; }
+  .notif-table td { padding: 8px 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .notif-table tr:last-child td { border-bottom: none; }
+  .dest-cast  { background: #fdf2f8; color: #9d174d; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 700; }
+  .dest-admin { background: #eef2ff; color: #3730a3; padding: 2px 8px; border-radius: 99px; font-size: 0.72rem; font-weight: 700; }
+
+  @media (max-width: 720px) {
+    .cards-2, .cards-3 { grid-template-columns: 1fr; }
+    .arch { grid-template-columns: 1fr; }
+    .arch-arrows { flex-direction: row; padding: 0; }
+    .schema-grid { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="badge">水商売系・多店舗対応</div>
+    <h1>CalendarApp</h1>
+    <p>キャバレー・ホステスバー向け シフト・報酬・キャスト管理アプリ</p>
+  </div>
+
+  <!-- 1. Tech Stack -->
+  <section>
+    <h2>技術スタック</h2>
+    <div class="cards cards-2">
+      <div class="card">
+        <h3>フロントエンド / UI</h3>
+        <div class="tech-row">
+          <span class="tech-badge tech-fe">Next.js 15 (App Router)</span>
+          <span class="tech-badge tech-fe">TypeScript</span>
+          <span class="tech-badge tech-ui">Tailwind CSS</span>
+          <span class="tech-badge tech-ui">shadcn/ui</span>
+        </div>
+      </div>
+      <div class="card">
+        <h3>バックエンド / インフラ</h3>
+        <div class="tech-row">
+          <span class="tech-badge tech-db">Supabase (Auth / DB / RLS)</span>
+          <span class="tech-badge tech-db">PostgreSQL</span>
+          <span class="tech-badge tech-dep">Vercel</span>
+          <span class="tech-badge tech-dep">Resend (メール)</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 2. Architecture -->
+  <section>
+    <h2>システム構成</h2>
+    <div class="card">
+      <div style="display:flex; flex-direction:column; align-items:center; gap:10px; padding: 8px 0;">
+
+        <!-- Browser -->
+        <div style="display:flex; gap:16px;">
+          <div class="arch-box arch-browser" style="width:140px;">ブラウザ<div class="arch-sub">Admin / Cast</div></div>
+        </div>
+
+        <div class="arrow-h">↕</div>
+
+        <!-- Next.js -->
+        <div class="arch-box arch-next" style="width:280px;">
+          Next.js 15 (App Router)
+          <div class="arch-sub">Server Components + Client Components + API Routes + Middleware</div>
+        </div>
+
+        <div class="arrow-h">↕</div>
+
+        <!-- Supabase -->
+        <div style="display:flex; gap:12px; flex-wrap:wrap; justify-content:center;">
+          <div class="arch-box arch-supa" style="min-width:110px;">Supabase Auth<div class="arch-sub">ログイン / JWT</div></div>
+          <div class="arch-box arch-supa" style="min-width:110px;">PostgreSQL<div class="arch-sub">DB + RLS</div></div>
+          <div class="arch-box arch-supa" style="min-width:110px;">Storage<div class="arch-sub">写真</div></div>
+        </div>
+
+        <div class="arrow-h">↕</div>
+
+        <!-- External -->
+        <div class="arch-box arch-ext" style="width:180px;">Resend<div class="arch-sub">メール通知</div></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. Roles & Features -->
+  <section>
+    <h2>ロールと主要機能</h2>
+    <div class="cards cards-2">
+      <div class="card role-admin">
+        <div class="role-label">Admin — 管理者</div>
+        <p style="font-size:0.8rem;">店舗全体の管理・意思決定を担う</p>
+        <ul class="feat-list">
+          <li>キャスト管理（招待・報酬率設定）</li>
+          <li>エリア・ルーム管理</li>
+          <li>シフト確定 / 差し戻し</li>
+          <li>ルーム被りチェック</li>
+          <li>修正申請の承認 / 却下</li>
+          <li>空き枠登録・申請承認</li>
+          <li>売上入力・月次集計</li>
+          <li>報酬計算・明細確定</li>
+          <li>店舗設定（締切ルール等）</li>
+          <li>通知受信</li>
+        </ul>
+      </div>
+      <div class="card role-cast">
+        <div class="role-label">Cast — キャスト</div>
+        <p style="font-size:0.8rem;">自分のシフト・報酬を管理する</p>
+        <ul class="feat-list">
+          <li>シフト提出（日時・備考）</li>
+          <li>提出済みシフトの確認</li>
+          <li>締切後の修正申請</li>
+          <li>空き枠の閲覧・申請</li>
+          <li>報酬明細の確認</li>
+          <li>通知受信</li>
+          <li>プロフィール設定</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Shift Status Flow -->
+  <section>
+    <h2>シフトのステータス遷移</h2>
+    <div class="card">
+      <div class="flow-group">
+        <div class="flow-label">通常フロー</div>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="flow-box flow-cast">キャストが提出</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="status-box s-submitted">提出済み</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="flow-box flow-admin">管理者が確認</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="status-box s-confirmed">確定</div>
+          </div>
+        </div>
+      </div>
+      <div class="flow-group" style="margin-top:16px;">
+        <div class="flow-label">差し戻しフロー</div>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="status-box s-submitted">提出済み</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="status-box s-rejected">差し戻し</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="flow-box flow-cast">キャストが修正して再提出</div>
+          </div>
+        </div>
+      </div>
+      <div class="flow-group" style="margin-top:16px;">
+        <div class="flow-label">締切後の修正申請フロー</div>
+        <div class="flow">
+          <div class="flow-step">
+            <div class="status-box s-confirmed">確定済み</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="flow-box flow-cast">キャストが申請</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="flow-box flow-sys">pending</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="flow-box flow-admin">管理者が承認 / 却下</div>
+            <span class="flow-arrow">→</span>
+          </div>
+          <div class="flow-step">
+            <div class="flow-box flow-sys">シフト更新 or 却下通知</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. DB Schema -->
+  <section>
+    <h2>DB スキーマ（主要テーブル）</h2>
+    <div class="schema-grid">
+
+      <div class="table-card">
+        <div class="table-head table-head-store">stores</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">id</span><span class="col-type">uuid PK</span></div>
+          <div class="col-row"><span class="col-name">name</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name">created_at</span><span class="col-type">timestamptz</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-store">store_settings</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">store_id</span><span class="col-type">FK → stores</span></div>
+          <div class="col-row"><span class="col-name">deadline_type</span><span class="col-type">monthly/weekly</span></div>
+          <div class="col-row"><span class="col-name">deadline_day</span><span class="col-type">int</span></div>
+          <div class="col-row"><span class="col-name">location_mode</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name">require_approval</span><span class="col-type">boolean</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-user">users</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">id</span><span class="col-type">uuid (Auth)</span></div>
+          <div class="col-row"><span class="col-name">role</span><span class="col-type">admin/cast</span></div>
+          <div class="col-row"><span class="col-name">store_id</span><span class="col-type">FK → stores</span></div>
+          <div class="col-row"><span class="col-name">display_name</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name">reward_rate</span><span class="col-type">numeric(5,4)</span></div>
+          <div class="col-row"><span class="col-name">is_active</span><span class="col-type">boolean</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-shift">shifts</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">cast_id</span><span class="col-type">FK → users</span></div>
+          <div class="col-row"><span class="col-name">store_id</span><span class="col-type">FK → stores</span></div>
+          <div class="col-row"><span class="col-name">area_id</span><span class="col-type">FK → areas?</span></div>
+          <div class="col-row"><span class="col-name">room_id</span><span class="col-type">FK → rooms?</span></div>
+          <div class="col-row"><span class="col-name">date</span><span class="col-type">date</span></div>
+          <div class="col-row"><span class="col-name">start_time</span><span class="col-type">time</span></div>
+          <div class="col-row"><span class="col-name">end_time</span><span class="col-type">time</span></div>
+          <div class="col-row"><span class="col-name">status</span><span class="col-type">enum</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-shift">areas / rooms</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">store_id</span><span class="col-type">FK → stores</span></div>
+          <div class="col-row"><span class="col-name">name</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name" style="color:#6b7280">area_id (rooms)</span><span class="col-type">FK → areas?</span></div>
+          <div class="col-row"><span class="col-name" style="color:#6b7280">capacity (rooms)</span><span class="col-type">int?</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-shift">shift_modification_requests</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">shift_id</span><span class="col-type">FK → shifts</span></div>
+          <div class="col-row"><span class="col-name">new_date</span><span class="col-type">date</span></div>
+          <div class="col-row"><span class="col-name">new_start_time</span><span class="col-type">time</span></div>
+          <div class="col-row"><span class="col-name">reason</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name">status</span><span class="col-type">pending/approved/rejected</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-sales">sales</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">cast_id</span><span class="col-type">FK → users</span></div>
+          <div class="col-row"><span class="col-name">store_id</span><span class="col-type">FK → stores</span></div>
+          <div class="col-row"><span class="col-name">date</span><span class="col-type">date</span></div>
+          <div class="col-row"><span class="col-name">amount</span><span class="col-type">numeric(12,0)</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-sales">reward_calculations</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">cast_id</span><span class="col-type">FK → users</span></div>
+          <div class="col-row"><span class="col-name">period_year/month</span><span class="col-type">int</span></div>
+          <div class="col-row"><span class="col-name">sales_total</span><span class="col-type">numeric</span></div>
+          <div class="col-row"><span class="col-name">reward_rate</span><span class="col-type">numeric(5,4)</span></div>
+          <div class="col-row"><span class="col-name">bonus / deduction</span><span class="col-type">numeric</span></div>
+          <div class="col-row"><span class="col-name">total_reward</span><span class="col-type">numeric</span></div>
+          <div class="col-row"><span class="col-name">is_finalized</span><span class="col-type">boolean</span></div>
+        </div>
+      </div>
+
+      <div class="table-card">
+        <div class="table-head table-head-misc">notifications</div>
+        <div class="table-body">
+          <div class="col-row"><span class="col-name">user_id</span><span class="col-type">FK → users</span></div>
+          <div class="col-row"><span class="col-name">title / body</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name">link</span><span class="col-type">text</span></div>
+          <div class="col-row"><span class="col-name">read_at</span><span class="col-type">timestamptz?</span></div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Reward formula -->
+    <div class="card" style="margin-top:16px; background:#f8fafc;">
+      <h3>報酬計算式</h3>
+      <div style="font-size:1rem; font-family:monospace; margin-top:8px; padding:12px 16px; background:#1e293b; color:#86efac; border-radius:8px; letter-spacing:.03em;">
+        支払総額 = 売上合計 × 報酬率 + ボーナス − 控除
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Location modes -->
+  <section>
+    <h2>ロケーションモード</h2>
+    <p style="margin-bottom:12px;">店舗設定で4つのモードを選択可能。タイムライン等の表示もこれに連動する。</p>
+    <div class="cards cards-2">
+      <div class="card">
+        <div class="tech-row" style="flex-direction:column; gap:10px;">
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="tech-badge tech-fe" style="min-width:100px; text-align:center;">none</span>
+            <span style="font-size:0.85rem;">場所管理なし</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="tech-badge tech-ui" style="min-width:100px; text-align:center;">area_only</span>
+            <span style="font-size:0.85rem;">エリアのみ（ルームなし）</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="tech-badge tech-db" style="min-width:100px; text-align:center;">room</span>
+            <span style="font-size:0.85rem;">ルームのみ</span>
+          </div>
+          <div style="display:flex; align-items:center; gap:10px;">
+            <span class="tech-badge tech-dep" style="min-width:100px; text-align:center;">area_and_room</span>
+            <span style="font-size:0.85rem;">エリア ＋ ルーム階層管理</span>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>タイムライン表示</h3>
+        <p style="font-size:0.83rem; margin-top:6px;">シフトを横軸＝時間・縦軸＝日付のガントチャートで表示。ロケーションモードに応じてタブが切り替わる。<br><br>7日単位でページング可能。シフトのない日も含めて自由に前後移動できる。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Notifications -->
+  <section>
+    <h2>通知トリガー</h2>
+    <table class="notif-table">
+      <thead>
+        <tr>
+          <th>トリガー</th>
+          <th>通知先</th>
+          <th>方法</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr><td>シフト確定</td><td><span class="dest-cast">Cast</span></td><td>アプリ内</td></tr>
+        <tr><td>シフト差し戻し</td><td><span class="dest-cast">Cast</span></td><td>アプリ内</td></tr>
+        <tr><td>修正申請の結果（承認 / 却下）</td><td><span class="dest-cast">Cast</span></td><td>アプリ内</td></tr>
+        <tr><td>修正申請が届いた</td><td><span class="dest-admin">Admin</span></td><td>アプリ内</td></tr>
+        <tr><td>空き枠申請が届いた</td><td><span class="dest-admin">Admin</span></td><td>アプリ内</td></tr>
+        <tr><td>空き枠申請の結果</td><td><span class="dest-cast">Cast</span></td><td>アプリ内</td></tr>
+        <tr><td>報酬明細が確定</td><td><span class="dest-cast">Cast</span></td><td>アプリ内 + メール（任意）</td></tr>
+      </tbody>
+    </table>
+  </section>
+
+  <!-- 8. Priority -->
+  <section>
+    <h2>実装優先度</h2>
+    <div class="card">
+      <ul class="priority-list">
+        <li><span class="pri-badge pri-high">高</span>認証・ロール分け</li>
+        <li><span class="pri-badge pri-high">高</span>店舗・キャスト・エリア・ルーム管理</li>
+        <li><span class="pri-badge pri-high">高</span>シフト提出・一覧・管理者確定</li>
+        <li><span class="pri-badge pri-high">高</span>ルーム被りチェック</li>
+        <li><span class="pri-badge pri-high">高</span>締切ルール設定</li>
+        <li><span class="pri-badge pri-mid">中</span>シフト修正申請フロー</li>
+        <li><span class="pri-badge pri-mid">中</span>空き枠管理・申請</li>
+        <li><span class="pri-badge pri-low">低</span>売上入力・報酬計算・明細</li>
+        <li><span class="pri-badge pri-low">低</span>通知機能</li>
+        <li><span class="pri-badge pri-low">低</span>PDF出力（MVP外）</li>
+      </ul>
+    </div>
+  </section>
+
+  <div style="text-align:center; color:var(--muted); font-size:0.78rem; margin-top:32px;">CalendarApp — 内部ドキュメント</div>
+</div>
+</body>
+</html>

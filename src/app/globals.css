@@ -49,6 +49,7 @@
 }
 
 :root {
+  --app-bg: oklch(0.976 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
   --card: oklch(1 0 0);
@@ -127,4 +128,87 @@
   html {
     @apply font-sans;
   }
+}
+
+/* ── Theme: Rose ─────────────────────────────── */
+[data-theme="rose"] {
+  --primary: oklch(0.558 0.220 14);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.658 0.220 14);
+}
+
+/* ── Theme: Midnight (ダーク) ────────────────── */
+[data-theme="midnight"] {
+  --app-bg:                    oklch(0.155 0.040 255);
+  --background:                oklch(0.180 0.035 255);
+  --foreground:                oklch(0.930 0 0);
+  --card:                      oklch(0.210 0.035 255);
+  --card-foreground:           oklch(0.930 0 0);
+  --popover:                   oklch(0.210 0.035 255);
+  --popover-foreground:        oklch(0.930 0 0);
+  --muted:                     oklch(0.240 0.025 255);
+  --muted-foreground:          oklch(0.640 0.020 255);
+  --secondary:                 oklch(0.240 0.025 255);
+  --secondary-foreground:      oklch(0.930 0 0);
+  --accent:                    oklch(0.260 0.030 255);
+  --accent-foreground:         oklch(0.930 0 0);
+  --border:                    oklch(1 0 0 / 12%);
+  --input:                     oklch(1 0 0 / 15%);
+  --primary:                   oklch(0.511 0.262 276);
+  --primary-foreground:        oklch(0.985 0 0);
+  --ring:                      oklch(0.511 0.262 276);
+  --destructive:               oklch(0.650 0.200 25);
+}
+
+/* ── Theme: Emerald (ライト) ─────────────────── */
+[data-theme="emerald"] {
+  --primary: oklch(0.527 0.154 162);
+  --primary-foreground: oklch(0.985 0 0);
+  --ring: oklch(0.627 0.154 162);
+}
+
+/* ── Theme: Gold (ダーク) ────────────────────── */
+[data-theme="gold"] {
+  --app-bg:                    oklch(0.130 0.025 45);
+  --background:                oklch(0.160 0.025 45);
+  --foreground:                oklch(0.920 0.030 54);
+  --card:                      oklch(0.190 0.025 45);
+  --card-foreground:           oklch(0.920 0.030 54);
+  --popover:                   oklch(0.190 0.025 45);
+  --popover-foreground:        oklch(0.920 0.030 54);
+  --muted:                     oklch(0.215 0.020 45);
+  --muted-foreground:          oklch(0.620 0.060 54);
+  --secondary:                 oklch(0.215 0.020 45);
+  --secondary-foreground:      oklch(0.920 0.030 54);
+  --accent:                    oklch(0.230 0.025 45);
+  --accent-foreground:         oklch(0.920 0.030 54);
+  --border:                    oklch(1 0 0 / 10%);
+  --input:                     oklch(1 0 0 / 13%);
+  --primary:                   oklch(0.702 0.165 54);
+  --primary-foreground:        oklch(0.145 0 0);
+  --ring:                      oklch(0.702 0.165 54);
+  --destructive:               oklch(0.650 0.200 25);
+}
+
+/* ── Theme: Violet (ダーク) ──────────────────── */
+[data-theme="violet"] {
+  --app-bg:                    oklch(0.130 0.040 285);
+  --background:                oklch(0.160 0.040 285);
+  --foreground:                oklch(0.950 0 0);
+  --card:                      oklch(0.190 0.045 285);
+  --card-foreground:           oklch(0.950 0 0);
+  --popover:                   oklch(0.190 0.045 285);
+  --popover-foreground:        oklch(0.950 0 0);
+  --muted:                     oklch(0.225 0.035 285);
+  --muted-foreground:          oklch(0.650 0.050 285);
+  --secondary:                 oklch(0.225 0.035 285);
+  --secondary-foreground:      oklch(0.950 0 0);
+  --accent:                    oklch(0.245 0.040 285);
+  --accent-foreground:         oklch(0.950 0 0);
+  --border:                    oklch(1 0 0 / 10%);
+  --input:                     oklch(1 0 0 / 13%);
+  --primary:                   oklch(0.491 0.270 292);
+  --primary-foreground:        oklch(0.985 0 0);
+  --ring:                      oklch(0.491 0.270 292);
+  --destructive:               oklch(0.650 0.200 25);
 }

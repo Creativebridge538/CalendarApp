@@ -23,9 +23,9 @@ const adminNav = [
   { href: '/admin/modification-requests', label: '修正申請',        icon: FileEdit },
   { href: '/admin/vacant-slots',          label: '空き枠管理',      icon: Briefcase },
   { href: '/admin/sales',                 label: '売上入力',        icon: BarChart2 },
-  { href: '/admin/rewards',              label: '報酬計算',        icon: Award },
-  { href: '/notifications',              label: '通知',            icon: Bell },
-  { href: '/admin/settings',             label: '店舗設定',        icon: Settings },
+  { href: '/admin/rewards',               label: '報酬計算',        icon: Award },
+  { href: '/notifications',               label: '通知',            icon: Bell },
+  { href: '/admin/settings',              label: '店舗設定',        icon: Settings },
 ]
 
 const castNav = [
@@ -36,17 +36,114 @@ const castNav = [
   { href: '/notifications',     label: '通知',           icon: Bell },
 ]
 
+type ThemeStyles = {
+  sidebar: React.CSSProperties
+  border: string
+  logo: React.CSSProperties
+  subtext: React.CSSProperties
+  link: React.CSSProperties
+  linkHover: string
+  linkActive: React.CSSProperties
+  linkActiveHover: string
+  userTrigger: React.CSSProperties
+  mobileBar: React.CSSProperties
+  mobileButton: React.CSSProperties
+}
+
+const THEME_STYLES: Record<string, ThemeStyles> = {
+  default: {
+    sidebar:        { backgroundColor: '#ffffff' },
+    border:         'border-gray-200',
+    logo:           { color: '#111827' },
+    subtext:        { color: '#6b7280' },
+    link:           { color: '#4b5563' },
+    linkHover:      'hover:bg-gray-50 hover:text-gray-900',
+    linkActive:     { backgroundColor: '#f3f4f6', color: '#111827', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#4b5563' },
+    mobileBar:      { backgroundColor: '#ffffff', borderColor: '#e5e7eb', color: '#111827' },
+    mobileButton:   { color: '#4b5563' },
+  },
+  rose: {
+    sidebar:        { backgroundColor: '#ffffff' },
+    border:         'border-rose-100',
+    logo:           { color: '#111827' },
+    subtext:        { color: '#6b7280' },
+    link:           { color: '#4b5563' },
+    linkHover:      'hover:bg-rose-50 hover:text-rose-700',
+    linkActive:     { backgroundColor: '#fff1f2', color: '#e11d48', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#4b5563' },
+    mobileBar:      { backgroundColor: '#ffffff', borderColor: '#ffe4e6', color: '#111827' },
+    mobileButton:   { color: '#4b5563' },
+  },
+  midnight: {
+    sidebar:        { backgroundColor: '#1a2744' },
+    border:         'border-white/10',
+    logo:           { color: '#f9fafb' },
+    subtext:        { color: '#94a3b8' },
+    link:           { color: '#94a3b8' },
+    linkHover:      'hover:bg-white/8 hover:text-white',
+    linkActive:     { backgroundColor: 'rgba(99,102,241,0.25)', color: '#ffffff', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#94a3b8' },
+    mobileBar:      { backgroundColor: '#1a2744', borderColor: 'rgba(255,255,255,0.1)', color: '#f9fafb' },
+    mobileButton:   { color: '#94a3b8' },
+  },
+  emerald: {
+    sidebar:        { backgroundColor: '#ffffff' },
+    border:         'border-emerald-100',
+    logo:           { color: '#111827' },
+    subtext:        { color: '#6b7280' },
+    link:           { color: '#4b5563' },
+    linkHover:      'hover:bg-emerald-50 hover:text-emerald-700',
+    linkActive:     { backgroundColor: '#d1fae5', color: '#065f46', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#4b5563' },
+    mobileBar:      { backgroundColor: '#ffffff', borderColor: '#a7f3d0', color: '#111827' },
+    mobileButton:   { color: '#4b5563' },
+  },
+  gold: {
+    sidebar:        { backgroundColor: '#1c1610' },
+    border:         'border-yellow-900/40',
+    logo:           { color: '#fbbf24' },
+    subtext:        { color: '#a16207' },
+    link:           { color: '#d6b87a' },
+    linkHover:      'hover:bg-yellow-900/30 hover:text-yellow-300',
+    linkActive:     { backgroundColor: 'rgba(217,119,6,0.25)', color: '#fbbf24', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#d6b87a' },
+    mobileBar:      { backgroundColor: '#1c1610', borderColor: 'rgba(217,119,6,0.3)', color: '#fbbf24' },
+    mobileButton:   { color: '#d6b87a' },
+  },
+  violet: {
+    sidebar:        { backgroundColor: '#1e1235' },
+    border:         'border-white/10',
+    logo:           { color: '#f5f3ff' },
+    subtext:        { color: '#a78bfa' },
+    link:           { color: '#c4b5fd' },
+    linkHover:      'hover:bg-white/8 hover:text-white',
+    linkActive:     { backgroundColor: 'rgba(124,58,237,0.30)', color: '#ffffff', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#c4b5fd' },
+    mobileBar:      { backgroundColor: '#1e1235', borderColor: 'rgba(255,255,255,0.1)', color: '#f5f3ff' },
+    mobileButton:   { color: '#c4b5fd' },
+  },
+}
+
 interface AppNavProps {
   role: string
   userEmail: string
+  theme?: string
 }
 
-export function AppNav({ role, userEmail }: AppNavProps) {
+export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
   const nav = role === 'admin' ? adminNav : castNav
   const [mobileOpen, setMobileOpen] = useState(false)
+  const s = THEME_STYLES[theme] ?? THEME_STYLES.default
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -57,27 +154,32 @@ export function AppNav({ role, userEmail }: AppNavProps) {
   const NavContent = ({ onLinkClick }: { onLinkClick?: () => void }) => (
     <>
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
-        {nav.map(({ href, label, icon: Icon }) => (
-          <Link
-            key={href}
-            href={href}
-            onClick={onLinkClick}
-            className={cn(
-              'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
-              pathname === href || pathname.startsWith(href + '/')
-                ? 'bg-gray-100 font-medium text-gray-900'
-                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
-            )}
-          >
-            <Icon className="h-4 w-4 shrink-0" />
-            {label}
-          </Link>
-        ))}
+        {nav.map(({ href, label, icon: Icon }) => {
+          const isActive = pathname === href || pathname.startsWith(href + '/')
+          return (
+            <Link
+              key={href}
+              href={href}
+              onClick={onLinkClick}
+              className={cn(
+                'flex items-center gap-2.5 px-3 py-2 rounded-md text-sm transition-colors',
+                !isActive && s.linkHover
+              )}
+              style={isActive ? s.linkActive : s.link}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              {label}
+            </Link>
+          )
+        })}
       </nav>
 
-      <div className="px-2 py-2 border-t">
+      <div className={cn('px-2 py-2 border-t', s.border)}>
         <DropdownMenu>
-          <DropdownMenuTrigger className="flex w-full items-center justify-between px-3 py-2 rounded-md text-sm text-gray-600 hover:bg-gray-50 hover:text-gray-900">
+          <DropdownMenuTrigger
+            className={cn('flex w-full items-center justify-between px-3 py-2 rounded-md text-sm transition-colors', s.linkHover)}
+            style={s.userTrigger}
+          >
             <span className="truncate text-left">{userEmail}</span>
             <ChevronDown className="h-3.5 w-3.5 shrink-0 ml-1" />
           </DropdownMenuTrigger>
@@ -95,10 +197,13 @@ export function AppNav({ role, userEmail }: AppNavProps) {
   return (
     <>
       {/* デスクトップ サイドバー */}
-      <aside className="hidden md:flex w-56 shrink-0 bg-white border-r flex-col h-screen sticky top-0">
-        <div className="px-4 py-4 border-b">
-          <p className="font-bold text-lg tracking-tight">CalendarApp</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
+      <aside
+        className={cn('hidden md:flex w-56 shrink-0 border-r flex-col h-screen sticky top-0', s.border)}
+        style={s.sidebar}
+      >
+        <div className={cn('px-4 py-4 border-b', s.border)}>
+          <p className="font-bold text-lg tracking-tight" style={s.logo}>CalendarApp</p>
+          <p className="text-xs mt-0.5" style={s.subtext}>
             {role === 'admin' ? '管理者' : 'キャスト'}
           </p>
         </div>
@@ -106,10 +211,14 @@ export function AppNav({ role, userEmail }: AppNavProps) {
       </aside>
 
       {/* モバイル トップバー */}
-      <div className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 bg-white border-b flex items-center px-4 gap-3">
+      <div
+        className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center px-4 gap-3"
+        style={s.mobileBar}
+      >
         <button
           onClick={() => setMobileOpen(true)}
-          className="p-1 rounded-md text-gray-600 hover:bg-gray-100"
+          className="p-1 rounded-md hover:bg-white/10"
+          style={s.mobileButton}
         >
           <Menu className="h-5 w-5" />
         </button>
@@ -119,23 +228,22 @@ export function AppNav({ role, userEmail }: AppNavProps) {
       {/* モバイル ドロワー */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-50 flex">
-          {/* オーバーレイ */}
-          <div
-            className="absolute inset-0 bg-black/40"
-            onClick={() => setMobileOpen(false)}
-          />
-          {/* ドロワー本体 */}
-          <aside className="relative w-64 bg-white flex flex-col h-full shadow-xl">
-            <div className="px-4 py-4 border-b flex items-center justify-between">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <aside
+            className={cn('relative w-64 flex flex-col h-full shadow-xl border-r', s.border)}
+            style={s.sidebar}
+          >
+            <div className={cn('px-4 py-4 border-b flex items-center justify-between', s.border)}>
               <div>
-                <p className="font-bold text-lg tracking-tight">CalendarApp</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
+                <p className="font-bold text-lg tracking-tight" style={s.logo}>CalendarApp</p>
+                <p className="text-xs mt-0.5" style={s.subtext}>
                   {role === 'admin' ? '管理者' : 'キャスト'}
                 </p>
               </div>
               <button
                 onClick={() => setMobileOpen(false)}
-                className="p-1 rounded-md text-gray-500 hover:bg-gray-100"
+                className="p-1 rounded-md hover:bg-white/10"
+                style={s.mobileButton}
               >
                 <X className="h-5 w-5" />
               </button>

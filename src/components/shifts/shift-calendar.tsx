@@ -7,7 +7,6 @@ import {
 } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { Database } from '@/lib/supabase/database.types'
@@ -24,11 +23,20 @@ interface Shift {
   rooms?: { name: string } | null
 }
 
+// ダーク背景でも見えるよう彩度を保った色にする
 const STATUS_COLOR: Record<ShiftStatus, string> = {
-  draft:     'bg-gray-100 text-gray-600',
-  submitted: 'bg-blue-100 text-blue-700',
-  confirmed: 'bg-green-100 text-green-700',
-  rejected:  'bg-red-100 text-red-600',
+  draft:     'bg-muted text-muted-foreground',
+  submitted: 'bg-blue-500/20 text-blue-400',
+  confirmed: 'bg-emerald-500/20 text-emerald-400',
+  rejected:  'bg-red-500/20 text-red-400',
+}
+
+// 凡例はやや濃いめ
+const STATUS_LEGEND: Record<ShiftStatus, string> = {
+  draft:     'bg-muted text-muted-foreground',
+  submitted: 'bg-blue-500/25 text-blue-500',
+  confirmed: 'bg-emerald-500/25 text-emerald-600',
+  rejected:  'bg-red-500/25 text-red-500',
 }
 
 const STATUS_LABEL: Record<ShiftStatus, string> = {
@@ -48,8 +56,6 @@ export function ShiftCalendar({ shifts, showCastName = false }: Props) {
   const monthStart = startOfMonth(current)
   const monthEnd = endOfMonth(current)
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd })
-
-  // 月の最初の曜日に合わせて空白を入れる（日曜=0）
   const startPad = getDay(monthStart)
 
   function shiftsOn(day: Date) {
@@ -77,7 +83,7 @@ export function ShiftCalendar({ shifts, showCastName = false }: Props) {
       </div>
 
       {/* 曜日ヘッダー */}
-      <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground border-b py-1">
+      <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground border-b border-border py-1">
         {WEEKDAYS.map((d, i) => (
           <div key={d} className={cn(i === 0 && 'text-red-500', i === 6 && 'text-blue-500')}>
             {d}
@@ -85,10 +91,10 @@ export function ShiftCalendar({ shifts, showCastName = false }: Props) {
         ))}
       </div>
 
-      {/* カレンダーグリッド — モバイルはフルブリード・細線のみ */}
-      <div className="grid grid-cols-7 divide-x divide-y divide-gray-100 border border-gray-100 md:rounded-lg md:overflow-hidden md:gap-px md:bg-gray-200 md:divide-none">
+      {/* カレンダーグリッド */}
+      <div className="grid grid-cols-7 divide-x divide-y divide-border border border-border md:rounded-lg md:overflow-hidden md:gap-px md:bg-border md:divide-none">
         {Array.from({ length: startPad }).map((_, i) => (
-          <div key={`pad-${i}`} className="bg-white md:bg-gray-50 min-h-[80px] md:min-h-[88px]" />
+          <div key={`pad-${i}`} className="bg-card md:bg-muted/30 min-h-[80px] md:min-h-[88px]" />
         ))}
 
         {days.map(day => {
@@ -100,21 +106,22 @@ export function ShiftCalendar({ shifts, showCastName = false }: Props) {
             <div
               key={day.toISOString()}
               className={cn(
-                'bg-white min-h-[80px] md:min-h-[88px] p-0.5 md:p-1 flex flex-col gap-0.5',
-                !isSameMonth(day, current) && 'bg-gray-50/50'
+                'bg-card min-h-[80px] md:min-h-[88px] p-0.5 md:p-1 flex flex-col gap-0.5',
+                !isSameMonth(day, current) && 'bg-muted/20'
               )}
             >
               {/* 日付 */}
               <span className={cn(
                 'text-xs font-medium w-5 h-5 mx-auto md:mx-0 flex items-center justify-center rounded-full',
-                isToday && 'bg-gray-900 text-white',
+                isToday && 'bg-foreground text-background',
                 !isToday && dow === 0 && 'text-red-500',
                 !isToday && dow === 6 && 'text-blue-500',
+                !isToday && dow !== 0 && dow !== 6 && 'text-foreground',
               )}>
                 {format(day, 'd')}
               </span>
 
-              {/* シフト一覧（最大3件、超えたら+N表示） */}
+              {/* シフト一覧 */}
               <div className="flex flex-col gap-px min-w-0">
                 {dayShifts.slice(0, 3).map(s => (
                   <div
@@ -151,7 +158,7 @@ export function ShiftCalendar({ shifts, showCastName = false }: Props) {
 
       {/* 凡例 */}
       <div className="flex flex-wrap gap-2 text-xs mt-3 px-1 md:px-0">
-        {(Object.entries(STATUS_COLOR) as [ShiftStatus, string][]).map(([status, cls]) => (
+        {(Object.entries(STATUS_LEGEND) as [ShiftStatus, string][]).map(([status, cls]) => (
           <span key={status} className={cn('px-2 py-0.5 rounded', cls)}>
             {STATUS_LABEL[status]}
           </span>
