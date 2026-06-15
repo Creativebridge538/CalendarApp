@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CalendarApp — 使い方ガイド</title>
+<style>
+  :root {
+    --admin: #6366f1;
+    --admin-light: #eef2ff;
+    --cast: #ec4899;
+    --cast-light: #fdf2f8;
+    --green: #10b981;
+    --yellow: #f59e0b;
+    --red: #ef4444;
+    --bg: #f8fafc;
+    --card: #ffffff;
+    --border: #e2e8f0;
+    --text: #1e293b;
+    --muted: #64748b;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'Hiragino Sans', 'Noto Sans JP', sans-serif; background: var(--bg); color: var(--text); line-height: 1.7; font-size: 15px; }
+
+  .page { max-width: 900px; margin: 0 auto; padding: 40px 20px 80px; }
+
+  /* Typography */
+  h1 { font-size: 1.9rem; font-weight: 900; line-height: 1.3; }
+  h2 { font-size: 1.3rem; font-weight: 800; margin-bottom: 20px; }
+  h3 { font-size: 1rem; font-weight: 700; margin-bottom: 10px; }
+  p  { color: var(--muted); }
+  section { margin-bottom: 60px; }
+
+  /* Hero */
+  .hero { text-align: center; padding: 48px 0 40px; }
+  .hero-icon { font-size: 3rem; margin-bottom: 12px; }
+  .hero p { font-size: 1rem; margin-top: 10px; max-width: 500px; margin-inline: auto; }
+  .audience-row { display: flex; gap: 12px; justify-content: center; margin-top: 20px; flex-wrap: wrap; }
+  .audience-pill { padding: 8px 20px; border-radius: 99px; font-size: 0.85rem; font-weight: 700; }
+  .pill-admin { background: var(--admin-light); color: var(--admin); }
+  .pill-cast  { background: var(--cast-light);  color: var(--cast); }
+
+  /* Section headers */
+  .sec-header { display: flex; align-items: center; gap: 12px; margin-bottom: 20px; padding-bottom: 12px; border-bottom: 2px solid var(--border); }
+  .sec-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 1.1rem; flex-shrink: 0; }
+  .sec-icon-admin { background: var(--admin-light); }
+  .sec-icon-cast  { background: var(--cast-light); }
+  .sec-icon-both  { background: #f0fdf4; }
+  .sec-title { font-size: 1.3rem; font-weight: 800; }
+  .sec-sub   { font-size: 0.82rem; color: var(--muted); margin-top: 2px; }
+
+  /* Role badge */
+  .role-admin { display: inline-block; background: var(--admin-light); color: var(--admin); font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; vertical-align: middle; margin-left: 4px; }
+  .role-cast  { display: inline-block; background: var(--cast-light);  color: var(--cast);  font-size: 0.7rem; font-weight: 700; padding: 2px 8px; border-radius: 99px; vertical-align: middle; margin-left: 4px; }
+
+  /* Cards */
+  .card { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; }
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+  .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+
+  /* Feature cards */
+  .feat-card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 18px; }
+  .feat-icon { font-size: 1.5rem; margin-bottom: 8px; }
+  .feat-card h3 { font-size: 0.95rem; margin-bottom: 6px; }
+  .feat-card p { font-size: 0.82rem; }
+
+  /* Step flow */
+  .steps { display: flex; flex-direction: column; gap: 0; }
+  .step { display: flex; gap: 16px; position: relative; }
+  .step:not(:last-child)::after {
+    content: '';
+    position: absolute;
+    left: 19px;
+    top: 44px;
+    width: 2px;
+    height: calc(100% - 12px);
+    background: var(--border);
+  }
+  .step-num { width: 40px; height: 40px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 0.9rem; font-weight: 800; flex-shrink: 0; margin-top: 2px; }
+  .step-num-admin { background: var(--admin-light); color: var(--admin); }
+  .step-num-cast  { background: var(--cast-light); color: var(--cast); }
+  .step-num-green { background: #d1fae5; color: #065f46; }
+  .step-body { padding-bottom: 24px; flex: 1; }
+  .step-title { font-weight: 700; font-size: 0.95rem; margin-bottom: 4px; }
+  .step-desc  { font-size: 0.83rem; color: var(--muted); }
+
+  /* Status pills */
+  .status-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 12px 0; }
+  .status { padding: 5px 14px; border-radius: 99px; font-size: 0.82rem; font-weight: 700; }
+  .s-draft     { background: #f1f5f9; color: #475569; border: 1.5px solid #cbd5e1; }
+  .s-submitted { background: #fffbeb; color: #92400e; border: 1.5px solid #fcd34d; }
+  .s-confirmed { background: #d1fae5; color: #065f46; border: 1.5px solid #6ee7b7; }
+  .s-rejected  { background: #fee2e2; color: #991b1b; border: 1.5px solid #fca5a5; }
+  .s-pending   { background: #eff6ff; color: #1e40af; border: 1.5px solid #93c5fd; }
+  .s-arrow { color: #94a3b8; font-size: 1rem; }
+
+  /* Callout */
+  .callout { border-radius: 10px; padding: 14px 18px; font-size: 0.85rem; display: flex; gap: 10px; align-items: flex-start; margin: 12px 0; }
+  .callout-icon { font-size: 1.1rem; flex-shrink: 0; margin-top: 1px; }
+  .callout-info    { background: #eff6ff; border-left: 3px solid #60a5fa; }
+  .callout-warn    { background: #fffbeb; border-left: 3px solid #fbbf24; }
+  .callout-success { background: #d1fae5; border-left: 3px solid #34d399; }
+  .callout p { color: var(--text); margin: 0; }
+
+  /* Table */
+  .guide-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+  .guide-table th { background: var(--bg); padding: 10px 14px; text-align: left; border-bottom: 2px solid var(--border); font-weight: 700; color: var(--muted); font-size: 0.78rem; text-transform: uppercase; letter-spacing:.04em; }
+  .guide-table td { padding: 10px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+  .guide-table tr:last-child td { border-bottom: none; }
+
+  /* Reward formula */
+  .formula { background: #1e293b; color: #86efac; font-family: monospace; font-size: 1.05rem; padding: 16px 20px; border-radius: 10px; letter-spacing: .02em; text-align: center; margin: 12px 0; }
+
+  /* FAQ */
+  .faq-item { border-bottom: 1px solid var(--border); padding: 16px 0; }
+  .faq-item:last-child { border-bottom: none; }
+  .faq-q { font-weight: 700; font-size: 0.92rem; margin-bottom: 6px; display: flex; gap: 8px; }
+  .faq-q::before { content: 'Q'; background: var(--text); color: white; font-size: 0.72rem; padding: 1px 6px; border-radius: 4px; flex-shrink: 0; margin-top: 2px; }
+  .faq-a { font-size: 0.85rem; color: var(--muted); padding-left: 28px; }
+
+  /* TOC */
+  .toc { background: var(--card); border: 1px solid var(--border); border-radius: 14px; padding: 20px 24px; margin-bottom: 48px; }
+  .toc h3 { font-size: 0.85rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .05em; margin-bottom: 12px; }
+  .toc-list { list-style: none; display: flex; flex-direction: column; gap: 2px; }
+  .toc-list li a { text-decoration: none; color: var(--text); font-size: 0.88rem; padding: 5px 8px; border-radius: 6px; display: block; transition: background .15s; }
+  .toc-list li a:hover { background: var(--bg); }
+  .toc-list li a .toc-num { color: var(--muted); font-size: 0.78rem; margin-right: 6px; }
+
+  @media (max-width: 640px) {
+    .grid-2, .grid-3 { grid-template-columns: 1fr; }
+    h1 { font-size: 1.5rem; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- Hero -->
+  <div class="hero">
+    <div class="hero-icon">📅</div>
+    <h1>CalendarApp<br>使い方ガイド</h1>
+    <p>シフト・報酬・キャスト管理をまとめて行えるアプリです。<br>このガイドはパソコンやスマホが得意でない方にも読めるよう書かれています。</p>
+    <div class="audience-row">
+      <span class="audience-pill pill-admin">👔 管理者（オーナー・マネージャー）向け</span>
+      <span class="audience-pill pill-cast">💼 キャスト向け</span>
+    </div>
+  </div>
+
+  <!-- TOC -->
+  <div class="toc">
+    <h3>目次</h3>
+    <ul class="toc-list">
+      <li><a href="#login"><span class="toc-num">1.</span>ログインと画面の切り替え</a></li>
+      <li><a href="#shift-cast"><span class="toc-num">2.</span>シフトを提出する（キャスト）</a></li>
+      <li><a href="#shift-admin"><span class="toc-num">3.</span>シフトを確認・確定する（管理者）</a></li>
+      <li><a href="#status"><span class="toc-num">4.</span>シフトの「状態」について</a></li>
+      <li><a href="#modify"><span class="toc-num">5.</span>締切後にシフトを変更したいとき</a></li>
+      <li><a href="#vacant"><span class="toc-num">6.</span>空き枠の使い方</a></li>
+      <li><a href="#reward"><span class="toc-num">7.</span>報酬の計算と明細確認</a></li>
+      <li><a href="#notify"><span class="toc-num">8.</span>通知について</a></li>
+      <li><a href="#settings"><span class="toc-num">9.</span>店舗の設定（管理者）</a></li>
+      <li><a href="#faq"><span class="toc-num">10.</span>よくある質問</a></li>
+    </ul>
+  </div>
+
+  <!-- 1. Login -->
+  <section id="login">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-both">🔑</div>
+      <div>
+        <div class="sec-title">1. ログインと画面の切り替え</div>
+        <div class="sec-sub">管理者・キャスト共通</div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num step-num-green">1</div>
+        <div class="step-body">
+          <div class="step-title">アプリを開く</div>
+          <div class="step-desc">ブラウザ（Safari・Chrome等）でアプリのURLにアクセスします。スマホからも使えます。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-green">2</div>
+        <div class="step-body">
+          <div class="step-title">メールアドレスとパスワードを入力</div>
+          <div class="step-desc">管理者から発行されたメールアドレスとパスワードでログインします。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-green">3</div>
+        <div class="step-body">
+          <div class="step-title">自分の画面が表示される</div>
+          <div class="step-desc">ログインすると、自動的に自分のロール（管理者 or キャスト）に合った画面が表示されます。別のロールの画面に間違って入ることはありません。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-info" style="margin-top:4px;">
+      <span class="callout-icon">💡</span>
+      <p><strong>パスワードを忘れた場合：</strong>ログイン画面の「パスワードを忘れた方はこちら」からリセットできます。登録メールアドレス宛にリンクが届きます。</p>
+    </div>
+  </section>
+
+  <!-- 2. Shift (Cast) -->
+  <section id="shift-cast">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-cast">📝</div>
+      <div>
+        <div class="sec-title">2. シフトを提出する</div>
+        <div class="sec-sub"><span class="role-cast">キャスト</span> の操作</div>
+      </div>
+    </div>
+
+    <div class="callout callout-info">
+      <span class="callout-icon">📌</span>
+      <p>シフト締切日までに提出します。締切日は店舗の設定によって異なります（毎月〇日 or 毎週〇曜日）。</p>
+    </div>
+
+    <div class="steps" style="margin-top:16px;">
+      <div class="step">
+        <div class="step-num step-num-cast">1</div>
+        <div class="step-body">
+          <div class="step-title">「シフト」メニューを開く</div>
+          <div class="step-desc">ナビゲーションから「シフト」を選択します。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-cast">2</div>
+        <div class="step-body">
+          <div class="step-title">「新しいシフトを追加」をタップ</div>
+          <div class="step-desc">ボタンを押すと入力フォームが開きます。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-cast">3</div>
+        <div class="step-body">
+          <div class="step-title">日付・開始時間・終了時間を入力</div>
+          <div class="step-desc">出勤予定の日付と時間帯を選択します。必要があれば備考欄にメモを入れることもできます。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-cast">4</div>
+        <div class="step-body">
+          <div class="step-title">「提出」ボタンを押す</div>
+          <div class="step-desc">提出するとシフトの状態が「提出済み」になり、管理者に通知が届きます。管理者が確定するまで待ちましょう。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-warn" style="margin-top:4px;">
+      <span class="callout-icon">⚠️</span>
+      <p><strong>締切前なら何度でも修正できます。</strong>提出済みのシフトを選んで「編集」から変更してください。締切を過ぎた後の変更は「修正申請」が必要です（→ 5章）。</p>
+    </div>
+  </section>
+
+  <!-- 3. Shift (Admin) -->
+  <section id="shift-admin">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-admin">✅</div>
+      <div>
+        <div class="sec-title">3. シフトを確認・確定する</div>
+        <div class="sec-sub"><span class="role-admin">管理者</span> の操作</div>
+      </div>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step-num step-num-admin">1</div>
+        <div class="step-body">
+          <div class="step-title">「シフト管理」を開く</div>
+          <div class="step-desc">提出済みのシフトが一覧で表示されます。カレンダー・タイムライン・リストの3つの表示モードを切り替えられます。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-admin">2</div>
+        <div class="step-body">
+          <div class="step-title">内容を確認する</div>
+          <div class="step-desc">日時・キャスト名・ルームを確認します。同じルームに同じ時間帯でキャストが重複している場合は、自動で警告が表示されます（「ルーム被り」）。</div>
+        </div>
+      </div>
+      <div class="step">
+        <div class="step-num step-num-admin">3</div>
+        <div class="step-body">
+          <div class="step-title">「確定」または「差し戻し」を選ぶ</div>
+          <div class="step-desc">問題なければ「確定」を押します。修正してほしい場合は「差し戻し」を押すと、キャストに通知が届きます。</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="callout callout-success">
+      <span class="callout-icon">✅</span>
+      <p>「確定」を押すと、そのキャストのアプリに「シフトが確定されました」という通知が届きます。</p>
+    </div>
+
+    <div style="margin-top:20px;">
+      <h3>表示モードの使い分け</h3>
+      <div class="grid-3" style="margin-top:12px;">
+        <div class="feat-card">
+          <div class="feat-icon">📆</div>
+          <h3>カレンダー</h3>
+          <p>月全体を一望したいとき。誰がどの日に出勤するか把握しやすい。</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📊</div>
+          <h3>タイムライン</h3>
+          <p>時間帯の重なりを確認したいとき。横軸が時間・縦軸が日付のガントチャート表示。週単位で前後移動できる。</p>
+        </div>
+        <div class="feat-card">
+          <div class="feat-icon">📋</div>
+          <h3>リスト</h3>
+          <p>ステータスやキャストで絞り込んで確認したいとき。一括操作に便利。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 4. Status -->
+  <section id="status">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-both">🏷️</div>
+      <div>
+        <div class="sec-title">4. シフトの「状態」について</div>
+        <div class="sec-sub">管理者・キャスト共通</div>
+      </div>
+    </div>
+
+    <p style="margin-bottom:16px;">シフトには以下の4つの状態があります。</p>
+
+    <div class="card">
+      <table class="guide-table">
+        <thead>
+          <tr>
+            <th>状態</th>
+            <th>意味</th>
+            <th>次にすること</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="status s-draft">下書き</span></td>
+            <td>まだ提出していない状態。自分だけが見られる。</td>
+            <td>内容を確認して「提出」する。</td>
+          </tr>
+          <tr>
+            <td><span class="status s-submitted">提出済み</span></td>
+            <td>管理者に提出した状態。確認待ち。</td>
+            <td>管理者の確定を待つ。締切前なら修正可能。</td>
+          </tr>
+          <tr>
+            <td><span class="status s-confirmed">確定</span></td>
+            <td>管理者がOKを出した状態。</td>
+            <td>そのまま出勤。変更が必要なら修正申請。</td>
+          </tr>
+          <tr>
+            <td><span class="status s-rejected">差し戻し</span></td>
+            <td>管理者から修正を求められた状態。</td>
+            <td>内容を修正して再提出する。</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top:16px;">
+      <h3>状態の流れ</h3>
+      <div class="status-row" style="margin-top:12px;">
+        <span class="status s-submitted">提出済み</span>
+        <span class="s-arrow">→ 管理者が確認 →</span>
+        <span class="status s-confirmed">確定</span>
+      </div>
+      <div class="status-row">
+        <span class="status s-submitted">提出済み</span>
+        <span class="s-arrow">→ 管理者が差し戻し →</span>
+        <span class="status s-rejected">差し戻し</span>
+        <span class="s-arrow">→ 修正して再提出 →</span>
+        <span class="status s-submitted">提出済み</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- 5. Modification -->
+  <section id="modify">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-cast">🔄</div>
+      <div>
+        <div class="sec-title">5. 締切後にシフトを変更したいとき</div>
+        <div class="sec-sub"><span class="role-cast">キャスト</span> が申請 → <span class="role-admin">管理者</span> が承認</div>
+      </div>
+    </div>
+
+    <div class="callout callout-warn">
+      <span class="callout-icon">⚠️</span>
+      <p>締切日を過ぎると、シフトを直接編集できなくなります。変更したい場合は「修正申請」を出してください。</p>
+    </div>
+
+    <div style="margin-top:16px;">
+      <h3>キャスト側の操作</h3>
+      <div class="steps" style="margin-top:12px;">
+        <div class="step">
+          <div class="step-num step-num-cast">1</div>
+          <div class="step-body">
+            <div class="step-title">変更したいシフトを開く</div>
+            <div class="step-desc">シフト一覧から該当のシフトをタップ。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num step-num-cast">2</div>
+          <div class="step-body">
+            <div class="step-title">「修正申請」ボタンを押す</div>
+            <div class="step-desc">変更後の日時と、変更理由を入力して送信します。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num step-num-cast">3</div>
+          <div class="step-body">
+            <div class="step-title">承認・却下の通知を待つ</div>
+            <div class="step-desc">管理者が確認後、結果が通知で届きます。承認されるとシフトが自動的に更新されます。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <h3>管理者側の操作</h3>
+      <div class="steps" style="margin-top:12px;">
+        <div class="step">
+          <div class="step-num step-num-admin">1</div>
+          <div class="step-body">
+            <div class="step-title">「修正申請管理」を開く</div>
+            <div class="step-desc">新しい申請が届いていると、通知が表示されます。</div>
+          </div>
+        </div>
+        <div class="step">
+          <div class="step-num step-num-admin">2</div>
+          <div class="step-body">
+            <div class="step-title">内容を確認して「承認」または「却下」</div>
+            <div class="step-desc">承認するとシフトが自動更新され、キャストに通知されます。却下する場合は理由を入力できます。</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 6. Vacant slots -->
+  <section id="vacant">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-both">🗓️</div>
+      <div>
+        <div class="sec-title">6. 空き枠の使い方</div>
+        <div class="sec-sub"><span class="role-admin">管理者</span> が登録 → <span class="role-cast">キャスト</span> が申請</div>
+      </div>
+    </div>
+
+    <p style="margin-bottom:16px;">「急に人が足りなくなった」「特定の日に出られる人を募りたい」というときに使う機能です。</p>
+
+    <div class="grid-2">
+      <div class="card" style="border-top: 3px solid var(--admin);">
+        <h3 style="color:var(--admin); margin-bottom:12px;">管理者の操作</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num step-num-admin">1</div>
+            <div class="step-body">
+              <div class="step-title">「空き枠管理」を開く</div>
+              <div class="step-desc">「新しい空き枠を追加」から日時・ルームを入力して登録する。</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num step-num-admin">2</div>
+            <div class="step-body">
+              <div class="step-title">キャストから申請が来たら確認</div>
+              <div class="step-desc">承認するとその枠にシフトが自動登録される。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="border-top: 3px solid var(--cast);">
+        <h3 style="color:var(--cast); margin-bottom:12px;">キャストの操作</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num step-num-cast">1</div>
+            <div class="step-body">
+              <div class="step-title">「空き枠一覧」を確認</div>
+              <div class="step-desc">管理者が公開した空き枠の日時が表示されている。</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num step-num-cast">2</div>
+            <div class="step-body">
+              <div class="step-title">出られる枠に「申請」を押す</div>
+              <div class="step-desc">管理者が承認すると、自分のシフトとして登録される。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 7. Reward -->
+  <section id="reward">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-admin">💴</div>
+      <div>
+        <div class="sec-title">7. 報酬の計算と明細確認</div>
+        <div class="sec-sub"><span class="role-admin">管理者</span> が計算 → <span class="role-cast">キャスト</span> が確認</div>
+      </div>
+    </div>
+
+    <div class="formula">支払総額 ＝ 売上合計 × 報酬率 ＋ ボーナス − 控除</div>
+
+    <div class="grid-2" style="margin-top:20px;">
+      <div class="card" style="border-top: 3px solid var(--admin);">
+        <h3 style="color:var(--admin); margin-bottom:12px;">管理者の操作</h3>
+        <div class="steps">
+          <div class="step">
+            <div class="step-num step-num-admin">1</div>
+            <div class="step-body">
+              <div class="step-title">売上を入力する</div>
+              <div class="step-desc">「売上入力」からキャスト・日付・金額を入力。いつでも修正できます。</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num step-num-admin">2</div>
+            <div class="step-body">
+              <div class="step-title">報酬を計算する</div>
+              <div class="step-desc">「報酬計算」から対象月を選んでボタンを押すと、売上合計 × 報酬率で自動計算されます。ボーナスや控除は手動で入力できます。</div>
+            </div>
+          </div>
+          <div class="step">
+            <div class="step-num step-num-admin">3</div>
+            <div class="step-body">
+              <div class="step-title">明細を確定する</div>
+              <div class="step-desc">「確定」を押すとキャストの明細画面に反映され、通知が届きます。</div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="card" style="border-top: 3px solid var(--cast);">
+        <h3 style="color:var(--cast); margin-bottom:12px;">キャストの操作</h3>
+        <div style="margin-bottom:16px;">
+          <p style="font-size:0.85rem; margin-bottom:12px;">管理者が確定した月の明細を確認できます。</p>
+          <div class="steps">
+            <div class="step">
+              <div class="step-num step-num-cast">1</div>
+              <div class="step-body">
+                <div class="step-title">「報酬明細」を開く</div>
+                <div class="step-desc">月を選択すると詳細が表示されます。</div>
+              </div>
+            </div>
+            <div class="step">
+              <div class="step-num step-num-cast">2</div>
+              <div class="step-body">
+                <div class="step-title">内訳を確認する</div>
+                <div class="step-desc">売上合計・報酬率・ボーナス・控除・支払総額が表示されます。</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="callout callout-info" style="margin-top:0;">
+          <span class="callout-icon">💡</span>
+          <p>明細が確定するとアプリ内通知（＋メール）でお知らせが届きます。</p>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:20px;">
+      <h3>報酬率について</h3>
+      <div class="callout callout-info">
+        <span class="callout-icon">📌</span>
+        <p>報酬率はキャストごとに個別設定できます（例：45% なら <strong>0.4500</strong> と登録）。管理者が「キャスト管理」画面から変更できます。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 8. Notifications -->
+  <section id="notify">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-both">🔔</div>
+      <div>
+        <div class="sec-title">8. 通知について</div>
+        <div class="sec-sub">管理者・キャスト共通</div>
+      </div>
+    </div>
+
+    <p style="margin-bottom:16px;">以下のタイミングでアプリ内に通知が届きます。画面右上の🔔アイコンから確認できます。</p>
+
+    <div class="card">
+      <table class="guide-table">
+        <thead>
+          <tr><th>こんなとき</th><th>届く人</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>自分のシフトが確定された</td><td><span class="role-cast">キャスト</span></td></tr>
+          <tr><td>自分のシフトが差し戻された</td><td><span class="role-cast">キャスト</span></td></tr>
+          <tr><td>修正申請が承認 / 却下された</td><td><span class="role-cast">キャスト</span></td></tr>
+          <tr><td>空き枠申請の結果が届いた</td><td><span class="role-cast">キャスト</span></td></tr>
+          <tr><td>報酬明細が確定された</td><td><span class="role-cast">キャスト</span>（＋メール）</td></tr>
+          <tr><td>キャストから修正申請が届いた</td><td><span class="role-admin">管理者</span></td></tr>
+          <tr><td>空き枠への申請が届いた</td><td><span class="role-admin">管理者</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- 9. Settings -->
+  <section id="settings">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-admin">⚙️</div>
+      <div>
+        <div class="sec-title">9. 店舗の設定</div>
+        <div class="sec-sub"><span class="role-admin">管理者</span> のみ</div>
+      </div>
+    </div>
+
+    <div class="grid-2">
+      <div class="feat-card">
+        <div class="feat-icon">📅</div>
+        <h3>シフト締切ルール</h3>
+        <p>「毎月◯日」または「毎週◯曜日」を選んで設定できます。締切を過ぎると、キャストは修正申請フローに切り替わります。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🏢</div>
+        <h3>ロケーションモード</h3>
+        <p>店舗の形態に合わせてルーム管理の方法を選べます。<br>「なし」「エリアのみ」「ルームのみ」「エリア＋ルーム」の4種類。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🔒</div>
+        <h3>締切後の修正承認</h3>
+        <p>締切後の修正申請を「承認制にする / しない」を切り替えられます。</p>
+      </div>
+      <div class="feat-card">
+        <div class="feat-icon">🏷️</div>
+        <h3>エリア・ルームラベル</h3>
+        <p>「エリア」「ルーム」の呼び方を店舗に合わせて変更できます（例：「フロア」「テーブル」など）。</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- 10. FAQ -->
+  <section id="faq">
+    <div class="sec-header">
+      <div class="sec-icon sec-icon-both">❓</div>
+      <div>
+        <div class="sec-title">10. よくある質問</div>
+        <div class="sec-sub">管理者・キャスト共通</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="faq-item">
+        <div class="faq-q">シフトを提出したのに管理者に見えていないみたい</div>
+        <div class="faq-a">「提出」ボタンを最後まで押したか確認してください。下書き保存の状態では管理者に見えません。シフト一覧でステータスが「提出済み」になっていれば問題ありません。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">シフトを間違えて提出してしまった</div>
+        <div class="faq-a">締切前であれば、シフト一覧から直接修正できます。締切後の場合は「修正申請」（→ 5章）を使ってください。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">「ルーム被り」の警告が出た</div>
+        <div class="faq-a">同じルーム・同じ時間帯に複数のキャストのシフトが重複しています。どちらかのルームまたは時間を変更してから確定してください。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">通知が届かない</div>
+        <div class="faq-a">アプリを開いていないと通知は届きません（メール通知はメールアドレスに届きます）。ログインしてアプリ内の🔔アイコンをご確認ください。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">報酬明細が表示されない</div>
+        <div class="faq-a">管理者がその月の計算を「確定」するまで表示されません。管理者にご確認ください。</div>
+      </div>
+      <div class="faq-item">
+        <div class="faq-q">キャストのアカウントを作るには？</div>
+        <div class="faq-a">管理者が「キャスト管理」→「キャストを追加」からメールアドレスを登録します。登録したメールアドレスに招待メールが届き、そこからパスワードを設定してログインできます。</div>
+      </div>
+    </div>
+  </section>
+
+  <div style="text-align:center; color:var(--muted); font-size:0.78rem; margin-top:32px; padding-top:24px; border-top:1px solid var(--border);">
+    CalendarApp 使い方ガイド — ご不明な点はマネージャーまでお問い合わせください
+  </div>
+
+</div>
+</body>
+</html>
