@@ -10,6 +10,10 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Switch } from '@/components/ui/switch'
+import {
+  DEFAULT_FORMULA_MULTIPLIER, parsePlatformSettings,
+  type PlatformKey, type PlatformSettings,
+} from '@/lib/platform-earnings'
 
 const THEMES = [
   {
@@ -74,6 +78,17 @@ const THEMES = [
   },
 ]
 
+const PLATFORM_LABEL: Record<PlatformKey, string> = {
+  stripchat: 'STRIPCHAT（TK）', fc2: 'FC2（ポイント）', dxlive: 'DXライブ（ポイント）',
+}
+const PLATFORM_UNIT: Record<PlatformKey, string> = {
+  stripchat: 'TK', fc2: 'ポイント', dxlive: 'ポイント',
+}
+/** formula_multiplier の結果が USD 建てか JPY 建てか（FC2はドルを経由せず直接円） */
+const PLATFORM_FORMULA_CURRENCY: Record<PlatformKey, 'usd' | 'jpy'> = {
+  stripchat: 'usd', fc2: 'jpy', dxlive: 'usd',
+}
+
 interface Props {
   store: { id: string; name: string } | null
   settings: {
@@ -84,7 +99,10 @@ interface Props {
     location_mode: string
     area_label: string
     room_label: string
-    theme?: string
+    theme: string
+    logo_url: string | null
+    usd_jpy_rate: number | null
+    platform_settings: unknown
   } | null
   storeId: string
 }
@@ -98,6 +116,10 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [areaLabel, setAreaLabel] = useState(initialSettings?.area_label ?? 'エリア')
   const [roomLabel, setRoomLabel] = useState(initialSettings?.room_label ?? 'ルーム')
   const [theme, setTheme] = useState(initialSettings?.theme ?? 'default')
+  const [logoUrl, setLogoUrl] = useState(initialSettings?.logo_url ?? null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [usdJpyRate, setUsdJpyRate] = useState(String(initialSettings?.usd_jpy_rate ?? ''))
+  const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(parsePlatformSettings(initialSettings?.platform_settings))
   const supabase = createClient()
   const router = useRouter()
 
@@ -126,20 +148,59 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
 
   async function saveTheme() {
     if (initialSettings) {
-      const { error } = await supabase.from('store_settings').update({ theme } as never).eq('id', initialSettings.id)
+      const { error } = await supabase.from('store_settings').update({ theme }).eq('id', initialSettings.id)
       if (error) { toast.error('保存に失敗しました'); return }
     } else {
-      const { error } = await supabase.from('store_settings').insert({ theme, store_id: storeId } as never)
+      const { error } = await supabase.from('store_settings').insert({ theme, store_id: storeId })
       if (error) { toast.error('保存に失敗しました'); return }
     }
     toast.success('テーマを変更しました')
     router.refresh()
   }
 
+  async function uploadLogo(file: File) {
+    setUploadingLogo(true)
+    try {
+      const ext = file.name.split('.').pop() ?? 'png'
+      const path = `${storeId}/logo.${ext}`
+      const { error: uploadError } = await supabase.storage.from('store-assets').upload(path, file, { upsert: true })
+      if (uploadError) { toast.error('アップロードに失敗しました'); return }
+      const { data } = supabase.storage.from('store-assets').getPublicUrl(path)
+      const publicUrl = `${data.publicUrl}?t=${Date.now()}`
+      const payload = { logo_url: publicUrl }
+      if (initialSettings) {
+        const { error } = await supabase.from('store_settings').update(payload).eq('id', initialSettings.id)
+        if (error) { toast.error('保存に失敗しました'); return }
+      } else {
+        const { error } = await supabase.from('store_settings').insert({ ...payload, store_id: storeId })
+        if (error) { toast.error('保存に失敗しました'); return }
+      }
+      setLogoUrl(publicUrl)
+      toast.success('ロゴを更新しました')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
+  async function savePlatformSettings() {
+    const payload = {
+      usd_jpy_rate: usdJpyRate ? parseFloat(usdJpyRate) : null,
+      platform_settings: platformSettings,
+    }
+    if (initialSettings) {
+      const { error } = await supabase.from('store_settings').update(payload).eq('id', initialSettings.id)
+      if (error) { toast.error('保存に失敗しました'); return }
+    } else {
+      const { error } = await supabase.from('store_settings').insert({ ...payload, store_id: storeId })
+      if (error) { toast.error('保存に失敗しました'); return }
+    }
+    toast.success('プラットフォーム設定を保存しました')
+  }
+
   async function saveDeadlineSettings() {
     const payload = {
       store_id: storeId,
-      deadline_type: deadlineType as 'monthly' | 'weekly',
+      deadline_type: deadlineType as 'monthly' | 'weekly' | 'none',
       deadline_day: parseInt(deadlineDay),
       require_approval_after_deadline: requireApproval,
     }
@@ -163,6 +224,20 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             <Input value={storeName} onChange={e => setStoreName(e.target.value)} />
           </div>
           <Button onClick={saveStoreName}>保存</Button>
+          <div className="space-y-1.5 pt-2 border-t">
+            <Label>店舗ロゴ</Label>
+            <p className="text-xs text-muted-foreground">支払通知書などの印刷用ドキュメントに表示されます</p>
+            {logoUrl && (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={logoUrl} alt="店舗ロゴ" className="h-12 w-auto object-contain border rounded bg-white p-1" />
+            )}
+            <Input
+              type="file"
+              accept="image/png,image/jpeg,image/svg+xml,image/webp"
+              disabled={uploadingLogo}
+              onChange={e => { const file = e.target.files?.[0]; if (file) uploadLogo(file) }}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -257,28 +332,114 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             <Select value={deadlineType} onValueChange={v => { if (v) setDeadlineType(v) }}>
               <SelectTrigger>
                 <SelectValue>
-                  {deadlineType === 'monthly' ? '月次（毎月X日）' : '週次（毎週X曜日）'}
+                  {{ monthly: '月次（毎月X日）', weekly: '週次（毎週X曜日）', none: '締切なし' }[deadlineType] ?? deadlineType}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">締切なし</SelectItem>
                 <SelectItem value="monthly">月次（毎月X日）</SelectItem>
                 <SelectItem value="weekly">週次（毎週X曜日）</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-1.5">
-            <Label>{deadlineType === 'monthly' ? '締切日（1〜31）' : '締切曜日（0=日〜6=土）'}</Label>
-            <Input type="number" min={0} max={deadlineType === 'monthly' ? 31 : 6}
-              value={deadlineDay} onChange={e => setDeadlineDay(e.target.value)} />
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium">締切後の修正に承認を必要とする</p>
-              <p className="text-xs text-muted-foreground">OFFにすると締切後でも自由に修正できます</p>
-            </div>
-            <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
-          </div>
+          {deadlineType !== 'none' && (
+            <>
+              <div className="space-y-1.5">
+                <Label>{deadlineType === 'monthly' ? '締切日（1〜31）' : '締切曜日（0=日〜6=土）'}</Label>
+                <Input type="number" min={0} max={deadlineType === 'monthly' ? 31 : 6}
+                  value={deadlineDay} onChange={e => setDeadlineDay(e.target.value)} />
+              </div>
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium">締切後の修正に承認を必要とする</p>
+                  <p className="text-xs text-muted-foreground">OFFにすると締切後でも自由に修正できます</p>
+                </div>
+                <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
+              </div>
+            </>
+          )}
           <Button onClick={saveDeadlineSettings}>保存</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>プラットフォーム連携・為替設定</CardTitle></CardHeader>
+        <CardContent className="space-y-5">
+          <div className="space-y-1.5">
+            <Label>USD → JPY 参考レート</Label>
+            <Input
+              type="number" step="0.01" min="0" placeholder="例: 150.25"
+              value={usdJpyRate} onChange={e => setUsdJpyRate(e.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              STRIPCHAT・DXライブの売上入力時、この時点のレートがスナップショットとして記録されます
+            </p>
+          </div>
+
+          {(Object.keys(PLATFORM_LABEL) as PlatformKey[]).map(key => (
+            <div key={key} className="space-y-1.5 pt-3 border-t first:border-t-0 first:pt-0">
+              <Label>{PLATFORM_LABEL[key]}</Label>
+              <Select
+                value={platformSettings[key].mode}
+                onValueChange={v => { if (v) setPlatformSettings({ ...platformSettings, [key]: { ...platformSettings[key], mode: v as 'formula' | 'fixed' } }) }}
+              >
+                <SelectTrigger>
+                  <SelectValue>{platformSettings[key].mode === 'formula' ? '計算式を使う' : '固定単価を使う'}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="formula">計算式を使う</SelectItem>
+                  <SelectItem value="fixed">固定単価を使う</SelectItem>
+                </SelectContent>
+              </Select>
+              {platformSettings[key].mode === 'formula' ? (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">
+                    掛け率（1{PLATFORM_UNIT[key]} = ◯{PLATFORM_FORMULA_CURRENCY[key] === 'usd' ? 'ドル' : '円'}）
+                  </Label>
+                  <div className="flex items-center gap-2">
+                    <Input
+                      type="number" step="0.0001" min="0"
+                      placeholder={String(DEFAULT_FORMULA_MULTIPLIER[key])}
+                      value={platformSettings[key].formula_multiplier ?? ''}
+                      onChange={e => setPlatformSettings({
+                        ...platformSettings,
+                        [key]: { ...platformSettings[key], formula_multiplier: e.target.value ? parseFloat(e.target.value) : null },
+                      })}
+                    />
+                    {platformSettings[key].formula_multiplier != null && (
+                      <Button
+                        type="button" variant="outline" size="sm"
+                        onClick={() => setPlatformSettings({
+                          ...platformSettings,
+                          [key]: { ...platformSettings[key], formula_multiplier: null },
+                        })}
+                      >
+                        既定値に戻す
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    既定: 1{PLATFORM_UNIT[key]} = {DEFAULT_FORMULA_MULTIPLIER[key]}
+                    {PLATFORM_FORMULA_CURRENCY[key] === 'usd' ? 'ドル（為替レートで円換算）' : '円'}
+                    。プラットフォーム側の換算率が変わった場合はここを書き換えてください。
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">1{PLATFORM_UNIT[key]} = ◯円</Label>
+                  <Input
+                    type="number" step="0.01" min="0" placeholder="例: 5"
+                    value={platformSettings[key].fixed_rate ?? ''}
+                    onChange={e => setPlatformSettings({
+                      ...platformSettings,
+                      [key]: { ...platformSettings[key], fixed_rate: e.target.value ? parseFloat(e.target.value) : null },
+                    })}
+                  />
+                </div>
+              )}
+            </div>
+          ))}
+          <Button onClick={savePlatformSettings}>保存</Button>
         </CardContent>
       </Card>
     </div>

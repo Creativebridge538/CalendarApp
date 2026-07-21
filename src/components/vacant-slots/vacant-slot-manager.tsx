@@ -15,6 +15,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
 import { Plus, Check, X } from 'lucide-react'
+import { sendPushNotification } from '@/lib/push'
 
 interface Application { id: string; status: string; cast_id: string; cast: { display_name: string | null } | null }
 interface Slot {
@@ -75,12 +76,10 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     toast.success(approve ? '承認しました' : '却下しました')
 
     if (slot) {
-      await supabase.from('notifications').insert({
-        user_id: castId,
-        title: approve ? '空き枠申請が承認されました' : '空き枠申請が却下されました',
-        body: `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} の空き枠`,
-        link: '/cast/vacant-slots',
-      })
+      const title = approve ? '空き枠申請が承認されました' : '空き枠申請が却下されました'
+      const body = `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} の空き枠`
+      await supabase.from('notifications').insert({ user_id: castId, title, body, link: '/cast/vacant-slots' })
+      sendPushNotification(castId, title, body, '/cast/vacant-slots')
     }
   }
 
@@ -119,7 +118,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                   </TableCell>
                 </TableRow>
                 {slot.vacant_slot_applications.filter(a => a.status === 'pending').map(app => (
-                  <TableRow key={app.id} className="bg-blue-50">
+                  <TableRow key={app.id} className="bg-primary/10">
                     <TableCell colSpan={3} className="pl-8 text-sm">
                       申請: {app.cast?.display_name ?? '—'}
                     </TableCell>

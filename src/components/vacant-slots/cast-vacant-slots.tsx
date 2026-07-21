@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { sendPushNotification } from '@/lib/push'
 
 interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; rooms: { name: string } | null }
 interface Application { vacant_slot_id: string; status: string }
@@ -36,14 +37,12 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
     const slot = slots.find(s => s.id === slotId)
     const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
     if (admins?.length && slot) {
+      const title = '空き枠申請が届きました'
+      const body = `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} への申請`
       await supabase.from('notifications').insert(
-        admins.map(a => ({
-          user_id: a.id,
-          title: '空き枠申請が届きました',
-          body: `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} への申請`,
-          link: '/admin/vacant-slots',
-        }))
+        admins.map(a => ({ user_id: a.id, title, body, link: '/admin/vacant-slots' }))
       )
+      admins.forEach(a => sendPushNotification(a.id, title, body, '/admin/vacant-slots'))
     }
   }
 

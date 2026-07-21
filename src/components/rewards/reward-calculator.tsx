@@ -3,17 +3,20 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { Button } from '@/components/ui/button'
+import { format, endOfMonth } from 'date-fns'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Calculator, Lock } from 'lucide-react'
+import { Calculator, Lock, FileText, ChevronLeft, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
 import type { Database } from '@/lib/supabase/database.types'
+import { sendPushNotification } from '@/lib/push'
 
 type Reward = Database['public']['Tables']['reward_calculations']['Row']
 
-interface CastUser { id: string; display_name: string | null; reward_rate: number | string }
+interface CastUser { id: string; display_name: string | null; reward_rate: number | string; is_active: boolean }
 
 interface Props {
   casts: CastUser[]
@@ -36,15 +39,23 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
 
   async function calculate(cast: CastUser) {
     setCalculating(true)
+    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
+    const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
     const { data: salesData } = await supabase.from('sales')
-      .select('amount')
+      .select('amount, is_daily_payment, reward_rate_override')
       .eq('cast_id', cast.id)
-      .gte('date', `${year}-${String(month).padStart(2, '0')}-01`)
-      .lte('date', `${year}-${String(month).padStart(2, '0')}-31`)
+      .gte('date', monthStart)
+      .lte('date', monthEnd)
 
-    const salesTotal = (salesData ?? []).reduce((sum, s) => sum + Number(s.amount), 0)
     const rewardRate = Number(cast.reward_rate)
-    const baseReward = Math.floor(salesTotal * rewardRate)
+    const salesTotal = (salesData ?? []).reduce((sum, s) => sum + Number(s.amount), 0)
+    // 日払いで報酬率が上書きされている行はその行だけ別の率で計算する（それ以外は通常の報酬率）
+    const baseReward = Math.floor(
+      (salesData ?? []).reduce((sum, s) => {
+        const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+        return sum + Number(s.amount) * rate
+      }, 0)
+    )
     const adj = getAdj(cast.id)
     const bonus = parseInt(adj.bonus) || 0
     const deduction = parseInt(adj.deduction) || 0
@@ -78,18 +89,29 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
     if (error) { toast.error('確定に失敗しました'); return }
     setRewards(rewards.map(r => r.id === reward.id ? { ...r, is_finalized: true } : r))
     toast.success('明細を確定しました')
-    await supabase.from('notifications').insert({
-      user_id: reward.cast_id,
-      title: '報酬明細が確定されました',
-      body: `${year}年${month}月の報酬: ¥${Number(reward.total_reward).toLocaleString()}`,
-      link: '/cast/rewards',
-    })
+    const title = '報酬明細が確定されました'
+    const body = `${year}年${month}月の報酬: ¥${Number(reward.total_reward).toLocaleString()}`
+    await supabase.from('notifications').insert({ user_id: reward.cast_id, title, body, link: '/cast/rewards' })
+    sendPushNotification(reward.cast_id, title, body, '/cast/rewards')
   }
+
+  const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle>報酬計算 — {year}年{month}月</CardTitle>
+        <div className="flex items-center justify-between flex-wrap gap-2">
+          <CardTitle>報酬計算 — {year}年{month}月</CardTitle>
+          <div className="flex items-center gap-1">
+            <Link href={`/admin/rewards?year=${prev.year}&month=${prev.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+              <ChevronLeft className="h-3.5 w-3.5 mr-0.5" />前月
+            </Link>
+            <Link href={`/admin/rewards?year=${next.year}&month=${next.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+              翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+            </Link>
+          </div>
+        </div>
       </CardHeader>
       <CardContent>
         <Table>
@@ -113,7 +135,12 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
 
               return (
                 <TableRow key={cast.id}>
-                  <TableCell className="font-medium">{cast.display_name ?? '—'}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-1.5">
+                      {cast.display_name ?? '—'}
+                      {!cast.is_active && <Badge variant="outline" className="text-[10px] font-normal">退店済み</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">{reward ? `¥${Number(reward.sales_total).toLocaleString()}` : '—'}</TableCell>
                   <TableCell className="text-right">{(Number(cast.reward_rate) * 100).toFixed(1)}%</TableCell>
                   <TableCell className="text-right">{reward ? `¥${Number(reward.base_reward).toLocaleString()}` : '—'}</TableCell>
@@ -140,6 +167,15 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
                           <Button size="sm" onClick={() => finalize(reward)}>確定</Button>
                         )}
                       </>
+                    )}
+                    {reward && (
+                      <Link
+                        href={`/admin/rewards/notice?cast_id=${cast.id}&year=${year}&month=${month}`}
+                        target="_blank"
+                        className={buttonVariants({ size: 'sm', variant: 'ghost' })}
+                      >
+                        <FileText className="h-3.5 w-3.5 mr-1" />通知書
+                      </Link>
                     )}
                   </TableCell>
                 </TableRow>

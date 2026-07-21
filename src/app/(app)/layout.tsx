@@ -22,12 +22,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         .single()
     : { data: null }
 
-  const theme = (settings as { theme?: string } | null)?.theme ?? 'default'
+  const role = profile?.role ?? 'cast'
+  // 管理者は店舗テーマ設定に関わらず、常に専用の固定ダークテーマ（analytics基調）を使う
+  const theme = role === 'admin' ? 'admin-pro' : ((settings as { theme?: string } | null)?.theme ?? 'default')
 
   return (
     <div className="flex h-screen" style={{ backgroundColor: 'var(--app-bg)' }} data-theme={theme}>
-      <AppNav role={profile?.role ?? 'cast'} userEmail={user.email ?? ''} theme={theme} />
-      <main className="flex-1 overflow-y-auto pt-14 md:pt-0">
+      <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
+      <main
+        className={`flex-1 overflow-y-auto pt-14 md:pt-0 ${role === 'cast' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0' : ''}`}
+      >
         {children}
       </main>
     </div>

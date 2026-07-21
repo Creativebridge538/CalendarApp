@@ -12,7 +12,7 @@ export default async function AdminShiftsPage() {
 
   const storeId = profile.store_id!
 
-  const [{ data: shifts }, { data: casts }, { data: rooms }, { data: areas }, { data: settings }] = await Promise.all([
+  const [{ data: shifts }, { data: casts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems }] = await Promise.all([
     supabase.from('shifts')
       .select('*, cast:users!shifts_cast_id_fkey(display_name), rooms(name)')
       .eq('store_id', storeId)
@@ -23,12 +23,13 @@ export default async function AdminShiftsPage() {
     supabase.from('rooms').select('id, name, area_id').eq('store_id', storeId).eq('is_active', true),
     supabase.from('areas').select('id, name').eq('store_id', storeId).eq('is_active', true).order('sort_order'),
     supabase.from('store_settings').select('location_mode, area_label, room_label').eq('store_id', storeId).single(),
+    supabase.from('shift_checklist_items').select('id, label, item_type').eq('store_id', storeId),
   ])
 
   return (
     <div className="px-0 py-4 md:p-6">
       <AdminShiftView
-        shifts={shifts ?? []}
+        shifts={(shifts ?? []).map(s => ({ ...s, checklist_answers: (s.checklist_answers ?? {}) as Record<string, boolean | string> }))}
         casts={casts ?? []}
         rooms={rooms ?? []}
         areas={areas ?? []}
@@ -36,6 +37,7 @@ export default async function AdminShiftsPage() {
         locationMode={settings?.location_mode ?? 'room'}
         areaLabel={settings?.area_label ?? 'エリア'}
         roomLabel={settings?.room_label ?? 'ルーム'}
+        checklistItems={checklistItems ?? []}
       />
     </div>
   )

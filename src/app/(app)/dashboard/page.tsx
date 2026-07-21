@@ -1,10 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Calendar, Users, FileEdit } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, subDays, subMonths, startOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
+import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 
 export default async function DashboardPage() {
   const supabase = await createClient()
@@ -21,14 +19,23 @@ export default async function DashboardPage() {
     return <AdminDashboard storeId={profile.store_id!} />
   }
 
-  return <CastDashboard userId={user.id} />
+  // キャストはダッシュボードを経由せず、シフト提出画面を直接使う
+  redirect('/cast/shifts')
+}
+
+function parseLocalDate(dateStr: string): Date {
+  return new Date(`${dateStr}T00:00:00`)
 }
 
 async function AdminDashboard({ storeId }: { storeId: string }) {
   const supabase = await createClient()
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const now = new Date()
+  const today = format(now, 'yyyy-MM-dd')
+  const sixtyDaysAgo = format(subDays(now, 59), 'yyyy-MM-dd')
+  const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
+  const prevMonthStart = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd')
 
-  const [{ count: pendingShifts }, { count: pendingRequests }, { data: todayShifts }] =
+  const [{ count: pendingShifts }, { count: pendingRequests }, { data: todayShifts }, { data: sales }, { data: casts }] =
     await Promise.all([
       supabase.from('shifts').select('*', { count: 'exact', head: true })
         .eq('store_id', storeId).eq('status', 'submitted'),
@@ -41,172 +48,75 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
         .eq('date', today)
         .eq('status', 'confirmed')
         .order('start_time'),
+      supabase.from('sales').select('date, amount, cast_id')
+        .eq('store_id', storeId).gte('date', sixtyDaysAgo).lte('date', today),
+      supabase.from('users').select('id, display_name')
+        .eq('store_id', storeId).eq('role', 'cast'),
     ])
 
-  return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">ダッシュボード</h1>
+  const salesList = sales ?? []
+  const castNameMap = new Map((casts ?? []).map(c => [c.id, c.display_name ?? '—']))
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">未確定シフト</CardTitle>
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{pendingShifts ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">要確認</p>
-          </CardContent>
-        </Card>
+  // 直近30日の日次売上推移
+  const trend = Array.from({ length: 30 }, (_, idx) => {
+    const i = 29 - idx
+    const d = format(subDays(now, i), 'yyyy-MM-dd')
+    const amount = salesList.filter(s => s.date === d).reduce((sum, s) => sum + Number(s.amount), 0)
+    return { date: d, amount }
+  })
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">修正申請</CardTitle>
-            <FileEdit className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{pendingRequests ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">未処理</p>
-          </CardContent>
-        </Card>
+  // 今月・先月の合計
+  const thisMonthSales = salesList.filter(s => s.date >= monthStart)
+  const prevMonthSales = salesList.filter(s => s.date >= prevMonthStart && s.date < monthStart)
+  const totalThisMonth = thisMonthSales.reduce((sum, s) => sum + Number(s.amount), 0)
+  const totalPrevMonth = prevMonthSales.reduce((sum, s) => sum + Number(s.amount), 0)
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">本日のシフト</CardTitle>
-            <Users className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{todayShifts?.length ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">確定済み</p>
-          </CardContent>
-        </Card>
-      </div>
+  // キャスト別ランキング（今月）
+  const castTotals = new Map<string, number>()
+  thisMonthSales.forEach(s => castTotals.set(s.cast_id, (castTotals.get(s.cast_id) ?? 0) + Number(s.amount)))
+  const castRanking = [...castTotals.entries()]
+    .map(([castId, amount]) => ({ name: castNameMap.get(castId) ?? '—', amount }))
+    .sort((a, b) => b.amount - a.amount)
+    .slice(0, 6)
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">
-            本日のシフト — {format(new Date(), 'M月d日(E)', { locale: ja })}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!todayShifts?.length ? (
-            <p className="text-sm text-muted-foreground text-center py-6">本日のシフトはありません</p>
-          ) : (
-            <div className="space-y-2">
-              {todayShifts.map((shift) => (
-                <div key={shift.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="font-medium text-sm">
-                      {(shift.cast as { display_name: string | null } | null)?.display_name ?? '—'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}
-                      {shift.rooms && ` ／ ${(shift.rooms as { name: string }).name}`}
-                    </p>
-                  </div>
-                  <Badge variant="outline">確定</Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
-  )
-}
+  // 曜日別平均売上（直近60日）
+  const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土']
+  const weekdaySums = new Array(7).fill(0)
+  const weekdayCounts = new Array(7).fill(0)
+  salesList.forEach(s => {
+    const dow = parseLocalDate(s.date).getDay()
+    weekdaySums[dow] += Number(s.amount)
+    weekdayCounts[dow] += 1
+  })
+  const weekday = weekdayLabels.map((label, i) => ({
+    label,
+    amount: weekdayCounts[i] > 0 ? Math.round(weekdaySums[i] / weekdayCounts[i]) : 0,
+  }))
 
-async function CastDashboard({ userId }: { userId: string }) {
-  const supabase = await createClient()
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('display_name, store_id')
-    .eq('id', userId)
-    .single()
-
-  const now = new Date()
-
-  const [{ data: upcomingShifts }, { data: reward }] = profile?.store_id
-    ? await Promise.all([
-        supabase.from('shifts')
-          .select('*, rooms(name)')
-          .eq('cast_id', userId)
-          .gte('date', format(now, 'yyyy-MM-dd'))
-          .in('status', ['submitted', 'confirmed'])
-          .order('date')
-          .limit(5),
-        supabase.from('reward_calculations')
-          .select('total_reward, is_finalized')
-          .eq('cast_id', userId)
-          .eq('period_year', now.getFullYear())
-          .eq('period_month', now.getMonth() + 1)
-          .single(),
-      ])
-    : [{ data: null }, { data: null }]
+  // 追加KPI: 稼働キャスト数・平均日商（今月）
+  const activeCastCount = new Set(thisMonthSales.map(s => s.cast_id)).size
+  const daysElapsedThisMonth = now.getDate()
+  const avgDailySales = daysElapsedThisMonth > 0 ? Math.round(totalThisMonth / daysElapsedThisMonth) : 0
 
   return (
-    <div className="p-6 space-y-6">
-      <h1 className="text-2xl font-bold">
-        こんにちは、{profile?.display_name ?? 'さん'}
-      </h1>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">今月の報酬</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">
-              {reward ? `¥${Number(reward.total_reward).toLocaleString()}` : '未計算'}
-            </div>
-            {reward && (
-              <Badge variant={reward.is_finalized ? 'default' : 'secondary'} className="mt-1">
-                {reward.is_finalized ? '確定済み' : '暫定'}
-              </Badge>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm font-medium text-muted-foreground">直近のシフト</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-3xl font-bold">{upcomingShifts?.length ?? 0}</div>
-            <p className="text-xs text-muted-foreground mt-1">件</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">直近のシフト</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {!upcomingShifts?.length ? (
-            <p className="text-sm text-muted-foreground text-center py-6">シフトがありません</p>
-          ) : (
-            <div className="space-y-2">
-              {upcomingShifts.map((shift) => (
-                <div key={shift.id} className="flex items-center justify-between py-2 border-b last:border-0">
-                  <div>
-                    <p className="font-medium text-sm">
-                      {format(new Date(shift.date), 'M月d日(E)', { locale: ja })}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}
-                      {shift.rooms && ` ／ ${(shift.rooms as { name: string }).name}`}
-                    </p>
-                  </div>
-                  <Badge variant={shift.status === 'confirmed' ? 'default' : 'secondary'}>
-                    {shift.status === 'confirmed' ? '確定' : '提出済み'}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    </div>
+    <AdminAnalytics
+      pendingShifts={pendingShifts ?? 0}
+      pendingRequests={pendingRequests ?? 0}
+      todayShifts={(todayShifts ?? []).map(s => ({
+        id: s.id,
+        castName: (s.cast as { display_name: string | null } | null)?.display_name ?? '—',
+        startTime: s.start_time.slice(0, 5),
+        endTime: s.end_time.slice(0, 5),
+        roomName: (s.rooms as { name: string } | null)?.name ?? null,
+      }))}
+      todayLabel={format(now, 'M月d日(E)', { locale: ja })}
+      totalThisMonth={totalThisMonth}
+      totalPrevMonth={totalPrevMonth}
+      trend={trend}
+      castRanking={castRanking}
+      weekday={weekday}
+      activeCastCount={activeCastCount}
+      avgDailySales={avgDailySales}
+    />
   )
 }

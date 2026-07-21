@@ -10,16 +10,22 @@ export default async function CastsPage() {
   const { data: profile } = await supabase.from('users').select('role, store_id').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: casts } = await supabase
-    .from('users')
-    .select('id, display_name, real_name, phone, reward_rate, is_active, email')
-    .eq('store_id', profile.store_id!)
-    .eq('role', 'cast')
-    .order('display_name')
+  const [{ data: casts }, { data: profileFields }] = await Promise.all([
+    supabase.from('users')
+      .select('id, display_name, real_name, phone, reward_rate, is_active, email, profile_answers')
+      .eq('store_id', profile.store_id!)
+      .eq('role', 'cast')
+      .order('display_name'),
+    supabase.from('cast_profile_fields')
+      .select('id, label')
+      .eq('store_id', profile.store_id!)
+      .eq('is_active', true)
+      .order('sort_order'),
+  ])
 
   return (
     <div className="p-6">
-      <CastList casts={casts ?? []} storeId={profile.store_id!} />
+      <CastList casts={casts ?? []} storeId={profile.store_id!} profileFields={profileFields ?? []} />
     </div>
   )
 }

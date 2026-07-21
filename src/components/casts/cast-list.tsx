@@ -19,25 +19,26 @@ import type { Database } from '@/lib/supabase/database.types'
 
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
-  'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'is_active' | 'email'
+  'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'is_active' | 'email' | 'profile_answers'
 >
 
 interface CastListProps {
   casts: CastUser[]
   storeId: string
+  profileFields: { id: string; label: string }[]
 }
 
-export function CastList({ casts: initialCasts, storeId }: CastListProps) {
+export function CastList({ casts: initialCasts, storeId, profileFields }: CastListProps) {
   const [casts, setCasts] = useState(initialCasts)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<CastUser | null>(null)
-  const [form, setForm] = useState({ email: '', password: '', display_name: '', real_name: '', phone: '', reward_rate: '0.4' })
+  const [form, setForm] = useState({ email: '', password: '', display_name: '', real_name: '', phone: '', reward_rate: '0.4', profile_answers: {} as Record<string, string> })
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
   function openNew() {
     setEditing(null)
-    setForm({ email: '', password: '', display_name: '', real_name: '', phone: '', reward_rate: '0.4' })
+    setForm({ email: '', password: '', display_name: '', real_name: '', phone: '', reward_rate: '0.4', profile_answers: {} })
     setOpen(true)
   }
 
@@ -50,6 +51,7 @@ export function CastList({ casts: initialCasts, storeId }: CastListProps) {
       real_name: cast.real_name ?? '',
       phone: cast.phone ?? '',
       reward_rate: String(cast.reward_rate),
+      profile_answers: { ...(cast.profile_answers as Record<string, string> | null ?? {}) },
     })
     setOpen(true)
   }
@@ -73,6 +75,7 @@ export function CastList({ casts: initialCasts, storeId }: CastListProps) {
           real_name: form.real_name || null,
           phone: form.phone || null,
           reward_rate: parseFloat(form.reward_rate),
+          profile_answers: form.profile_answers,
         }
         const { error } = await supabase.from('users').update(payload).eq('id', editing.id)
         if (error) { toast.error('更新に失敗しました'); return }
@@ -187,6 +190,15 @@ export function CastList({ casts: initialCasts, storeId }: CastListProps) {
               />
               <p className="text-xs text-muted-foreground">例: 0.40 = 40%</p>
             </div>
+            {editing && profileFields.map(field => (
+              <div key={field.id} className="space-y-1.5">
+                <Label>{field.label}</Label>
+                <Input
+                  value={form.profile_answers[field.id] ?? ''}
+                  onChange={e => setForm({ ...form, profile_answers: { ...form.profile_answers, [field.id]: e.target.value } })}
+                />
+              </div>
+            ))}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>キャンセル</Button>
               <Button

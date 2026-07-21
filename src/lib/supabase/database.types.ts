@@ -69,6 +69,41 @@ export type Database = {
           },
         ]
       }
+      cast_profile_fields: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          label: string
+          sort_order: number
+          store_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label: string
+          sort_order?: number
+          store_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          label?: string
+          sort_order?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cast_profile_fields_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null
@@ -110,6 +145,41 @@ export type Database = {
           },
           {
             foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
@@ -245,10 +315,17 @@ export type Database = {
           created_at: string
           created_by: string | null
           date: string
+          fx_rate_snapshot: number | null
           id: string
+          is_daily_payment: boolean
           notes: string | null
+          platform: string
+          raw_units: number | null
+          rate_override: number | null
+          reward_rate_override: number | null
           store_id: string
           updated_at: string
+          usd_amount: number | null
         }
         Insert: {
           amount?: number
@@ -256,10 +333,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date: string
+          fx_rate_snapshot?: number | null
           id?: string
+          is_daily_payment?: boolean
           notes?: string | null
+          platform?: string
+          raw_units?: number | null
+          rate_override?: number | null
+          reward_rate_override?: number | null
           store_id: string
           updated_at?: string
+          usd_amount?: number | null
         }
         Update: {
           amount?: number
@@ -267,10 +351,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date?: string
+          fx_rate_snapshot?: number | null
           id?: string
+          is_daily_payment?: boolean
           notes?: string | null
+          platform?: string
+          raw_units?: number | null
+          rate_override?: number | null
+          reward_rate_override?: number | null
           store_id?: string
           updated_at?: string
+          usd_amount?: number | null
         }
         Relationships: [
           {
@@ -289,6 +380,47 @@ export type Database = {
           },
           {
             foreignKeyName: "sales_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shift_checklist_items: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          item_type: string
+          label: string
+          options: string[]
+          sort_order: number
+          store_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_type?: string
+          label: string
+          options?: string[]
+          sort_order?: number
+          store_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          item_type?: string
+          label?: string
+          options?: string[]
+          sort_order?: number
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shift_checklist_items_store_id_fkey"
             columns: ["store_id"]
             isOneToOne: false
             referencedRelation: "stores"
@@ -378,8 +510,10 @@ export type Database = {
       }
       shifts: {
         Row: {
+          admin_note: string | null
           area_id: string | null
           cast_id: string
+          checklist_answers: Json
           confirmed_at: string | null
           confirmed_by: string | null
           created_at: string
@@ -394,8 +528,10 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          admin_note?: string | null
           area_id?: string | null
           cast_id: string
+          checklist_answers?: Json
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
@@ -410,8 +546,10 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          admin_note?: string | null
           area_id?: string | null
           cast_id?: string
+          checklist_answers?: Json
           confirmed_at?: string | null
           confirmed_by?: string | null
           created_at?: string
@@ -471,10 +609,14 @@ export type Database = {
           deadline_type: Database["public"]["Enums"]["deadline_type"]
           id: string
           location_mode: string
+          logo_url: string | null
+          platform_settings: Json
           require_approval_after_deadline: boolean
           room_label: string
           store_id: string
+          theme: string
           updated_at: string
+          usd_jpy_rate: number | null
         }
         Insert: {
           area_label?: string
@@ -483,10 +625,14 @@ export type Database = {
           deadline_type?: Database["public"]["Enums"]["deadline_type"]
           id?: string
           location_mode?: string
+          logo_url?: string | null
+          platform_settings?: Json
           require_approval_after_deadline?: boolean
           room_label?: string
           store_id: string
+          theme?: string
           updated_at?: string
+          usd_jpy_rate?: number | null
         }
         Update: {
           area_label?: string
@@ -495,10 +641,14 @@ export type Database = {
           deadline_type?: Database["public"]["Enums"]["deadline_type"]
           id?: string
           location_mode?: string
+          logo_url?: string | null
+          platform_settings?: Json
           require_approval_after_deadline?: boolean
           room_label?: string
           store_id?: string
+          theme?: string
           updated_at?: string
+          usd_jpy_rate?: number | null
         }
         Relationships: [
           {
@@ -506,6 +656,66 @@ export type Database = {
             columns: ["store_id"]
             isOneToOne: true
             referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      store_signup_requests: {
+        Row: {
+          contact_email: string
+          contact_name: string
+          created_at: string
+          created_store_id: string | null
+          id: string
+          message: string | null
+          phone: string | null
+          reject_reason: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string
+          store_name: string
+        }
+        Insert: {
+          contact_email: string
+          contact_name: string
+          created_at?: string
+          created_store_id?: string | null
+          id?: string
+          message?: string | null
+          phone?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_name: string
+        }
+        Update: {
+          contact_email?: string
+          contact_name?: string
+          created_at?: string
+          created_store_id?: string | null
+          id?: string
+          message?: string | null
+          phone?: string | null
+          reject_reason?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string
+          store_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_signup_requests_created_store_id_fkey"
+            columns: ["created_store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_signup_requests_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
@@ -530,14 +740,17 @@ export type Database = {
       }
       users: {
         Row: {
+          calendar_token: string | null
           created_at: string
           display_name: string | null
           email: string
           id: string
           is_active: boolean
+          monthly_goal: number | null
           notes: string | null
           phone: string | null
           photo_url: string | null
+          profile_answers: Json
           real_name: string | null
           reward_rate: number
           role: Database["public"]["Enums"]["user_role"]
@@ -545,14 +758,17 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          calendar_token?: string | null
           created_at?: string
           display_name?: string | null
           email: string
           id: string
           is_active?: boolean
+          monthly_goal?: number | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
+          profile_answers?: Json
           real_name?: string | null
           reward_rate?: number
           role?: Database["public"]["Enums"]["user_role"]
@@ -560,14 +776,17 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          calendar_token?: string | null
           created_at?: string
           display_name?: string | null
           email?: string
           id?: string
           is_active?: boolean
+          monthly_goal?: number | null
           notes?: string | null
           phone?: string | null
           photo_url?: string | null
+          profile_answers?: Json
           real_name?: string | null
           reward_rate?: number
           role?: Database["public"]["Enums"]["user_role"]
@@ -709,7 +928,7 @@ export type Database = {
       my_store_id: { Args: never; Returns: string }
     }
     Enums: {
-      deadline_type: "monthly" | "weekly"
+      deadline_type: "monthly" | "weekly" | "none"
       request_status: "pending" | "approved" | "rejected"
       shift_status: "draft" | "submitted" | "confirmed" | "rejected"
       user_role: "admin" | "cast"
@@ -843,7 +1062,7 @@ export const Constants = {
   },
   public: {
     Enums: {
-      deadline_type: ["monthly", "weekly"],
+      deadline_type: ["monthly", "weekly", "none"],
       request_status: ["pending", "approved", "rejected"],
       shift_status: ["draft", "submitted", "confirmed", "rejected"],
       user_role: ["admin", "cast"],

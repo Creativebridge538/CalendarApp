@@ -5,16 +5,22 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import Link from 'next/link'
+import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
 
 interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
+  platform: string; raw_units: number | string | null
+  is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
   cast: { display_name: string | null } | null
 }
 
@@ -23,22 +29,72 @@ interface Props {
   sales: Sale[]
   storeId: string
   userId: string
+  storeSettings: { usd_jpy_rate: number | null; platform_settings: unknown } | null
+  year: number
+  month: number
 }
 
-export function SalesInput({ casts, sales: initialSales, storeId, userId }: Props) {
+const PLATFORM_LABEL: Record<string, string> = {
+  manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
+}
+
+function defaultDateFor(year: number, month: number): string {
+  const now = new Date()
+  const isCurrentMonth = now.getFullYear() === year && now.getMonth() + 1 === month
+  return isCurrentMonth ? format(now, 'yyyy-MM-dd') : `${year}-${String(month).padStart(2, '0')}-01`
+}
+
+export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month }: Props) {
+  const emptyForm = useMemo(() => ({
+    cast_id: '', date: defaultDateFor(year, month),
+    platform: 'manual' as 'manual' | PlatformKey,
+    amount: '', raw_units: '',
+    is_daily_payment: false, rate_override: '', reward_rate_override: '',
+    notes: '',
+  }), [year, month])
   const [sales, setSales] = useState(initialSales)
-  const [form, setForm] = useState({ cast_id: '', date: format(new Date(), 'yyyy-MM-dd'), amount: '', notes: '' })
+  const [form, setForm] = useState(emptyForm)
   const [editing, setEditing] = useState<Sale | null>(null)
   const supabase = createClient()
 
-  const monthlyTotal = useMemo(() => {
-    const month = format(new Date(), 'yyyy-MM')
-    return sales.filter(s => s.date.startsWith(month)).reduce((sum, s) => sum + Number(s.amount), 0)
-  }, [sales])
+  const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
+  const usdJpyRate = storeSettings?.usd_jpy_rate ?? null
+
+  const monthlyTotal = useMemo(() => sales.reduce((sum, s) => sum + Number(s.amount), 0), [sales])
+
+  const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
+  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
+
+  const preview = useMemo(() => {
+    if (form.platform === 'manual') return null
+    const rawUnits = parseFloat(form.raw_units) || 0
+    const override = form.is_daily_payment && form.rate_override ? parseFloat(form.rate_override) : null
+    return calcPlatformAmount(form.platform, rawUnits, platformSettings[form.platform], usdJpyRate, override)
+  }, [form.platform, form.raw_units, form.is_daily_payment, form.rate_override, platformSettings, usdJpyRate])
 
   async function handleSave() {
-    if (!form.cast_id || !form.amount) { toast.error('キャストと金額は必須です'); return }
-    const payload = { cast_id: form.cast_id, date: form.date, amount: parseInt(form.amount), notes: form.notes || null, store_id: storeId, created_by: userId }
+    if (!form.cast_id) { toast.error('キャストは必須です'); return }
+    if (form.platform === 'manual' && !form.amount) { toast.error('金額は必須です'); return }
+    if (form.platform !== 'manual' && !form.raw_units) { toast.error('数量は必須です'); return }
+
+    const isPlatform = form.platform !== 'manual'
+    const amount = isPlatform ? (preview?.jpy ?? 0) : parseInt(form.amount)
+
+    const payload = {
+      cast_id: form.cast_id,
+      date: form.date,
+      platform: form.platform,
+      amount,
+      raw_units: isPlatform ? parseFloat(form.raw_units) : null,
+      usd_amount: isPlatform ? preview?.usd ?? null : null,
+      fx_rate_snapshot: isPlatform ? usdJpyRate : null,
+      is_daily_payment: form.is_daily_payment,
+      rate_override: form.is_daily_payment && isPlatform && form.rate_override ? parseFloat(form.rate_override) : null,
+      reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) : null,
+      notes: form.notes || null,
+      store_id: storeId,
+      created_by: userId,
+    }
 
     if (editing) {
       const { error } = await supabase.from('sales').update(payload).eq('id', editing.id)
@@ -53,7 +109,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId }: Prop
       setSales([data, ...sales])
       toast.success('売上を登録しました')
     }
-    setForm({ cast_id: '', date: format(new Date(), 'yyyy-MM-dd'), amount: '', notes: '' })
+    setForm(emptyForm)
   }
 
   async function handleDelete(id: string) {
@@ -66,15 +122,37 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId }: Prop
 
   function startEdit(sale: Sale) {
     setEditing(sale)
-    setForm({ cast_id: sale.cast_id, date: sale.date, amount: String(sale.amount), notes: sale.notes ?? '' })
+    setForm({
+      cast_id: sale.cast_id,
+      date: sale.date,
+      platform: (sale.platform as 'manual' | PlatformKey) ?? 'manual',
+      amount: String(sale.amount),
+      raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
+      is_daily_payment: sale.is_daily_payment,
+      rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
+      reward_rate_override: sale.reward_rate_override != null ? String(sale.reward_rate_override) : '',
+      notes: sale.notes ?? '',
+    })
   }
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>売上入力</CardTitle>
-          <p className="text-sm text-muted-foreground">今月合計: ¥{monthlyTotal.toLocaleString()}</p>
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <CardTitle>売上入力 — {year}年{month}月</CardTitle>
+              <p className="text-sm text-muted-foreground mt-1">月合計: ¥{monthlyTotal.toLocaleString()}</p>
+            </div>
+            <div className="flex items-center gap-1">
+              <Link href={`/admin/sales?year=${prev.year}&month=${prev.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+                <ChevronLeft className="h-3.5 w-3.5 mr-0.5" />前月
+              </Link>
+              <Link href={`/admin/sales?year=${next.year}&month=${next.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+                翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
+              </Link>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -92,17 +170,65 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId }: Prop
               <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>売上金額（円）*</Label>
-              <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
+              <Label>プラットフォーム</Label>
+              <Select value={form.platform} onValueChange={v => { if (v) setForm({ ...form, platform: v as 'manual' | PlatformKey }) }}>
+                <SelectTrigger><SelectValue>{PLATFORM_LABEL[form.platform]}</SelectValue></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="manual">手入力</SelectItem>
+                  <SelectItem value="stripchat">STRIPCHAT</SelectItem>
+                  <SelectItem value="fc2">FC2</SelectItem>
+                  <SelectItem value="dxlive">DXライブ</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
-            <div className="space-y-1.5">
+            {form.platform === 'manual' ? (
+              <div className="space-y-1.5">
+                <Label>売上金額（円）*</Label>
+                <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'} *</Label>
+                <Input type="number" min="0" value={form.raw_units} onChange={e => setForm({ ...form, raw_units: e.target.value })} placeholder="0" />
+              </div>
+            )}
+            <div className="space-y-1.5 col-span-2 md:col-span-4">
               <Label>備考</Label>
               <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
           </div>
+
+          {form.platform !== 'manual' && preview && (
+            <p className="text-sm text-muted-foreground mt-2">
+              換算金額: <span className="font-medium text-foreground">¥{preview.jpy.toLocaleString()}</span>
+              {preview.usd != null && ` （$${preview.usd.toFixed(2)}）`}
+            </p>
+          )}
+
+          <div className="mt-4 pt-3 border-t space-y-3">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={form.is_daily_payment} onCheckedChange={c => setForm({ ...form, is_daily_payment: !!c })} />
+              日払い（この回だけ単価・報酬率を上書きする）
+            </label>
+            {form.is_daily_payment && (
+              <div className="grid grid-cols-2 gap-3 pl-1">
+                {form.platform !== 'manual' && (
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-muted-foreground font-normal">単価上書き（1{form.platform === 'stripchat' ? 'TK' : 'pt'}＝◯円）</Label>
+                    <Input type="number" min="0" step="0.01" value={form.rate_override} onChange={e => setForm({ ...form, rate_override: e.target.value })} placeholder="通常の計算式/固定単価を使う場合は空欄" />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">報酬率上書き（0〜1）</Label>
+                  <Input type="number" min="0" max="1" step="0.01" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
+                </div>
+              </div>
+            )}
+          </div>
+
           <div className="flex gap-2 mt-3">
             <Button onClick={handleSave}><Plus className="h-4 w-4 mr-1" />{editing ? '更新' : '登録'}</Button>
-            {editing && <Button variant="outline" onClick={() => { setEditing(null); setForm({ cast_id: '', date: format(new Date(), 'yyyy-MM-dd'), amount: '', notes: '' }) }}>キャンセル</Button>}
+            {editing && <Button variant="outline" onClick={() => { setEditing(null); setForm(emptyForm) }}>キャンセル</Button>}
           </div>
         </CardContent>
       </Card>
@@ -115,6 +241,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId }: Prop
               <TableRow>
                 <TableHead>日付</TableHead>
                 <TableHead>キャスト</TableHead>
+                <TableHead>プラットフォーム</TableHead>
                 <TableHead className="text-right">金額</TableHead>
                 <TableHead>備考</TableHead>
                 <TableHead className="text-right">操作</TableHead>
@@ -122,12 +249,18 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId }: Prop
             </TableHeader>
             <TableBody>
               {sales.length === 0 && (
-                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">売上データがありません</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">売上データがありません</TableCell></TableRow>
               )}
               {sales.map(sale => (
                 <TableRow key={sale.id}>
                   <TableCell>{format(new Date(sale.date), 'M/d(E)', { locale: ja })}</TableCell>
                   <TableCell>{sale.cast?.display_name ?? '—'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1 flex-wrap">
+                      <Badge variant="outline">{PLATFORM_LABEL[sale.platform] ?? sale.platform}</Badge>
+                      {sale.is_daily_payment && <Badge variant="secondary">日払い</Badge>}
+                    </div>
+                  </TableCell>
                   <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
                   <TableCell>{sale.notes ?? '—'}</TableCell>
                   <TableCell className="text-right space-x-1">

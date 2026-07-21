@@ -8,11 +8,12 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, DoorOpen, Calendar, FileEdit,
   Briefcase, BarChart2, Award, Settings, Bell, LogOut,
-  ChevronDown, Menu, X, MapPin,
+  ChevronDown, Menu, X, MapPin, User,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Logo } from '@/components/logo'
 
 const adminNav = [
   { href: '/dashboard',                   label: 'ダッシュボード',  icon: LayoutDashboard },
@@ -29,7 +30,6 @@ const adminNav = [
 ]
 
 const castNav = [
-  { href: '/dashboard',         label: 'ダッシュボード', icon: LayoutDashboard },
   { href: '/cast/shifts',       label: 'シフト提出',     icon: Calendar },
   { href: '/cast/vacant-slots', label: '空き枠',         icon: Briefcase },
   { href: '/cast/rewards',      label: '報酬明細',       icon: Award },
@@ -90,6 +90,19 @@ const THEME_STYLES: Record<string, ThemeStyles> = {
     mobileBar:      { backgroundColor: '#1a2744', borderColor: 'rgba(255,255,255,0.1)', color: '#f9fafb' },
     mobileButton:   { color: '#94a3b8' },
   },
+  'admin-pro': {
+    sidebar:        { backgroundColor: '#0a0b0d' },
+    border:         'border-white/8',
+    logo:           { color: '#ffffff' },
+    subtext:        { color: '#7d8590' },
+    link:           { color: '#9ca3af' },
+    linkHover:      'hover:bg-white/6 hover:text-white',
+    linkActive:     { backgroundColor: 'rgba(57,135,229,0.16)', color: '#5b9ee8', fontWeight: '500' },
+    linkActiveHover:'',
+    userTrigger:    { color: '#9ca3af' },
+    mobileBar:      { backgroundColor: '#0a0b0d', borderColor: 'rgba(255,255,255,0.08)', color: '#ffffff' },
+    mobileButton:   { color: '#9ca3af' },
+  },
   emerald: {
     sidebar:        { backgroundColor: '#ffffff' },
     border:         'border-emerald-100',
@@ -137,21 +150,19 @@ interface AppNavProps {
   theme?: string
 }
 
-export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
-  const pathname = usePathname()
-  const router = useRouter()
-  const supabase = createClient()
-  const nav = role === 'admin' ? adminNav : castNav
-  const [mobileOpen, setMobileOpen] = useState(false)
-  const s = THEME_STYLES[theme] ?? THEME_STYLES.default
+type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
 
-  async function handleLogout() {
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
-  }
-
-  const NavContent = ({ onLinkClick }: { onLinkClick?: () => void }) => (
+function NavContent({
+  nav, pathname, s, userEmail, onLogout, onLinkClick,
+}: {
+  nav: NavItem[]
+  pathname: string
+  s: ThemeStyles
+  userEmail: string
+  onLogout: () => void
+  onLinkClick?: () => void
+}) {
+  return (
     <>
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
         {nav.map(({ href, label, icon: Icon }) => {
@@ -184,7 +195,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
             <ChevronDown className="h-3.5 w-3.5 shrink-0 ml-1" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+            <DropdownMenuItem onClick={onLogout} className="text-red-600">
               <LogOut className="h-4 w-4 mr-2" />
               ログアウト
             </DropdownMenuItem>
@@ -193,6 +204,21 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
       </div>
     </>
   )
+}
+
+export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
+  const pathname = usePathname()
+  const router = useRouter()
+  const supabase = createClient()
+  const nav = role === 'admin' ? adminNav : castNav
+  const [mobileOpen, setMobileOpen] = useState(false)
+  const s = THEME_STYLES[theme] ?? THEME_STYLES.default
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
 
   return (
     <>
@@ -202,55 +228,112 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
         style={s.sidebar}
       >
         <div className={cn('px-4 py-4 border-b', s.border)}>
-          <p className="font-bold text-lg tracking-tight" style={s.logo}>CalendarApp</p>
+          <div className="flex items-center gap-2.5" style={s.logo}>
+            <Logo className="h-7 w-7 shrink-0" />
+            <p className="font-bold text-lg tracking-tight">CalendarApp</p>
+          </div>
           <p className="text-xs mt-0.5" style={s.subtext}>
             {role === 'admin' ? '管理者' : 'キャスト'}
           </p>
         </div>
-        <NavContent />
+        <NavContent nav={nav} pathname={pathname} s={s} userEmail={userEmail} onLogout={handleLogout} />
       </aside>
 
-      {/* モバイル トップバー */}
-      <div
-        className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center px-4 gap-3"
-        style={s.mobileBar}
-      >
-        <button
-          onClick={() => setMobileOpen(true)}
-          className="p-1 rounded-md hover:bg-white/10"
-          style={s.mobileButton}
-        >
-          <Menu className="h-5 w-5" />
-        </button>
-        <span className="font-bold tracking-tight">CalendarApp</span>
-      </div>
-
-      {/* モバイル ドロワー */}
-      {mobileOpen && (
-        <div className="md:hidden fixed inset-0 z-50 flex">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
-          <aside
-            className={cn('relative w-64 flex flex-col h-full shadow-xl border-r', s.border)}
-            style={s.sidebar}
+      {role === 'cast' ? (
+        <>
+          {/* キャスト: スマホアプリ風の上部バー */}
+          <div
+            className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center justify-between px-4"
+            style={s.mobileBar}
           >
-            <div className={cn('px-4 py-4 border-b flex items-center justify-between', s.border)}>
-              <div>
-                <p className="font-bold text-lg tracking-tight" style={s.logo}>CalendarApp</p>
-                <p className="text-xs mt-0.5" style={s.subtext}>
-                  {role === 'admin' ? '管理者' : 'キャスト'}
-                </p>
-              </div>
-              <button
-                onClick={() => setMobileOpen(false)}
-                className="p-1 rounded-md hover:bg-white/10"
-                style={s.mobileButton}
-              >
-                <X className="h-5 w-5" />
-              </button>
+            <div className="flex items-center gap-2">
+              <Logo className="h-5 w-5 shrink-0" />
+              <span className="font-bold tracking-tight">CalendarApp</span>
             </div>
-            <NavContent onLinkClick={() => setMobileOpen(false)} />
-          </aside>
-        </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger className="p-1.5 rounded-full hover:bg-white/10" style={s.mobileButton}>
+                <User className="h-4 w-4" />
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
+                  <LogOut className="h-4 w-4 mr-2" />
+                  ログアウト
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+
+          {/* キャスト: 下部タブバー */}
+          <nav
+            className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t flex"
+            style={{ ...s.mobileBar, paddingBottom: 'env(safe-area-inset-bottom)' }}
+          >
+            {nav.map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
+                  style={{ color: isActive ? s.linkActive.color : s.link.color, fontWeight: isActive ? 600 : 400 }}
+                >
+                  <Icon className="h-5 w-5" />
+                  <span className="text-[10.5px]">{label}</span>
+                </Link>
+              )
+            })}
+          </nav>
+        </>
+      ) : (
+        <>
+          {/* 管理者: モバイル トップバー */}
+          <div
+            className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center px-4 gap-3"
+            style={s.mobileBar}
+          >
+            <button
+              onClick={() => setMobileOpen(true)}
+              className="p-1 rounded-md hover:bg-white/10"
+              style={s.mobileButton}
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+            <Logo className="h-5 w-5 shrink-0" />
+            <span className="font-bold tracking-tight">CalendarApp</span>
+          </div>
+
+          {/* 管理者: モバイル ドロワー */}
+          {mobileOpen && (
+            <div className="md:hidden fixed inset-0 z-50 flex">
+              <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+              <aside
+                className={cn('relative w-64 flex flex-col h-full shadow-xl border-r', s.border)}
+                style={s.sidebar}
+              >
+                <div className={cn('px-4 py-4 border-b flex items-center justify-between', s.border)}>
+                  <div>
+                    <div className="flex items-center gap-2.5" style={s.logo}>
+                      <Logo className="h-6 w-6 shrink-0" />
+                      <p className="font-bold text-lg tracking-tight">CalendarApp</p>
+                    </div>
+                    <p className="text-xs mt-0.5" style={s.subtext}>管理者</p>
+                  </div>
+                  <button
+                    onClick={() => setMobileOpen(false)}
+                    className="p-1 rounded-md hover:bg-white/10"
+                    style={s.mobileButton}
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                <NavContent
+                  nav={nav} pathname={pathname} s={s} userEmail={userEmail}
+                  onLogout={handleLogout} onLinkClick={() => setMobileOpen(false)}
+                />
+              </aside>
+            </div>
+          )}
+        </>
       )}
     </>
   )

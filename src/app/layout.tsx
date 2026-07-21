@@ -8,6 +8,11 @@ const geist = Geist({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'CalendarApp - 業務管理システム',
   description: '多店舗対応シフト・報酬・キャスト管理',
+  manifest: '/manifest.json',
+}
+
+export const viewport = {
+  themeColor: '#0a0b0d',
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

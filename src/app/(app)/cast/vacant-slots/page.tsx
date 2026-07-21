@@ -8,7 +8,9 @@ export default async function CastVacantSlotsPage() {
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('users').select('store_id').eq('id', user.id).single()
-  if (!profile?.store_id) redirect('/dashboard')
+  if (!profile?.store_id) {
+    return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
+  }
 
   const [{ data: slots }, { data: myApplications }] = await Promise.all([
     supabase.from('vacant_slots')

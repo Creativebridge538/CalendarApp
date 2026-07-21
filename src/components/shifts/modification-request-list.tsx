@@ -13,6 +13,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Check, X } from 'lucide-react'
+import { sendPushNotification } from '@/lib/push'
 
 interface Request {
   id: string
@@ -53,12 +54,10 @@ export function ModificationRequestList({ requests: initialRequests }: { request
     if (e1 || e2) { toast.error('承認に失敗しました'); return }
     setRequests(requests.filter(r => r.id !== req.id))
     toast.success('承認しました')
-    await supabase.from('notifications').insert({
-      user_id: req.requested_by,
-      title: 'シフト修正申請が承認されました',
-      body: req.shifts ? `${format(new Date(req.shifts.date), 'M/d(E)', { locale: ja })} のシフト修正申請` : null,
-      link: '/cast/shifts',
-    })
+    const title = 'シフト修正申請が承認されました'
+    const body = req.shifts ? `${format(new Date(req.shifts.date), 'M/d(E)', { locale: ja })} のシフト修正申請` : null
+    await supabase.from('notifications').insert({ user_id: req.requested_by, title, body, link: '/cast/shifts' })
+    sendPushNotification(req.requested_by, title, body, '/cast/shifts')
   }
 
   async function handleReject() {
@@ -69,12 +68,10 @@ export function ModificationRequestList({ requests: initialRequests }: { request
     if (error) { toast.error('却下に失敗しました'); return }
     setRequests(requests.filter(r => r.id !== rejectTarget.id))
     toast.success('却下しました')
-    await supabase.from('notifications').insert({
-      user_id: rejectTarget.requested_by,
-      title: 'シフト修正申請が却下されました',
-      body: `却下理由: ${rejectReason}`,
-      link: '/cast/shifts',
-    })
+    const title = 'シフト修正申請が却下されました'
+    const body = `却下理由: ${rejectReason}`
+    await supabase.from('notifications').insert({ user_id: rejectTarget.requested_by, title, body, link: '/cast/shifts' })
+    sendPushNotification(rejectTarget.requested_by, title, body, '/cast/shifts')
     setRejectTarget(null)
     setRejectReason('')
   }
