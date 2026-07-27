@@ -46,43 +46,77 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
     }
   }
 
+  function StatusControl({ slotId, block }: { slotId: string; block?: boolean }) {
+    const status = getStatus(slotId)
+    if (status === 'approved') return <Badge>承認済み</Badge>
+    if (status === 'rejected') return <Badge variant="destructive">却下</Badge>
+    if (status === 'pending') return <Badge variant="secondary">申請中</Badge>
+    return (
+      <Button size="sm" variant="tonal" className={block ? 'w-full' : undefined} onClick={() => apply(slotId)}>
+        申請する
+      </Button>
+    )
+  }
+
   return (
-    <Card>
-      <CardHeader><CardTitle>空き枠一覧</CardTitle></CardHeader>
-      <CardContent>
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>日付</TableHead>
-              <TableHead>時間</TableHead>
-              <TableHead>ルーム</TableHead>
-              <TableHead>備考</TableHead>
-              <TableHead className="text-right">申請</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {slots.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">公開中の空き枠はありません</TableCell></TableRow>
-            )}
-            {slots.map(slot => {
-              const status = getStatus(slot.id)
-              return (
+    <Card elevated className="rounded-none border-x-0 md:rounded-lg md:border-x">
+      <CardHeader className="px-4 md:px-6"><CardTitle>空き枠一覧</CardTitle></CardHeader>
+      <CardContent className="px-0 md:px-6">
+        {slots.length === 0 && (
+          <p className="text-center text-muted-foreground py-8 text-sm">公開中の空き枠はありません</p>
+        )}
+
+        {/* モバイル: カードレイアウト */}
+        {slots.length > 0 && (
+          <div className="md:hidden space-y-2 px-4">
+            {slots.map(slot => (
+              <div key={slot.id} className="rounded-lg border p-3 space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-sm">{format(new Date(slot.date), 'M月d日(E)', { locale: ja })}</span>
+                  <span className="text-sm text-muted-foreground">{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</span>
+                </div>
+                <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
+                  <span>{slot.rooms?.name ?? 'ルーム未指定'}</span>
+                  {slot.notes && (
+                    <>
+                      <span>・</span>
+                      <span>{slot.notes}</span>
+                    </>
+                  )}
+                </div>
+                <div className="pt-1">
+                  <StatusControl slotId={slot.id} block />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* デスクトップ: テーブル */}
+        {slots.length > 0 && (
+          <Table className="hidden md:table">
+            <TableHeader>
+              <TableRow>
+                <TableHead>日付</TableHead>
+                <TableHead>時間</TableHead>
+                <TableHead>ルーム</TableHead>
+                <TableHead>備考</TableHead>
+                <TableHead className="text-right">申請</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {slots.map(slot => (
                 <TableRow key={slot.id}>
                   <TableCell>{format(new Date(slot.date), 'M/d(E)', { locale: ja })}</TableCell>
                   <TableCell>{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</TableCell>
                   <TableCell>{slot.rooms?.name ?? '—'}</TableCell>
                   <TableCell>{slot.notes ?? '—'}</TableCell>
-                  <TableCell className="text-right">
-                    {status === 'approved' && <Badge>承認済み</Badge>}
-                    {status === 'rejected' && <Badge variant="destructive">却下</Badge>}
-                    {status === 'pending' && <Badge variant="secondary">申請中</Badge>}
-                    {!status && <Button size="sm" onClick={() => apply(slot.id)}>申請する</Button>}
-                  </TableCell>
+                  <TableCell className="text-right"><StatusControl slotId={slot.id} /></TableCell>
                 </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
+              ))}
+            </TableBody>
+          </Table>
+        )}
       </CardContent>
     </Card>
   )

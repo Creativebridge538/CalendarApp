@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, DoorOpen, Calendar, FileEdit,
   Briefcase, BarChart2, Award, Settings, Bell, LogOut,
-  ChevronDown, Menu, X, MapPin, User,
+  ChevronDown, Menu, X, MapPin, Palette,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -30,10 +30,10 @@ const adminNav = [
 ]
 
 const castNav = [
-  { href: '/cast/shifts',       label: 'シフト提出',     icon: Calendar },
+  { href: '/cast/shifts',       label: 'シフト',         icon: Calendar },
   { href: '/cast/vacant-slots', label: '空き枠',         icon: Briefcase },
-  { href: '/cast/rewards',      label: '報酬明細',       icon: Award },
-  { href: '/notifications',     label: '通知',           icon: Bell },
+  { href: '/cast/rewards',      label: '分析',           icon: Award },
+  { href: '/cast/settings',     label: '設定',           icon: Settings },
 ]
 
 type ThemeStyles = {
@@ -153,15 +153,17 @@ interface AppNavProps {
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
 
 function NavContent({
-  nav, pathname, s, userEmail, onLogout, onLinkClick,
+  nav, pathname, s, userEmail, role, onLogout, onLinkClick,
 }: {
   nav: NavItem[]
   pathname: string
   s: ThemeStyles
   userEmail: string
+  role: string
   onLogout: () => void
   onLinkClick?: () => void
 }) {
+  const router = useRouter()
   return (
     <>
       <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
@@ -195,6 +197,12 @@ function NavContent({
             <ChevronDown className="h-3.5 w-3.5 shrink-0 ml-1" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
+            {role === 'cast' && (
+              <DropdownMenuItem onClick={() => { onLinkClick?.(); router.push('/cast/settings') }}>
+                <Palette className="h-4 w-4 mr-2" />
+                設定・着せ替え
+              </DropdownMenuItem>
+            )}
             <DropdownMenuItem onClick={onLogout} className="text-red-600">
               <LogOut className="h-4 w-4 mr-2" />
               ログアウト
@@ -213,6 +221,11 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
   const nav = role === 'admin' ? adminNav : castNav
   const [mobileOpen, setMobileOpen] = useState(false)
   const s = THEME_STYLES[theme] ?? THEME_STYLES.default
+  // キャストの下部タブバーは店舗テーマに関わらず常に白基調（iOSネイティブ系の見た目）
+  const castBottomBar: React.CSSProperties = {
+    backgroundColor: '#ffffff',
+    color: '#8e8e93',
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -236,53 +249,40 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
             {role === 'admin' ? '管理者' : 'キャスト'}
           </p>
         </div>
-        <NavContent nav={nav} pathname={pathname} s={s} userEmail={userEmail} onLogout={handleLogout} />
+        <NavContent nav={nav} pathname={pathname} s={s} userEmail={userEmail} role={role} onLogout={handleLogout} />
       </aside>
 
       {role === 'cast' ? (
         <>
-          {/* キャスト: スマホアプリ風の上部バー */}
-          <div
-            className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center justify-between px-4"
-            style={s.mobileBar}
-          >
-            <div className="flex items-center gap-2">
-              <Logo className="h-5 w-5 shrink-0" />
-              <span className="font-bold tracking-tight">CalendarApp</span>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger className="p-1.5 rounded-full hover:bg-white/10" style={s.mobileButton}>
-                <User className="h-4 w-4" />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem onClick={handleLogout} className="text-red-600">
-                  <LogOut className="h-4 w-4 mr-2" />
-                  ログアウト
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
+          {/* キャスト: 固定の上部バーは廃止（ハンバーガーはシフト画面自身に持たせる）*/}
 
-          {/* キャスト: 下部タブバー */}
-          <nav
-            className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t flex"
-            style={{ ...s.mobileBar, paddingBottom: 'env(safe-area-inset-bottom)' }}
+          {/* キャスト: 下部タブバー（浮遊するピル型バー、アクティブタブは塗りつぶしピル） */}
+          <div
+            className="md:hidden fixed bottom-0 left-0 right-0 z-40 px-3"
+            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)' }}
           >
-            {nav.map(({ href, label, icon: Icon }) => {
-              const isActive = pathname === href || pathname.startsWith(href + '/')
-              return (
-                <Link
-                  key={href}
-                  href={href}
-                  className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2"
-                  style={{ color: isActive ? s.linkActive.color : s.link.color, fontWeight: isActive ? 600 : 400 }}
-                >
-                  <Icon className="h-5 w-5" />
-                  <span className="text-[10.5px]">{label}</span>
-                </Link>
-              )
-            })}
-          </nav>
+            <nav
+              className="grid grid-cols-4 rounded-full shadow-[0_4px_20px_oklch(0_0_0_/_15%)] px-1.5 py-1.5 gap-0.5"
+              style={castBottomBar}
+            >
+              {nav.map(({ href, label, icon: Icon }) => {
+                const isActive = pathname === href || pathname.startsWith(href + '/')
+                return (
+                  <Link
+                    key={href}
+                    href={href}
+                    className="min-w-0 h-10 flex items-center justify-center gap-1 px-1 rounded-full overflow-hidden transition-colors"
+                    style={isActive
+                      ? { backgroundColor: 'var(--brand-accent)', color: '#ffffff' }
+                      : { color: castBottomBar.color }}
+                  >
+                    <Icon className="h-4 w-4 shrink-0" />
+                    <span className="text-[11.5px] font-medium truncate">{label}</span>
+                  </Link>
+                )
+              })}
+            </nav>
+          </div>
         </>
       ) : (
         <>
@@ -327,7 +327,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
                   </button>
                 </div>
                 <NavContent
-                  nav={nav} pathname={pathname} s={s} userEmail={userEmail}
+                  nav={nav} pathname={pathname} s={s} userEmail={userEmail} role={role}
                   onLogout={handleLogout} onLinkClick={() => setMobileOpen(false)}
                 />
               </aside>

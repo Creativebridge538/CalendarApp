@@ -82,6 +82,19 @@
   --sidebar-accent-foreground: oklch(0.205 0 0);
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
+
+  /* ブランドアクセント: FAB等の最重要アクションは店舗テーマ（Mono等）に関わらず常にこの色で目立たせる */
+  --brand-accent: #3987e5;
+  --brand-accent-2: #5b9ee8;
+  --brand-accent-dark: #2f6fc4;
+  /* キャストのモバイル画面専用: ページ背景に色を敷いて白カードを明確に浮かせる */
+  --cast-mobile-bg: #f7f7f8;
+
+  /* エレベーション（iOSネイティブ風のフラットな見た目）: ほぼ罫線に近い薄い影のみ */
+  --elevation-1: 0 0 0 1px oklch(0 0 0 / 6%), 0 1px 2px oklch(0 0 0 / 4%);
+  --elevation-2: 0 0 0 1px oklch(0 0 0 / 6%), 0 4px 12px oklch(0 0 0 / 8%);
+  --elevation-fab: 0 3px 10px oklch(0 0 0 / 20%);
+  --elevation-fab-pressed: 0 1px 4px oklch(0 0 0 / 15%), inset 0 2px 4px oklch(0 0 0 / 15%);
 }
 
 .dark {
@@ -116,6 +129,11 @@
   --sidebar-accent-foreground: oklch(0.985 0 0);
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
+
+  --elevation-1: 0 0 0 1px oklch(1 0 0 / 10%), 0 1px 2px oklch(0 0 0 / 20%);
+  --elevation-2: 0 0 0 1px oklch(1 0 0 / 10%), 0 4px 14px oklch(0 0 0 / 30%);
+  --elevation-fab: 0 3px 10px oklch(0 0 0 / 40%);
+  --elevation-fab-pressed: 0 1px 4px oklch(0 0 0 / 35%), inset 0 2px 6px oklch(0 0 0 / 40%);
 }
 
 @layer base {
@@ -124,9 +142,12 @@
   }
   body {
     @apply bg-background text-foreground;
+    overscroll-behavior: none;
   }
   html {
     @apply font-sans;
+    overscroll-behavior: none;
+    height: 100%;
   }
 }
 

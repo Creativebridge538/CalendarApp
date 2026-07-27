@@ -140,11 +140,13 @@ export default async function CastRewardsPage() {
   }
 
   return (
-    <div className="p-4 md:p-6 max-w-lg mx-auto">
+    <div className="px-4 py-4 md:p-6 max-w-lg mx-auto">
       <CastRewardDashboard
         userId={user.id}
         displayName={profile.display_name}
         monthLabel={`${now.getFullYear()}年${now.getMonth() + 1}月`}
+        year={now.getFullYear()}
+        month={now.getMonth() + 1}
         thisMonthTotal={thisMonthTotal}
         prevMonthTotal={prevMonthTotal}
         monthlyGoal={profile.monthly_goal != null ? Number(profile.monthly_goal) : null}

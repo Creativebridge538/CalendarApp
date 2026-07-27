@@ -1,19 +1,20 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   TrendingUp, TrendingDown, Minus, Target, Pencil, StickyNote, Lock,
-  CircleDollarSign, CalendarDays, CalendarRange, BarChart3,
+  CircleDollarSign, CalendarDays, CalendarRange, BarChart3, FileText,
 } from 'lucide-react'
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -30,6 +31,8 @@ interface Props {
   userId: string
   displayName: string | null
   monthLabel: string
+  year: number
+  month: number
   thisMonthTotal: number
   prevMonthTotal: number
   monthlyGoal: number | null
@@ -63,7 +66,7 @@ function useCountUp(target: number, durationMs = 900) {
 const WEEKDAY_HEADS = ['日', '月', '火', '水', '木', '金', '土']
 
 export function CastRewardDashboard({
-  userId, monthLabel, thisMonthTotal, prevMonthTotal, monthlyGoal: initialGoal,
+  userId, monthLabel, year, month, thisMonthTotal, prevMonthTotal, monthlyGoal: initialGoal,
   calendarDays, workedDaysThisMonth, avgPerWorkedDay, trend, weekday, dayDetails,
   usdJpyRate, finalizedReward,
 }: Props) {
@@ -94,28 +97,36 @@ export function CastRewardDashboard({
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <h1 className="text-xl font-bold">収益ダッシュボード</h1>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="shrink-0">
+          <h1 className="text-xl font-bold whitespace-nowrap">収益ダッシュボード</h1>
           <p className="text-sm text-muted-foreground">{monthLabel}</p>
         </div>
-        <div className="flex rounded-lg border overflow-hidden shrink-0">
+        <div className="flex rounded-full bg-muted p-0.5 shrink-0 shadow-[inset_0_1px_3px_oklch(0_0_0_/_10%)]">
           <button
             onClick={() => setActiveTab('calendar')}
-            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors ${activeTab === 'calendar' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
+            className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 ${
+              activeTab === 'calendar'
+                ? 'bg-[var(--brand-accent)] text-white shadow-[0_2px_6px_oklch(0_0_0_/_15%)]'
+                : 'text-muted-foreground'
+            }`}
           >
             <CalendarRange className="h-3.5 w-3.5" />カレンダー
           </button>
           <button
             onClick={() => setActiveTab('report')}
-            className={`flex items-center gap-1 px-3 py-1.5 text-xs font-medium transition-colors border-l ${activeTab === 'report' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
+            className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 ${
+              activeTab === 'report'
+                ? 'bg-[var(--brand-accent)] text-white shadow-[0_2px_6px_oklch(0_0_0_/_15%)]'
+                : 'text-muted-foreground'
+            }`}
           >
             <BarChart3 className="h-3.5 w-3.5" />レポート
           </button>
         </div>
       </div>
 
-      <Card className="overflow-hidden border-primary/20">
+      <Card elevated>
         <CardContent className="pt-5 space-y-3">
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
@@ -136,9 +147,18 @@ export function CastRewardDashboard({
           </div>
 
           {finalizedReward != null && (
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
-            </p>
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
+              </p>
+              <Link
+                href={`/admin/rewards/notice?cast_id=${userId}&year=${year}&month=${month}`}
+                target="_blank"
+                className={buttonVariants({ size: 'sm', variant: 'tonal' })}
+              >
+                <FileText className="h-3.5 w-3.5 mr-1" />支払通知書
+              </Link>
+            </div>
           )}
 
           <div>
@@ -150,14 +170,18 @@ export function CastRewardDashboard({
               <button
                 type="button"
                 onClick={() => { setGoalInput(monthlyGoal != null ? String(monthlyGoal) : ''); setGoalOpen(true) }}
-                className="text-xs text-primary flex items-center gap-0.5 hover:underline"
+                className="text-xs flex items-center gap-0.5 hover:underline"
+                style={{ color: 'var(--brand-accent)' }}
               >
                 <Pencil className="h-3 w-3" />{monthlyGoal ? '編集' : '設定する'}
               </button>
             </div>
             {monthlyGoal != null && (
               <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div className="h-full rounded-full bg-primary transition-[width] duration-700" style={{ width: `${goalProgress}%` }} />
+                <div
+                  className="h-full rounded-full transition-[width] duration-700 bg-[var(--brand-accent)]"
+                  style={{ width: `${goalProgress}%` }}
+                />
               </div>
             )}
           </div>
@@ -167,11 +191,11 @@ export function CastRewardDashboard({
       {activeTab === 'calendar' && (
         <>
           <div className="grid grid-cols-2 gap-3">
-            <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">稼働日数</p><p className="text-lg font-bold mt-0.5">{workedDaysThisMonth}日</p></CardContent></Card>
-            <Card><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">1日の平均</p><p className="text-lg font-bold mt-0.5">¥{avgPerWorkedDay.toLocaleString()}</p></CardContent></Card>
+            <Card elevated><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">稼働日数</p><p className="text-lg font-bold mt-0.5">{workedDaysThisMonth}日</p></CardContent></Card>
+            <Card elevated><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">1日の平均</p><p className="text-lg font-bold mt-0.5">¥{avgPerWorkedDay.toLocaleString()}</p></CardContent></Card>
           </div>
 
-          <Card>
+          <Card elevated>
             <CardContent className="pt-4 pb-4">
               <div className="grid grid-cols-7 gap-1 text-center text-xs mb-1.5">
                 {WEEKDAY_HEADS.map(d => <div key={d} className="text-muted-foreground font-medium py-1">{d}</div>)}
@@ -183,14 +207,19 @@ export function CastRewardDashboard({
                       key={c.date}
                       onClick={() => setSelectedDate(selectedDate === c.date ? null : c.date)}
                       className={
-                        'rounded-lg py-1.5 text-center transition-colors ' +
-                        (selectedDate === c.date ? 'bg-primary text-primary-foreground' : c.amount > 0 ? 'bg-primary/10 hover:bg-primary/20' : 'hover:bg-muted')
+                        'rounded-lg py-1.5 text-center transition-all duration-150 ' +
+                        (selectedDate === c.date
+                          ? 'bg-[var(--brand-accent)] text-white shadow-[0_2px_6px_oklch(0_0_0_/_15%)]'
+                          : c.amount > 0 ? 'bg-[color-mix(in_oklch,var(--brand-accent)_10%,transparent)] hover:bg-[color-mix(in_oklch,var(--brand-accent)_18%,transparent)]' : 'hover:bg-muted')
                       }
-                      style={c.isToday && selectedDate !== c.date ? { boxShadow: 'inset 0 0 0 1.5px var(--primary)' } : undefined}
+                      style={c.isToday && selectedDate !== c.date ? { boxShadow: 'inset 0 0 0 1.5px var(--brand-accent)' } : undefined}
                     >
                       <div className="text-xs font-semibold">{c.day}</div>
                       {c.amount > 0 && (
-                        <div className={'text-[9px] mt-0.5 tabular-nums ' + (selectedDate === c.date ? '' : 'text-primary')}>
+                        <div
+                          className="text-[9px] mt-0.5 tabular-nums"
+                          style={selectedDate === c.date ? undefined : { color: 'var(--brand-accent)' }}
+                        >
                           {Math.round(c.amount / 1000)}k
                         </div>
                       )}
@@ -202,7 +231,7 @@ export function CastRewardDashboard({
           </Card>
 
           {detail && selectedDate && (
-            <Card className="border-primary/30">
+            <Card elevated>
               <CardContent className="pt-4 pb-4 space-y-3">
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold flex items-center gap-1.5">
@@ -260,7 +289,7 @@ export function CastRewardDashboard({
           <WeekdayChart data={weekday} />
 
           {usdJpyRate != null && (
-            <Card>
+            <Card elevated>
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-center justify-between">
                   <span className="text-xs text-muted-foreground flex items-center gap-1.5">
@@ -287,7 +316,7 @@ export function CastRewardDashboard({
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setGoalOpen(false)}>キャンセル</Button>
-              <Button onClick={saveGoal} disabled={savingGoal}>保存</Button>
+              <Button variant="elevated" onClick={saveGoal} disabled={savingGoal}>保存</Button>
             </div>
           </div>
         </DialogContent>
@@ -326,7 +355,7 @@ function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
   const hovered = hover != null ? points[hover] : null
 
   return (
-    <Card>
+    <Card elevated>
       <CardContent className="pt-4 pb-4" style={{ position: 'relative' }}>
         <p className="text-sm font-semibold mb-0.5">売上推移</p>
         <p className="text-xs text-muted-foreground mb-2">直近30日</p>
@@ -337,16 +366,16 @@ function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
         >
           <defs>
             <linearGradient id="cast-trend-fill" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.28" />
-              <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
+              <stop offset="0%" stopColor="var(--brand-accent)" stopOpacity="0.28" />
+              <stop offset="100%" stopColor="var(--brand-accent)" stopOpacity="0" />
             </linearGradient>
           </defs>
           <path d={areaPath} fill="url(#cast-trend-fill)" stroke="none" />
-          <path d={linePath} fill="none" stroke="var(--primary)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+          <path d={linePath} fill="none" stroke="var(--brand-accent)" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
           {hovered && (
             <>
               <line x1={hovered.x} x2={hovered.x} y1={padTop} y2={height - padBottom} stroke="var(--border)" strokeWidth={1} />
-              <circle cx={hovered.x} cy={hovered.y} r={4} fill="var(--primary)" stroke="var(--card)" strokeWidth={2} />
+              <circle cx={hovered.x} cy={hovered.y} r={4} fill="var(--brand-accent)" stroke="var(--card)" strokeWidth={2} />
             </>
           )}
         </svg>
@@ -367,7 +396,7 @@ function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
 function WeekdayChart({ data }: { data: { label: string; amount: number }[] }) {
   const max = Math.max(1, ...data.map(d => d.amount))
   return (
-    <Card>
+    <Card elevated>
       <CardContent className="pt-4 pb-4">
         <p className="text-sm font-semibold mb-0.5">曜日別 平均売上</p>
         <p className="text-xs text-muted-foreground mb-3">直近60日の平均</p>
@@ -379,7 +408,7 @@ function WeekdayChart({ data }: { data: { label: string; amount: number }[] }) {
                 <span className="text-[9px] text-muted-foreground mb-1 tabular-nums">
                   {d.amount > 0 ? Math.round(d.amount / 1000) + 'k' : ''}
                 </span>
-                <div className="w-full rounded-t-sm bg-primary/60" style={{ height: h }} />
+                <div className="w-full rounded-t-sm" style={{ height: h, backgroundColor: 'color-mix(in oklch, var(--brand-accent) 60%, transparent)' }} />
                 <span className="text-[10px] text-muted-foreground mt-1.5">{d.label}</span>
               </div>
             )

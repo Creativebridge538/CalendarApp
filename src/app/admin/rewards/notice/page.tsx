@@ -19,9 +19,11 @@ export default async function PaymentNoticePage({
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('users').select('role, store_id').eq('id', user.id).single()
-  if (profile?.role !== 'admin') redirect('/dashboard')
+  const isAdmin = profile?.role === 'admin'
+  const isSelf = profile?.role === 'cast' && cast_id === user.id
+  if (!isAdmin && !isSelf) redirect('/dashboard')
 
-  const storeId = profile.store_id!
+  const storeId = profile!.store_id!
   const year = parseInt(yearParam ?? '')
   const month = parseInt(monthParam ?? '')
 
@@ -48,6 +50,10 @@ export default async function PaymentNoticePage({
   if (!cast || !reward) {
     return <div className="p-6 text-sm text-muted-foreground">対象の報酬明細が見つかりません（まだ計算・確定されていない可能性があります）。</div>
   }
+  // キャスト本人は確定済みの月のみ閲覧可能（管理者は確認のため未確定でも閲覧可）
+  if (isSelf && !reward.is_finalized) {
+    return <div className="p-6 text-sm text-muted-foreground">この月の報酬明細はまだ確定されていません。確定後にご確認いただけます。</div>
+  }
 
   const periodLabel = `${year}年${month}月分`
 
@@ -65,6 +71,17 @@ export default async function PaymentNoticePage({
           padding: 14mm 16mm; box-shadow: 0 2px 24px rgba(0,0,0,0.16);
           font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
           font-size: 13px;
+        }
+        /* スマホ表示: A4固定幅だとはみ出すので画面用に流動幅に切り替え（印刷時は上のA4指定が優先） */
+        @media screen and (max-width: 700px) {
+          .notice-page { width: 100%; min-height: auto; margin: 0 auto 24px; padding: 20px 16px; box-shadow: none; border-bottom: 8px solid #f0f0f0; }
+          .notice-doc-title { font-size: 17px; letter-spacing: 3px; }
+          .notice-header-grid { flex-wrap: wrap; gap: 12px; }
+          .notice-issuer { text-align: left; }
+          .notice-issuer img { margin-left: 0; }
+          .notice-total-amount { font-size: 22px; }
+          table.notice-table, table.summary-table { font-size: 11px; }
+          table.notice-table th, table.notice-table td { padding: 5px 4px; }
         }
         .notice-title-row { display: flex; justify-content: space-between; align-items: flex-end; padding-bottom: 6px; border-bottom: 2px solid #1a1a1a; margin-bottom: 18px; }
         .notice-doc-title { font-size: 24px; font-weight: bold; letter-spacing: 8px; }

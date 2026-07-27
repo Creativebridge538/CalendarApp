@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
+import { Logo } from '@/components/logo'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -53,60 +54,71 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <Card className="w-full max-w-md">
-        <CardHeader className="space-y-1">
-          <CardTitle className="text-2xl font-bold text-center">ログイン</CardTitle>
-          <CardDescription className="text-center">
-            メールアドレスとパスワードを入力してください
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            {error && (
-              <Alert variant="destructive">
-                <AlertDescription>{error}</AlertDescription>
-              </Alert>
-            )}
-            <div className="space-y-2">
-              <Label htmlFor="email">メールアドレス</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="example@email.com"
-                required
-                autoComplete="email"
-              />
+    <div
+      className="min-h-screen flex items-center justify-center p-4"
+      style={{ background: 'var(--cast-mobile-bg, #f7f7f8)' }}
+    >
+      <div className="relative w-full max-w-md">
+        <Card elevated className="w-full">
+          <CardHeader className="space-y-1">
+            <div className="flex items-center justify-center gap-1.5 mb-2">
+              <Logo className="h-5 w-5" style={{ color: 'var(--brand-accent)' }} />
+              <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--brand-accent)' }}>
+                CalendarApp
+              </span>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">パスワード</Label>
-              <Input
-                id="password"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                autoComplete="current-password"
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={loading}>
-              {loading ? 'ログイン中...' : 'ログイン'}
-            </Button>
-            <Button
-              type="button"
-              variant="ghost"
-              className="w-full text-sm"
-              onClick={handleResetPassword}
-              disabled={loading}
-            >
-              パスワードをお忘れの方
-            </Button>
-          </form>
-        </CardContent>
-      </Card>
+            <CardTitle className="text-2xl font-bold text-center">ログイン</CardTitle>
+            <CardDescription className="text-center">
+              メールアドレスとパスワードを入力してください
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <form onSubmit={handleLogin} className="space-y-4">
+              {error && (
+                <Alert variant="destructive">
+                  <AlertDescription>{error}</AlertDescription>
+                </Alert>
+              )}
+              <div className="space-y-2">
+                <Label htmlFor="email">メールアドレス</Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="example@email.com"
+                  required
+                  autoComplete="email"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="password">パスワード</Label>
+                <Input
+                  id="password"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="••••••••"
+                  required
+                  autoComplete="current-password"
+                />
+              </div>
+              <Button type="submit" variant="elevated" className="w-full" disabled={loading}>
+                {loading ? 'ログイン中...' : 'ログイン'}
+              </Button>
+              <Button
+                type="button"
+                variant="tonal"
+                className="w-full text-sm"
+                onClick={handleResetPassword}
+                disabled={loading}
+              >
+                パスワードをお忘れの方
+              </Button>
+            </form>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   )
 }

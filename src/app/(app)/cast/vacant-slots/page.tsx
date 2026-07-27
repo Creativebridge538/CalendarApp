@@ -25,7 +25,7 @@ export default async function CastVacantSlotsPage() {
   ])
 
   return (
-    <div className="p-6">
+    <div className="px-0 py-4 md:p-6">
       <CastVacantSlots slots={slots ?? []} myApplications={myApplications ?? []} castId={user.id} storeId={profile.store_id} />
     </div>
   )

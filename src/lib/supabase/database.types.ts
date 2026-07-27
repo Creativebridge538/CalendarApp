@@ -740,6 +740,8 @@ export type Database = {
       }
       users: {
         Row: {
+          accent_skin: string
+          birthdate: string | null
           calendar_token: string | null
           created_at: string
           display_name: string | null
@@ -754,10 +756,13 @@ export type Database = {
           real_name: string | null
           reward_rate: number
           role: Database["public"]["Enums"]["user_role"]
+          show_birthdate: boolean
           store_id: string | null
           updated_at: string
         }
         Insert: {
+          accent_skin?: string
+          birthdate?: string | null
           calendar_token?: string | null
           created_at?: string
           display_name?: string | null
@@ -772,10 +777,13 @@ export type Database = {
           real_name?: string | null
           reward_rate?: number
           role?: Database["public"]["Enums"]["user_role"]
+          show_birthdate?: boolean
           store_id?: string | null
           updated_at?: string
         }
         Update: {
+          accent_skin?: string
+          birthdate?: string | null
           calendar_token?: string | null
           created_at?: string
           display_name?: string | null
@@ -790,6 +798,7 @@ export type Database = {
           real_name?: string | null
           reward_rate?: number
           role?: Database["public"]["Enums"]["user_role"]
+          show_birthdate?: boolean
           store_id?: string | null
           updated_at?: string
         }

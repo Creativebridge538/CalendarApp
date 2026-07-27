@@ -1,9 +1,10 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format, isAfter } from 'date-fns'
+import { format, isAfter, addMonths, subMonths, addDays, subDays, startOfWeek, isSameDay } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,14 +12,15 @@ import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Checkbox } from '@/components/ui/checkbox'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, FileEdit, CalendarDays, List, Trash2, Copy, RefreshCw, Link2 } from 'lucide-react'
+import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
+import { Logo } from '@/components/logo'
 
 type ShiftStatus = Database['public']['Enums']['shift_status']
 
@@ -45,6 +47,9 @@ const STATUS_LABEL: Record<ShiftStatus, string> = {
 const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive',
 }
+const STATUS_DOT: Record<ShiftStatus, string> = {
+  draft: '#94a3b8', submitted: '#3987e5', confirmed: '#10b981', rejected: '#ef4444',
+}
 
 interface Props {
   shifts: Shift[]
@@ -52,38 +57,136 @@ interface Props {
   areas: { id: string; name: string }[]
   castId: string
   storeId: string
+  storeName: string | null
   settings: Settings | null
   userId: string
   checklistItems: { id: string; label: string; item_type: string; options: string[] }[]
-  calendarToken: string | null
 }
 
-function isPastDeadline(settings: Settings | null): boolean {
-  if (!settings || settings.deadline_type === 'none') return false
-  const now = new Date()
-  if (settings.deadline_type === 'monthly') {
-    return now.getDate() > settings.deadline_day
-  }
-  // weekly: 月曜始まりで比較（日曜=7 に読み替え）
-  const todayNum = now.getDay() === 0 ? 7 : now.getDay()
-  const deadlineNum = settings.deadline_day === 0 ? 7 : settings.deadline_day
-  return todayNum > deadlineNum
+const HOUR_HEIGHT = 56
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
+
+function timeToMinutes(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return h * 60 + m
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, settings, userId, checklistItems, calendarToken: initialCalendarToken }: Props) {
+/** 週表示・日表示共通の時間軸グリッド（Googleカレンダー等と同じ、時刻に応じて予定ブロックを配置する形式） */
+function ShiftTimeGrid({
+  days, shiftsOn, onDayClick,
+}: {
+  days: Date[]
+  shiftsOn: (day: Date) => Shift[]
+  onDayClick: (day: Date) => void
+}) {
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const daysKey = days.map(d => d.toISOString()).join(',')
+
+  useEffect(() => {
+    const allShifts = days.flatMap(d => shiftsOn(d))
+    const earliestMin = allShifts.length > 0
+      ? Math.min(...allShifts.map(s => timeToMinutes(s.start_time.slice(0, 5))))
+      : 9 * 60
+    const scrollHour = Math.max(0, Math.floor(earliestMin / 60) - 1)
+    scrollRef.current?.scrollTo({ top: scrollHour * HOUR_HEIGHT })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [daysKey])
+
+  return (
+    <div>
+      {/* 日付ヘッダー行 */}
+      <div className="flex border-b border-border/60">
+        <div className="w-9 shrink-0" />
+        {days.map(day => {
+          const isToday = isSameDay(day, new Date())
+          return (
+            <div key={day.toISOString()} className="flex-1 text-center py-1.5 min-w-0">
+              <div className={`text-[10px] ${day.getDay() === 0 ? 'text-red-500' : day.getDay() === 6 ? 'text-blue-500' : 'text-muted-foreground'}`}>
+                {format(day, 'E', { locale: ja })}
+              </div>
+              <span
+                className={`inline-flex items-center justify-center h-6 w-6 rounded-full text-sm font-semibold ${isToday ? 'text-white' : ''}`}
+                style={isToday ? { backgroundColor: 'var(--brand-accent)' } : undefined}
+              >
+                {format(day, 'd')}
+              </span>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* スクロール可能な時間グリッド */}
+      <div ref={scrollRef} className="overflow-y-auto" style={{ maxHeight: 440 }}>
+        <div className="flex relative" style={{ height: HOUR_HEIGHT * 24 }}>
+          <div className="w-9 shrink-0 relative">
+            {HOURS.map(h => (
+              <div key={h} className="absolute right-1 text-[10px] text-muted-foreground" style={{ top: h * HOUR_HEIGHT - 6 }}>
+                {h}
+              </div>
+            ))}
+          </div>
+          {days.map(day => (
+            <div
+              key={day.toISOString()}
+              onClick={() => onDayClick(day)}
+              className="flex-1 relative border-l border-border/40 min-w-0 cursor-pointer"
+            >
+              {HOURS.map(h => (
+                <div key={h} className="absolute left-0 right-0 border-t border-border/30" style={{ top: h * HOUR_HEIGHT }} />
+              ))}
+              {shiftsOn(day).map(s => {
+                const startMin = timeToMinutes(s.start_time.slice(0, 5))
+                const endMin = timeToMinutes(s.end_time.slice(0, 5))
+                const top = (startMin / 60) * HOUR_HEIGHT
+                const height = Math.max(20, ((endMin - startMin) / 60) * HOUR_HEIGHT)
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={e => { e.stopPropagation(); onDayClick(day) }}
+                    className="absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-left text-white text-[10px] font-medium overflow-hidden leading-tight"
+                    style={{ top, height, backgroundColor: STATUS_DOT[s.status] }}
+                  >
+                    {s.start_time.slice(0, 5)}〜{s.end_time.slice(0, 5)}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
-  const [calendarToken, setCalendarToken] = useState(initialCalendarToken)
-  const [issuingToken, setIssuingToken] = useState(false)
-  const [view, setView] = useState<'list' | 'calendar'>('calendar')
+  const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
+  const [menuOpen, setMenuOpen] = useState(false)
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [calAnchor, setCalAnchor] = useState(() => new Date())
+  const [calDirection, setCalDirection] = useState<'next' | 'prev'>('next')
   const [open, setOpen] = useState(false)
   const [modOpen, setModOpen] = useState(false)
-  const [syncOpen, setSyncOpen] = useState(false)
+  const [dayDetailDate, setDayDetailDateRaw] = useState<string | null>(null)
+  const [detailShiftId, setDetailShiftId] = useState<string | null>(null)
+  function setDayDetailDate(date: string | null) {
+    setDayDetailDateRaw(date)
+    setDetailShiftId(null)
+  }
   const [editing, setEditing] = useState<Shift | null>(null)
   const [modTarget, setModTarget] = useState<Shift | null>(null)
   const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', checklist_answers: {} as ChecklistAnswers })
   const [modForm, setModForm] = useState({ new_date: '', new_start_time: '', new_end_time: '', reason: '' })
   const supabase = createClient()
-  const pastDeadline = isPastDeadline(settings)
+  const router = useRouter()
+
+  async function handleLogout() {
+    await supabase.auth.signOut()
+    router.push('/login')
+    router.refresh()
+  }
   const locationMode = settings?.location_mode ?? 'room'
   const areaLabel = settings?.area_label ?? 'エリア'
   const roomLabel = settings?.room_label ?? 'ルーム'
@@ -91,17 +194,25 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     ? rooms.filter(r => r.area_id === form.area_id)
     : rooms
 
-  // 確定済みシフトは常に修正申請が必要。それ以外は締切前、または「締切後の承認必須」がOFFなら直接編集・取消可能
+  function locationLabelOf(shift: Shift): string | null {
+    return locationMode === 'area_only' ? (shift.areas?.name ?? null) :
+      locationMode === 'room' ? (shift.rooms?.name ?? null) :
+      locationMode === 'area_and_room' ? ([shift.areas?.name, shift.rooms?.name].filter(Boolean).join(' / ') || null) :
+      null
+  }
+
+  function shiftsOn(date: Date) {
+    const key = format(date, 'yyyy-MM-dd')
+    return shifts.filter(s => s.date === key)
+  }
+
+  // 確定済みシフトは常に修正申請が必要。それ以外は直接編集・取消可能
   function canEditDirectly(shift: Shift): boolean {
-    if (shift.status === 'confirmed') return false
-    if (!pastDeadline) return true
-    return !settings?.require_approval_after_deadline
+    return shift.status !== 'confirmed'
   }
 
   function canRequestModification(shift: Shift): boolean {
-    if (canEditDirectly(shift)) return false
-    if (shift.status === 'confirmed') return true
-    return pastDeadline && !!settings?.require_approval_after_deadline
+    return shift.status === 'confirmed'
   }
 
   function openNew(date?: string) {
@@ -121,18 +232,24 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   function handleDayClick(date: Date) {
-    const key = format(date, 'yyyy-MM-dd')
-    const dayShifts = shifts.filter(s => s.date === key)
-    if (dayShifts.length === 0) {
-      if (pastDeadline) { toast.error('締切を過ぎているため新規提出できません。修正申請をご利用ください'); return }
-      openNew(key)
-    } else if (dayShifts.length === 1) {
-      const shift = dayShifts[0]
-      if (canEditDirectly(shift)) openEdit(shift)
-      else openModification(shift)
-    } else {
-      setView('list')
-    }
+    setDayDetailDate(format(date, 'yyyy-MM-dd'))
+  }
+
+  function goPrev() {
+    setCalDirection('prev')
+    setCalAnchor(d => view === 'week' ? subDays(d, 7) : view === 'day' ? subDays(d, 1) : subMonths(d, 1))
+  }
+  function goNext() {
+    setCalDirection('next')
+    setCalAnchor(d => view === 'week' ? addDays(d, 7) : view === 'day' ? addDays(d, 1) : addMonths(d, 1))
+  }
+
+  function checklistBadges(answers: ChecklistAnswers) {
+    return Object.entries(answers).map(([id, value]) => {
+      const item = checklistItems.find(c => c.id === id)
+      if (!item || !value) return null
+      return item.item_type === 'select' ? `${item.label}: ${value}` : item.label
+    }).filter((v): v is string => !!v)
   }
 
   function toggleChecklistItem(id: string) {
@@ -218,142 +335,417 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     }
   }
 
-  async function issueCalendarToken() {
-    setIssuingToken(true)
-    try {
-      const token = crypto.randomUUID()
-      const { error } = await supabase.from('users').update({ calendar_token: token }).eq('id', userId)
-      if (error) { toast.error('URLの発行に失敗しました'); return }
-      setCalendarToken(token)
-      toast.success('カレンダー連携URLを発行しました')
-    } finally {
-      setIssuingToken(false)
-    }
-  }
-
-  async function copyCalendarUrl() {
-    if (!calendarToken) return
-    const url = `${window.location.origin}/api/calendar/${calendarToken}`
-    await navigator.clipboard.writeText(url)
-    toast.success('URLをコピーしました')
-  }
-
   return (
-    <div className="space-y-3">
-      <Card size="sm" className="rounded-none border-x-0 md:rounded-lg md:border-x">
+    <div className="space-y-4">
+      <Card elevated className="rounded-none border-x-0 md:rounded-lg md:border-x">
         <CardHeader className="px-4 md:px-6">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <CardTitle>シフト管理</CardTitle>
-            <div className="flex items-center gap-2">
-              <div className="flex rounded-md border overflow-hidden">
-                <button
-                  onClick={() => setView('calendar')}
-                  className={`flex items-center gap-1 px-3 py-1.5 text-sm transition-colors ${view === 'calendar' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
-                >
-                  <CalendarDays className="h-3.5 w-3.5" /> カレンダー
+          <div className="flex items-center justify-between gap-2">
+            <button
+              type="button"
+              onClick={() => setMenuOpen(true)}
+              className="p-1.5 -ml-1.5 rounded-full hover:bg-muted text-muted-foreground shrink-0"
+              aria-label="メニュー"
+            >
+              <Menu className="h-5 w-5" />
+            </button>
+
+            {view === 'month' || view === 'week' || view === 'day' ? (
+              <div className="flex items-center gap-0.5 min-w-0 flex-1">
+                <button type="button" onClick={goPrev} className="p-1 rounded-full hover:bg-muted text-muted-foreground shrink-0" aria-label="前へ">
+                  <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
-                <button
-                  onClick={() => setView('list')}
-                  className={`flex items-center gap-1 px-3 py-1.5 text-sm transition-colors border-l ${view === 'list' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent'}`}
-                >
-                  <List className="h-3.5 w-3.5" /> リスト
+                <h1 className="text-base font-bold tracking-tight truncate px-0.5 min-w-0">
+                  {view === 'month' && format(calAnchor, 'yyyy年M月', { locale: ja })}
+                  {view === 'week' && (() => {
+                    const weekStart = startOfWeek(calAnchor)
+                    const weekEnd = addDays(weekStart, 6)
+                    return `${format(weekStart, 'M/d', { locale: ja })}〜${format(weekEnd, 'M/d', { locale: ja })}`
+                  })()}
+                  {view === 'day' && format(calAnchor, 'M月d日(E)', { locale: ja })}
+                </h1>
+                <button type="button" onClick={goNext} className="p-1 rounded-full hover:bg-muted text-muted-foreground shrink-0" aria-label="次へ">
+                  <ChevronRight className="h-3.5 w-3.5" />
                 </button>
               </div>
-              <Button size="sm" variant="outline" onClick={() => setSyncOpen(true)}><Link2 className="h-3.5 w-3.5 mr-1" />連携</Button>
-              {!pastDeadline && (
-                <Button size="sm" onClick={() => openNew()}><Plus className="h-4 w-4 mr-1" />シフト提出</Button>
-              )}
+            ) : (
+              <h1 className="text-base font-bold tracking-tight">シフト一覧</h1>
+            )}
+
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                type="button"
+                onClick={() => setSearchOpen(true)}
+                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground"
+                aria-label="シフトを検索"
+              >
+                <Search className="h-5 w-5" />
+              </button>
+              <Button variant="elevated" size="sm" className="rounded-full" onClick={() => openNew()}>
+                <Plus className="h-3.5 w-3.5 mr-1" />追加
+              </Button>
             </div>
           </div>
         </CardHeader>
-        {pastDeadline && settings?.require_approval_after_deadline && (
-          <div className="px-4 md:px-6 pb-2">
-            <p className="text-sm text-amber-600 bg-amber-50 px-3 py-2 rounded">締切を過ぎています。変更・取消は修正申請から行ってください。</p>
-          </div>
-        )}
         <CardContent className="px-0 md:px-6">
-          {view === 'calendar' && (
+          {view === 'month' && (
             <>
-              <ShiftCalendar shifts={shifts} onDayClick={handleDayClick} />
+              <ShiftCalendar shifts={shifts} onDayClick={handleDayClick} current={calAnchor} direction={calDirection} />
               <p className="text-xs text-muted-foreground text-center mt-2 px-4 md:px-0">日付をタップしてシフトを提出・編集できます</p>
             </>
           )}
+
+          {view === 'week' && (
+            <ShiftTimeGrid
+              days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(calAnchor), i))}
+              shiftsOn={shiftsOn}
+              onDayClick={handleDayClick}
+            />
+          )}
+
+          {view === 'day' && (
+            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} />
+          )}
           {view === 'list' && (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>日付</TableHead>
-                  <TableHead>時間</TableHead>
-                  {locationMode !== 'none' && <TableHead>場所</TableHead>}
-                  <TableHead>ステータス</TableHead>
-                  <TableHead className="text-right">操作</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {shifts.length === 0 && (
-                  <TableRow><TableCell colSpan={locationMode !== 'none' ? 5 : 4} className="text-center text-muted-foreground py-8">シフトがありません</TableCell></TableRow>
-                )}
-                {shifts.map(shift => (
-                  <TableRow key={shift.id}>
-                    <TableCell>{format(new Date(shift.date), 'M/d(E)', { locale: ja })}</TableCell>
-                    <TableCell>{shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}</TableCell>
-                    {locationMode !== 'none' && (
-                      <TableCell>
-                        {locationMode === 'area_only' && (shift.areas?.name ?? '—')}
-                        {locationMode === 'room' && (shift.rooms?.name ?? '—')}
-                        {locationMode === 'area_and_room' && [shift.areas?.name, shift.rooms?.name].filter(Boolean).join(' / ') || '—'}
-                      </TableCell>
-                    )}
-                    <TableCell><Badge variant={STATUS_VARIANT[shift.status]}>{STATUS_LABEL[shift.status]}</Badge></TableCell>
-                    <TableCell className="text-right space-x-1">
-                      {canEditDirectly(shift) && (
-                        <>
-                          <Button size="icon" variant="ghost" onClick={() => openEdit(shift)}><Pencil className="h-3.5 w-3.5" /></Button>
-                          <Button size="icon" variant="ghost" onClick={() => handleCancel(shift)}><Trash2 className="h-3.5 w-3.5" /></Button>
-                        </>
+            <>
+              {shifts.length === 0 && (
+                <p className="text-center text-muted-foreground py-8 text-sm">シフトがありません</p>
+              )}
+
+              {/* モバイル: カードレイアウト */}
+              {shifts.length > 0 && (
+                <div className="md:hidden space-y-2 px-4">
+                  {shifts.map(shift => (
+                    <div key={shift.id} className="rounded-lg border p-3 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="font-semibold text-sm">{format(new Date(shift.date), 'M月d日(E)', { locale: ja })}</span>
+                        <Badge variant={STATUS_VARIANT[shift.status]}>{STATUS_LABEL[shift.status]}</Badge>
+                      </div>
+                      <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
+                        <span>{shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}</span>
+                        {locationMode !== 'none' && (
+                          <>
+                            <span>・</span>
+                            <span>
+                              {locationMode === 'area_only' && (shift.areas?.name ?? '—')}
+                              {locationMode === 'room' && (shift.rooms?.name ?? '—')}
+                              {locationMode === 'area_and_room' && ([shift.areas?.name, shift.rooms?.name].filter(Boolean).join(' / ') || '—')}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                      {(canEditDirectly(shift) || canRequestModification(shift)) && (
+                        <div className="flex gap-2 pt-1">
+                          {canEditDirectly(shift) && (
+                            <>
+                              <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(shift)}>
+                                <Pencil className="h-3.5 w-3.5 mr-1" />編集
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleCancel(shift)}>
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </Button>
+                            </>
+                          )}
+                          {canRequestModification(shift) && (
+                            <Button size="sm" variant="outline" className="flex-1" onClick={() => openModification(shift)}>
+                              <FileEdit className="h-3.5 w-3.5 mr-1" />修正申請
+                            </Button>
+                          )}
+                        </div>
                       )}
-                      {canRequestModification(shift) && (
-                        <Button size="sm" variant="outline" onClick={() => openModification(shift)}>
-                          <FileEdit className="h-3.5 w-3.5 mr-1" />修正申請
-                        </Button>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* デスクトップ: テーブル */}
+              {shifts.length > 0 && (
+                <Table className="hidden md:table">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>日付</TableHead>
+                      <TableHead>時間</TableHead>
+                      {locationMode !== 'none' && <TableHead>場所</TableHead>}
+                      <TableHead>ステータス</TableHead>
+                      <TableHead className="text-right">操作</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {shifts.map(shift => (
+                      <TableRow key={shift.id}>
+                        <TableCell>{format(new Date(shift.date), 'M/d(E)', { locale: ja })}</TableCell>
+                        <TableCell>{shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}</TableCell>
+                        {locationMode !== 'none' && (
+                          <TableCell>
+                            {locationMode === 'area_only' && (shift.areas?.name ?? '—')}
+                            {locationMode === 'room' && (shift.rooms?.name ?? '—')}
+                            {locationMode === 'area_and_room' && [shift.areas?.name, shift.rooms?.name].filter(Boolean).join(' / ') || '—'}
+                          </TableCell>
+                        )}
+                        <TableCell><Badge variant={STATUS_VARIANT[shift.status]}>{STATUS_LABEL[shift.status]}</Badge></TableCell>
+                        <TableCell className="text-right space-x-1">
+                          {canEditDirectly(shift) && (
+                            <>
+                              <Button size="icon" variant="ghost" onClick={() => openEdit(shift)}><Pencil className="h-3.5 w-3.5" /></Button>
+                              <Button size="icon" variant="ghost" onClick={() => handleCancel(shift)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </>
+                          )}
+                          {canRequestModification(shift) && (
+                            <Button size="sm" variant="outline" onClick={() => openModification(shift)}>
+                              <FileEdit className="h-3.5 w-3.5 mr-1" />修正申請
+                            </Button>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              )}
+            </>
           )}
         </CardContent>
       </Card>
 
-      <Dialog open={syncOpen} onOpenChange={setSyncOpen}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>カレンダー連携</DialogTitle></DialogHeader>
-          <div className="space-y-3 mt-2">
-            <p className="text-xs text-muted-foreground">
-              専用URLを発行すると、GoogleカレンダーやTimeTreeの「外部カレンダーを購読」機能でシフトを自動的に取り込めます（提出済み・確定済みのシフトが対象）。
-            </p>
-            {calendarToken ? (
-              <div className="space-y-2">
-                <div className="flex gap-2">
-                  <Input readOnly value={`${typeof window !== 'undefined' ? window.location.origin : ''}/api/calendar/${calendarToken}`} className="text-xs" />
-                  <Button size="icon" variant="outline" onClick={copyCalendarUrl}><Copy className="h-3.5 w-3.5" /></Button>
-                </div>
-                <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                  <span>Googleカレンダー: 「他のカレンダー」→「URLで追加」</span>
-                  <span>／</span>
-                  <span>TimeTree: 「カレンダーを読み込む」からこのURLを登録</span>
-                </div>
-                <Button size="sm" variant="outline" onClick={issueCalendarToken} disabled={issuingToken}>
-                  <RefreshCw className="h-3.5 w-3.5 mr-1" />URLを再発行（旧URLは無効になります）
-                </Button>
+      {menuOpen && (
+        <div className="fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
+          <aside className="relative w-64 flex flex-col h-full bg-card shadow-xl border-r">
+            <div className="px-4 py-4 border-b flex items-center justify-between">
+              <div className="flex items-center gap-2 min-w-0">
+                <Logo className="h-6 w-6 shrink-0" style={{ color: 'var(--brand-accent)' }} />
+                <p className="font-bold text-lg tracking-tight truncate">{storeName ?? 'CalendarApp'}</p>
               </div>
-            ) : (
-              <Button size="sm" onClick={issueCalendarToken} disabled={issuingToken}>
-                {issuingToken ? '発行中...' : 'URLを発行'}
-              </Button>
-            )}
+              <button type="button" onClick={() => setMenuOpen(false)} className="p-1 rounded-md hover:bg-muted shrink-0" aria-label="閉じる">
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <nav className="flex-1 overflow-y-auto px-2 py-2 space-y-0.5">
+              {([
+                ['month', '月表示', CalendarDays],
+                ['week', '週表示', CalendarRange],
+                ['day', '日表示', CalendarClock],
+                ['list', 'リスト表示', List],
+              ] as const).map(([mode, label, Icon]) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => { setView(mode); setMenuOpen(false) }}
+                  className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors ${view === mode ? 'bg-muted font-medium' : 'hover:bg-muted/60'}`}
+                >
+                  <Icon className="h-4 w-4 shrink-0" />
+                  {label}
+                  {view === mode && <Check className="h-4 w-4 ml-auto" style={{ color: 'var(--brand-accent)' }} />}
+                </button>
+              ))}
+            </nav>
+            <div className="px-2 py-2 border-t">
+              <button
+                type="button"
+                onClick={handleLogout}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm text-red-600 hover:bg-red-50 transition-colors"
+              >
+                <LogOut className="h-4 w-4 shrink-0" />
+                ログアウト
+              </button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      <Dialog open={searchOpen} onOpenChange={open => { setSearchOpen(open); if (!open) setSearchQuery('') }}>
+        <DialogContent variant="sheet" onDismiss={() => setSearchOpen(false)}>
+          <DialogHeader><DialogTitle>シフトを検索</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <Input
+              autoFocus
+              placeholder="日付・場所・備考で検索"
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+            />
+            <div className="space-y-1 max-h-[60dvh] overflow-y-auto">
+              {(() => {
+                const q = searchQuery.trim().toLowerCase()
+                if (!q) {
+                  return <p className="text-sm text-muted-foreground text-center py-6">キーワードを入力してください</p>
+                }
+                const results = shifts.filter(s => {
+                  const dateLabel = format(new Date(`${s.date}T00:00:00`), 'yyyy年M月d日(E)', { locale: ja })
+                  const haystack = [
+                    dateLabel, locationLabelOf(s), s.notes, STATUS_LABEL[s.status],
+                  ].filter(Boolean).join(' ').toLowerCase()
+                  return haystack.includes(q)
+                })
+                if (results.length === 0) {
+                  return <p className="text-sm text-muted-foreground text-center py-6">見つかりませんでした</p>
+                }
+                return results.map(shift => (
+                  <button
+                    key={shift.id}
+                    type="button"
+                    onClick={() => {
+                      setSearchOpen(false)
+                      setSearchQuery('')
+                      setDayDetailDateRaw(shift.date)
+                      setDetailShiftId(shift.id)
+                    }}
+                    className="w-full flex items-center gap-3 pl-3 pr-2 py-2.5 rounded-md hover:bg-muted/40 transition-colors text-left border-b last:border-b-0"
+                  >
+                    <span className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: 'var(--brand-accent)' }} />
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-sm font-medium">{format(new Date(`${shift.date}T00:00:00`), 'M月d日(E)', { locale: ja })}</span>
+                      <span className="block text-xs text-muted-foreground truncate">
+                        {shift.start_time.slice(0, 5)}〜{shift.end_time.slice(0, 5)}
+                        {locationLabelOf(shift) && ` ・ ${locationLabelOf(shift)}`}
+                      </span>
+                    </span>
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[shift.status] }} />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                  </button>
+                ))
+              })()}
+            </div>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!dayDetailDate} onOpenChange={openState => { if (!openState) setDayDetailDate(null) }}>
+        <DialogContent variant="sheet" onDismiss={() => setDayDetailDate(null)}>
+          {(() => {
+            const dayShifts = dayDetailDate ? shifts.filter(s => s.date === dayDetailDate) : []
+            const activeShift = detailShiftId
+              ? dayShifts.find(s => s.id === detailShiftId) ?? null
+              : null
+
+            if (activeShift) {
+              const shift = activeShift
+              const badges = checklistBadges(shift.checklist_answers)
+              const locationLabel = locationLabelOf(shift)
+              return (
+                <>
+                  <DialogHeader className="flex-row items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setDetailShiftId(null)}
+                      className="p-1 -ml-1 rounded-full hover:bg-muted text-muted-foreground shrink-0"
+                      aria-label="一覧に戻る"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+                    <DialogTitle className="flex-1 text-center">{locationLabel ?? 'シフト詳細'}</DialogTitle>
+                    <span className="w-7 shrink-0" />
+                  </DialogHeader>
+
+                  <div className="mt-3 space-y-0 -mx-4 md:mx-0">
+                    <div className="flex items-center justify-center gap-4 px-4 py-3">
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">開始</p>
+                        <p className="text-lg font-bold tabular-nums">{shift.start_time.slice(0, 5)}</p>
+                      </div>
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <div className="text-center">
+                        <p className="text-xs text-muted-foreground">終了</p>
+                        <p className="text-lg font-bold tabular-nums">{shift.end_time.slice(0, 5)}</p>
+                      </div>
+                    </div>
+
+                    <div className="border-t px-4 py-3 flex items-center gap-2">
+                      <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[shift.status] }} />
+                      <span className="text-sm">{STATUS_LABEL[shift.status]}</span>
+                    </div>
+
+                    {locationLabel && (
+                      <div className="border-t px-4 py-3 flex items-center gap-2.5 text-sm">
+                        <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
+                        <span className="text-muted-foreground">場所</span>
+                        <span className="ml-auto">{locationLabel}</span>
+                      </div>
+                    )}
+
+                    {shift.notes && (
+                      <div className="border-t px-4 py-3 flex items-start gap-2.5 text-sm">
+                        <StickyNote className="h-4 w-4 text-muted-foreground shrink-0 mt-0.5" />
+                        <span className="text-muted-foreground shrink-0">備考</span>
+                        <span className="ml-auto text-right">{shift.notes}</span>
+                      </div>
+                    )}
+
+                    {badges.length > 0 && (
+                      <div className="border-t px-4 py-3 space-y-1.5 text-sm">
+                        <span className="text-muted-foreground">確認項目</span>
+                        <div className="flex flex-wrap gap-1">
+                          {badges.map(label => <Badge key={label} variant="outline" className="text-[10px]">{label}</Badge>)}
+                        </div>
+                      </div>
+                    )}
+                    <div className="border-t" />
+                  </div>
+
+                  {(canEditDirectly(shift) || canRequestModification(shift)) && (
+                    <div className="flex items-center gap-2 pt-1">
+                      {canEditDirectly(shift) && (
+                        <>
+                          <Button variant="elevated" size="sm" className="flex-1" onClick={() => { setDayDetailDate(null); openEdit(shift) }}>
+                            <Pencil className="h-3.5 w-3.5 mr-1" />編集
+                          </Button>
+                          <Button size="icon-sm" variant="outline" className="text-red-600" onClick={() => handleCancel(shift)} aria-label="取消">
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </>
+                      )}
+                      {canRequestModification(shift) && (
+                        <Button variant="elevated" size="sm" className="flex-1" onClick={() => { setDayDetailDate(null); openModification(shift) }}>
+                          <FileEdit className="h-3.5 w-3.5 mr-1" />修正申請
+                        </Button>
+                      )}
+                    </div>
+                  )}
+                </>
+              )
+            }
+
+            return (
+              <>
+                <div
+                  className="-mx-4 -mt-2 mb-3 px-4 py-3 flex items-center gap-2 text-white"
+                  style={{ backgroundColor: 'var(--brand-accent)' }}
+                >
+                  <CalendarDays className="h-4 w-4 shrink-0" />
+                  <span className="font-semibold">
+                    {dayDetailDate && format(new Date(`${dayDetailDate}T00:00:00`), 'M月d日(E)', { locale: ja })}
+                  </span>
+                </div>
+                <div className="space-y-1">
+                  {dayShifts.length === 0 && (
+                    <p className="text-sm text-muted-foreground text-center py-4">この日のシフトはありません</p>
+                  )}
+                  {dayShifts.map(shift => (
+                    <button
+                      key={shift.id}
+                      type="button"
+                      onClick={() => setDetailShiftId(shift.id)}
+                      className="w-full flex items-center gap-3 pl-3 pr-2 py-2 rounded-md hover:bg-muted/40 transition-colors text-left border-b last:border-b-0"
+                    >
+                      <span className="w-[3px] self-stretch rounded-full shrink-0" style={{ backgroundColor: 'var(--brand-accent)' }} />
+                      <span className="shrink-0 text-center leading-tight">
+                        <span className="block text-sm font-semibold tabular-nums">{shift.start_time.slice(0, 5)}</span>
+                        <span className="block text-xs text-muted-foreground tabular-nums">{shift.end_time.slice(0, 5)}</span>
+                      </span>
+                      <span className="flex-1 text-sm">{locationLabelOf(shift) ?? 'シフト'}</span>
+                      <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[shift.status] }} />
+                      <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+                    </button>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => { const d = dayDetailDate; setDayDetailDate(null); openNew(d ?? undefined) }}
+                    className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-md border border-dashed text-sm font-medium mt-2"
+                    style={{ borderColor: 'var(--brand-accent)', color: 'var(--brand-accent)' }}
+                  >
+                    <Plus className="h-4 w-4" />この日にシフトを追加する
+                  </button>
+                </div>
+              </>
+            )
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -362,15 +754,15 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
           <DialogHeader><DialogTitle>{editing ? 'シフト編集' : 'シフト提出'}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5"><Label>日付 *</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>開始時間</Label><Input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>終了時間</Label><Input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5 min-w-0"><Label>開始時間</Label><Input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></div>
+              <div className="space-y-1.5 min-w-0"><Label>終了時間</Label><Input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></div>
             </div>
             {(locationMode === 'area_only' || locationMode === 'area_and_room') && areas.length > 0 && (
               <div className="space-y-1.5">
                 <Label>{areaLabel}</Label>
                 <Select value={form.area_id || 'none'} onValueChange={v => setForm({ ...form, area_id: v === 'none' ? '' : (v ?? ''), room_id: '' })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder={`${areaLabel}を選択`}>
                       {form.area_id ? (areas.find(a => a.id === form.area_id)?.name ?? '未選択') : '未選択'}
                     </SelectValue>
@@ -386,7 +778,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               <div className="space-y-1.5">
                 <Label>{roomLabel}</Label>
                 <Select value={form.room_id || 'none'} onValueChange={v => setForm({ ...form, room_id: v === 'none' ? '' : (v ?? '') })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="w-full">
                     <SelectValue placeholder={`${roomLabel}を選択（任意）`}>
                       {form.room_id ? (filteredRooms.find(r => r.id === form.room_id)?.name ?? '未選択') : '未選択'}
                     </SelectValue>
@@ -410,7 +802,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                         value={(form.checklist_answers[item.id] as string) || 'none'}
                         onValueChange={v => setChecklistSelect(item.id, v === 'none' ? '' : (v ?? ''))}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="w-full">
                           <SelectValue>{(form.checklist_answers[item.id] as string) || '未選択'}</SelectValue>
                         </SelectTrigger>
                         <SelectContent>
@@ -424,6 +816,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                       <Checkbox
                         checked={!!form.checklist_answers[item.id]}
                         onCheckedChange={() => toggleChecklistItem(item.id)}
+                        className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
                       />
                       {item.label}
                     </label>
@@ -433,7 +826,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
             )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-              <Button onClick={handleSave} disabled={!form.date}>提出</Button>
+              <Button variant="elevated" onClick={handleSave} disabled={!form.date}>提出</Button>
             </div>
           </div>
         </DialogContent>
@@ -444,9 +837,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
           <DialogHeader><DialogTitle>修正申請</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5"><Label>変更後の日付</Label><Input type="date" value={modForm.new_date} onChange={e => setModForm({ ...modForm, new_date: e.target.value })} /></div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>開始時間</Label><Input type="time" value={modForm.new_start_time} onChange={e => setModForm({ ...modForm, new_start_time: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>終了時間</Label><Input type="time" value={modForm.new_end_time} onChange={e => setModForm({ ...modForm, new_end_time: e.target.value })} /></div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="space-y-1.5 min-w-0"><Label>開始時間</Label><Input type="time" value={modForm.new_start_time} onChange={e => setModForm({ ...modForm, new_start_time: e.target.value })} /></div>
+              <div className="space-y-1.5 min-w-0"><Label>終了時間</Label><Input type="time" value={modForm.new_end_time} onChange={e => setModForm({ ...modForm, new_end_time: e.target.value })} /></div>
             </div>
             <div className="space-y-1.5">
               <Label>申請理由 *</Label>
@@ -459,7 +852,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setModOpen(false)}>キャンセル</Button>
-              <Button onClick={handleModification} disabled={!modForm.reason}>申請する</Button>
+              <Button variant="elevated" onClick={handleModification} disabled={!modForm.reason}>申請する</Button>
             </div>
           </div>
         </DialogContent>
