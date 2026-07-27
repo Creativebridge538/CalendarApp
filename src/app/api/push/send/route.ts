@@ -3,12 +3,6 @@ import webpush from 'web-push'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-webpush.setVapidDetails(
-  process.env.VAPID_SUBJECT!,
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!
-)
-
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -18,6 +12,15 @@ export async function POST(request: Request) {
   if (!user_id || !title) {
     return NextResponse.json({ error: 'user_id, title は必須です' }, { status: 400 })
   }
+
+  if (!process.env.VAPID_SUBJECT || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
+    return NextResponse.json({ error: 'VAPID環境変数が未設定です' }, { status: 500 })
+  }
+  webpush.setVapidDetails(
+    process.env.VAPID_SUBJECT,
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY
+  )
 
   const admin = createAdminClient()
   const { data: subscriptions } = await admin.from('push_subscriptions').select('*').eq('user_id', user_id)
