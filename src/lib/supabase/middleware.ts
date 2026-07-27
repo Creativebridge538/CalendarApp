@@ -27,8 +27,13 @@ export async function updateSession(request: NextRequest) {
 
   const { pathname } = request.nextUrl
 
+  // 未認証でもアクセスできる必要があるパス（ログイン前のID解決・パスワードリセット等のOAuthコールバック）
+  const isPublicPath = pathname === '/login'
+    || pathname.startsWith('/auth/')
+    || pathname === '/api/auth/resolve-login-id'
+
   // 未認証ユーザーを /login にリダイレクト
-  if (!user && pathname !== '/login') {
+  if (!user && !isPublicPath) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

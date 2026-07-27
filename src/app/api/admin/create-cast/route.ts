@@ -11,10 +11,10 @@ export async function POST(request: Request) {
   if (profile?.role !== 'admin') return NextResponse.json({ error: '権限がありません' }, { status: 403 })
 
   const body = await request.json()
-  const { email, password, display_name, real_name, phone, reward_rate } = body
+  const { email, password, display_name, real_name, phone, reward_rate, login_id } = body
 
-  if (!email || !password || !display_name) {
-    return NextResponse.json({ error: 'email, password, display_name は必須です' }, { status: 400 })
+  if (!email || !password || !display_name || !login_id) {
+    return NextResponse.json({ error: 'email, password, display_name, login_id は必須です' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -40,15 +40,19 @@ export async function POST(request: Request) {
     phone: phone || null,
     reward_rate: parseFloat(reward_rate) || 0.4,
     is_active: true,
+    login_id,
   }).eq('id', newUser.user.id)
 
   if (updateError) {
     await admin.auth.admin.deleteUser(newUser.user.id)
-    return NextResponse.json({ error: 'プロフィール設定に失敗しました' }, { status: 500 })
+    const message = updateError.message.includes('duplicate') || updateError.code === '23505'
+      ? 'このユーザーIDは既に使用されています'
+      : 'プロフィール設定に失敗しました'
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 
   const { data: cast } = await admin.from('users')
-    .select('id, display_name, real_name, phone, reward_rate, is_active, email')
+    .select('id, display_name, real_name, phone, reward_rate, is_active, email, login_id')
     .eq('id', newUser.user.id)
     .single()
 

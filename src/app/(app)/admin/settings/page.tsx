@@ -3,13 +3,15 @@ import { redirect } from 'next/navigation'
 import { StoreSettings } from '@/components/settings/store-settings'
 import { ShiftChecklistSettings } from '@/components/settings/shift-checklist-settings'
 import { CastProfileFieldsSettings } from '@/components/settings/cast-profile-fields-settings'
+import { PasswordChangeSettings } from '@/components/settings/password-change-settings'
+import { LoginIdSettings } from '@/components/settings/login-id-settings'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('users').select('role, store_id').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('users').select('role, store_id, login_id').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const storeId = profile.store_id!
@@ -26,6 +28,8 @@ export default async function SettingsPage() {
       <StoreSettings store={store} settings={settings} storeId={storeId} />
       <ShiftChecklistSettings items={checklistItems ?? []} storeId={storeId} />
       <CastProfileFieldsSettings fields={profileFields ?? []} storeId={storeId} />
+      <PasswordChangeSettings />
+      <LoginIdSettings userId={user.id} initialLoginId={profile.login_id} />
     </div>
   )
 }

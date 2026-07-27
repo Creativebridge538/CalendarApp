@@ -35,13 +35,16 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const prevMonthStart = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd')
 
-  const [{ count: pendingShifts }, { count: pendingRequests }, { data: todayShifts }, { data: sales }, { data: casts }] =
+  const [{ count: pendingShifts }, { count: pendingRequests }, { count: pendingVacantApplications }, { data: todayShifts }, { data: sales }, { data: casts }] =
     await Promise.all([
       supabase.from('shifts').select('*', { count: 'exact', head: true })
         .eq('store_id', storeId).eq('status', 'submitted'),
       supabase.from('shift_modification_requests').select('shifts!inner(store_id)', { count: 'exact', head: true })
         .eq('status', 'pending')
         .eq('shifts.store_id', storeId),
+      supabase.from('vacant_slot_applications').select('vacant_slots!inner(store_id)', { count: 'exact', head: true })
+        .eq('status', 'pending')
+        .eq('vacant_slots.store_id', storeId),
       supabase.from('shifts')
         .select('*, cast:users!shifts_cast_id_fkey(display_name), rooms(name)')
         .eq('store_id', storeId)
@@ -102,6 +105,7 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
     <AdminAnalytics
       pendingShifts={pendingShifts ?? 0}
       pendingRequests={pendingRequests ?? 0}
+      pendingVacantApplications={pendingVacantApplications ?? 0}
       todayShifts={(todayShifts ?? []).map(s => ({
         id: s.id,
         castName: (s.cast as { display_name: string | null } | null)?.display_name ?? '—',

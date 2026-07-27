@@ -47,6 +47,7 @@ interface Props {
   areaLabel: string
   roomLabel: string
   checklistItems: { id: string; label: string; item_type: string }[]
+  periodDates?: Set<string>
 }
 
 const STATUS_LABEL: Record<ShiftStatus, string> = {
@@ -56,7 +57,7 @@ const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive
   draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive',
 }
 
-export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems }: Props) {
+export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems, periodDates }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
@@ -177,7 +178,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
       </CardHeader>
       <CardContent className="px-0 md:px-6">
         {view === 'calendar' && (
-          <ShiftCalendar shifts={filtered} showCastName={true} />
+          <ShiftCalendar shifts={filtered} showCastName={true} periodDates={periodDates} />
         )}
         {view === 'timeline' && (
           <ShiftTimeline

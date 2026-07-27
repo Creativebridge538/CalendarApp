@@ -17,15 +17,20 @@ interface Props {
   initialPhotoUrl: string | null
   initialBirthdate: string | null
   initialShowBirthdate: boolean
+  initialPeriodStartDate: string | null
+  initialPeriodEndDate: string | null
 }
 
 export function CastProfileSettings({
   userId, email, initialDisplayName, initialPhotoUrl, initialBirthdate, initialShowBirthdate,
+  initialPeriodStartDate, initialPeriodEndDate,
 }: Props) {
   const [displayName, setDisplayName] = useState(initialDisplayName ?? '')
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl)
   const [birthdate, setBirthdate] = useState(initialBirthdate ?? '')
   const [showBirthdate, setShowBirthdate] = useState(initialShowBirthdate)
+  const [periodStartDate, setPeriodStartDate] = useState(initialPeriodStartDate ?? '')
+  const [periodEndDate, setPeriodEndDate] = useState(initialPeriodEndDate ?? '')
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -57,6 +62,8 @@ export function CastProfileSettings({
         display_name: displayName || null,
         birthdate: birthdate || null,
         show_birthdate: showBirthdate,
+        period_start_date: periodStartDate || null,
+        period_end_date: periodEndDate || null,
       }).eq('id', userId)
       if (error) { toast.error('保存に失敗しました'); return }
       toast.success('プロフィールを更新しました')
@@ -129,6 +136,26 @@ export function CastProfileSettings({
             onCheckedChange={setShowBirthdate}
             className="data-checked:bg-[var(--brand-accent)]"
           />
+        </div>
+
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <Label>整理日</Label>
+            {(periodStartDate || periodEndDate) && (
+              <button
+                type="button"
+                onClick={() => { setPeriodStartDate(''); setPeriodEndDate('') }}
+                className="text-xs text-muted-foreground underline"
+              >
+                クリア
+              </button>
+            )}
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <Input type="date" value={periodStartDate} onChange={e => setPeriodStartDate(e.target.value)} />
+            <Input type="date" value={periodEndDate} onChange={e => setPeriodEndDate(e.target.value)} />
+          </div>
+          <p className="text-xs text-muted-foreground">自分と管理者のみ確認できます。カレンダーに控えめなドットで表示されます。</p>
         </div>
 
         <Button variant="elevated" className="w-full" onClick={save} disabled={saving}>

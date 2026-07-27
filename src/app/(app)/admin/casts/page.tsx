@@ -12,7 +12,7 @@ export default async function CastsPage() {
 
   const [{ data: casts }, { data: profileFields }] = await Promise.all([
     supabase.from('users')
-      .select('id, display_name, real_name, phone, reward_rate, is_active, email, profile_answers')
+      .select('id, display_name, real_name, phone, reward_rate, is_active, email, profile_answers, photo_url, period_start_date, period_end_date, login_id')
       .eq('store_id', profile.store_id!)
       .eq('role', 'cast')
       .order('display_name'),

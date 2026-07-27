@@ -51,9 +51,11 @@ interface Props {
   /** 指定すると月の状態は呼び出し元が管理し、内蔵のヘッダー（タイトル・前後ボタン）は表示しない */
   current?: Date
   direction?: 'next' | 'prev'
+  /** yyyy-MM-dd の集合。整理日の控えめなドット表示に使用 */
+  periodDates?: Set<string>
 }
 
-export function ShiftCalendar({ shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection }: Props) {
+export function ShiftCalendar({ shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection, periodDates }: Props) {
   const [internalCurrent, setInternalCurrent] = useState(() => new Date())
   const [internalDirection, setInternalDirection] = useState<'next' | 'prev'>('next')
   const isControlled = controlledCurrent !== undefined
@@ -125,17 +127,21 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
             const dayShifts = inMonth ? shiftsOn(day) : []
             const isToday = inMonth && isSameDay(day, new Date())
             const dow = getDay(day)
+            const isPeriod = inMonth && periodDates?.has(format(day, 'yyyy-MM-dd'))
 
             return (
               <div
                 key={day.toISOString()}
                 onClick={onDayClick && inMonth ? () => onDayClick(day) : undefined}
                 className={cn(
-                  'h-[84px] md:h-[112px] pt-1 px-1.5 pb-1.5 flex flex-col items-stretch gap-0.5 overflow-hidden',
+                  'relative h-[84px] md:h-[112px] pt-1 px-1.5 pb-1.5 flex flex-col items-stretch gap-0.5 overflow-hidden',
                   !inMonth && 'opacity-40',
                   onDayClick && inMonth && 'cursor-pointer active:bg-muted/40 md:hover:bg-muted/20 transition-colors'
                 )}
               >
+                {isPeriod && (
+                  <span className="absolute top-1 right-1.5 h-1.5 w-1.5 rounded-full bg-pink-400" title="整理日" />
+                )}
                 {/* 日付 */}
                 <span className={cn(
                   'text-[10px] font-semibold w-4 h-4 mx-auto flex items-center justify-center rounded-full transition-colors shrink-0',

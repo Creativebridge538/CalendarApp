@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { eachDayOfInterval, format } from 'date-fns'
 import { CastShiftView } from '@/components/shifts/cast-shift-view'
 
 export default async function CastShiftsPage() {
@@ -7,9 +8,18 @@ export default async function CastShiftsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('users').select('role, store_id, display_name').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('users').select('role, store_id, display_name, period_start_date, period_end_date').eq('id', user.id).single()
   if (!profile?.store_id) {
     return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
+  }
+
+  const periodDates = new Set<string>()
+  if (profile.period_start_date && profile.period_end_date) {
+    const start = new Date(`${profile.period_start_date}T00:00:00`)
+    const end = new Date(`${profile.period_end_date}T00:00:00`)
+    if (end >= start) {
+      eachDayOfInterval({ start, end }).forEach(d => periodDates.add(format(d, 'yyyy-MM-dd')))
+    }
   }
 
   const [{ data: shifts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems }, { data: store }] = await Promise.all([
@@ -33,6 +43,7 @@ export default async function CastShiftsPage() {
         settings={settings}
         userId={user.id}
         checklistItems={checklistItems ?? []}
+        periodDates={periodDates}
       />
     </div>
   )

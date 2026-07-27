@@ -61,6 +61,7 @@ interface Props {
   settings: Settings | null
   userId: string
   checklistItems: { id: string; label: string; item_type: string; options: string[] }[]
+  periodDates?: Set<string>
 }
 
 const HOUR_HEIGHT = 56
@@ -73,11 +74,12 @@ function timeToMinutes(hhmm: string): number {
 
 /** 週表示・日表示共通の時間軸グリッド（Googleカレンダー等と同じ、時刻に応じて予定ブロックを配置する形式） */
 function ShiftTimeGrid({
-  days, shiftsOn, onDayClick,
+  days, shiftsOn, onDayClick, periodDates,
 }: {
   days: Date[]
   shiftsOn: (day: Date) => Shift[]
   onDayClick: (day: Date) => void
+  periodDates?: Set<string>
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const daysKey = days.map(d => d.toISOString()).join(',')
@@ -99,8 +101,9 @@ function ShiftTimeGrid({
         <div className="w-9 shrink-0" />
         {days.map(day => {
           const isToday = isSameDay(day, new Date())
+          const isPeriod = periodDates?.has(format(day, 'yyyy-MM-dd'))
           return (
-            <div key={day.toISOString()} className="flex-1 text-center py-1.5 min-w-0">
+            <div key={day.toISOString()} className="flex-1 text-center py-1.5 min-w-0 relative">
               <div className={`text-[10px] ${day.getDay() === 0 ? 'text-red-500' : day.getDay() === 6 ? 'text-blue-500' : 'text-muted-foreground'}`}>
                 {format(day, 'E', { locale: ja })}
               </div>
@@ -110,6 +113,9 @@ function ShiftTimeGrid({
               >
                 {format(day, 'd')}
               </span>
+              {isPeriod && (
+                <span className="absolute top-0 right-1/2 translate-x-4 h-1.5 w-1.5 rounded-full bg-pink-400" title="整理日" />
+              )}
             </div>
           )
         })}
@@ -159,7 +165,7 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, periodDates }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -389,7 +395,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         <CardContent className="px-0 md:px-6">
           {view === 'month' && (
             <>
-              <ShiftCalendar shifts={shifts} onDayClick={handleDayClick} current={calAnchor} direction={calDirection} />
+              <ShiftCalendar shifts={shifts} onDayClick={handleDayClick} current={calAnchor} direction={calDirection} periodDates={periodDates} />
               <p className="text-xs text-muted-foreground text-center mt-2 px-4 md:px-0">日付をタップしてシフトを提出・編集できます</p>
             </>
           )}
@@ -399,11 +405,12 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(calAnchor), i))}
               shiftsOn={shiftsOn}
               onDayClick={handleDayClick}
+              periodDates={periodDates}
             />
           )}
 
           {view === 'day' && (
-            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} />
+            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} periodDates={periodDates} />
           )}
           {view === 'list' && (
             <>

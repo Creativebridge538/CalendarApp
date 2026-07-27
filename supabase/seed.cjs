@@ -38,18 +38,18 @@ const today = new Date().toISOString().split('T')[0]
     email: 'admin@stella.com', password: 'password123', email_confirm: true
   })
   await supabase.from('users').update({
-    role: 'admin', store_id: store.id, display_name: '店長', is_active: true
+    role: 'admin', store_id: store.id, display_name: '店長', is_active: true, login_id: 'admin'
   }).eq('id', adminAuth.user.id)
-  console.log('  admin@stella.com / password123')
+  console.log('  admin@stella.com / password123 (ユーザーID: admin)')
 
   // 4. キャスト5人作成
   console.log('キャスト作成...')
   const castData = [
-    { email: 'rin@stella.com',    display_name: 'りん',   real_name: '田中里奈',   phone: '090-1111-2222', reward_rate: 0.40 },
-    { email: 'mia@stella.com',    display_name: 'みあ',   real_name: '鈴木美亜',   phone: '090-3333-4444', reward_rate: 0.42 },
-    { email: 'saki@stella.com',   display_name: 'さき',   real_name: '佐藤咲希',   phone: '090-5555-6666', reward_rate: 0.38 },
-    { email: 'hana@stella.com',   display_name: 'はな',   real_name: '山田花那',   phone: '090-7777-8888', reward_rate: 0.45 },
-    { email: 'kotone@stella.com', display_name: 'ことね', real_name: '伊藤琴音',   phone: '090-9999-0000', reward_rate: 0.40 },
+    { email: 'rin@stella.com',    login_id: 'rin',    display_name: 'りん',   real_name: '田中里奈',   phone: '090-1111-2222', reward_rate: 0.40 },
+    { email: 'mia@stella.com',    login_id: 'mia',    display_name: 'みあ',   real_name: '鈴木美亜',   phone: '090-3333-4444', reward_rate: 0.42 },
+    { email: 'saki@stella.com',   login_id: 'saki',   display_name: 'さき',   real_name: '佐藤咲希',   phone: '090-5555-6666', reward_rate: 0.38 },
+    { email: 'hana@stella.com',   login_id: 'hana',   display_name: 'はな',   real_name: '山田花那',   phone: '090-7777-8888', reward_rate: 0.45 },
+    { email: 'kotone@stella.com', login_id: 'kotone', display_name: 'ことね', real_name: '伊藤琴音',   phone: '090-9999-0000', reward_rate: 0.40 },
   ]
   const castIds = []
   for (const c of castData) {
@@ -59,10 +59,10 @@ const today = new Date().toISOString().split('T')[0]
     await supabase.from('users').update({
       role: 'cast', store_id: store.id,
       display_name: c.display_name, real_name: c.real_name,
-      phone: c.phone, reward_rate: c.reward_rate, is_active: true
+      phone: c.phone, reward_rate: c.reward_rate, is_active: true, login_id: c.login_id
     }).eq('id', au.user.id)
     castIds.push(au.user.id)
-    console.log(`  ${c.display_name} (${c.email})`)
+    console.log(`  ${c.display_name} (${c.email} / ID: ${c.login_id})`)
   }
 
   // 5. ルーム作成
@@ -132,6 +132,6 @@ const today = new Date().toISOString().split('T')[0]
   else console.log(`  ${slots.length}件投入`)
 
   console.log('\n完了！')
-  console.log('ログイン: admin@stella.com / password123')
-  console.log('キャスト: rin@stella.com 〜 kotone@stella.com / password123')
+  console.log('ログイン: ユーザーID admin / password123')
+  console.log('キャスト: ユーザーID rin 〜 kotone / password123')
 })()

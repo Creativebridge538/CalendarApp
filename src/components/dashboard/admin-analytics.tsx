@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Calendar, FileEdit, Users, TrendingUp, TrendingDown, Minus, Trophy, Wallet } from 'lucide-react'
+import { Calendar, FileEdit, Users, TrendingUp, TrendingDown, Minus, Trophy, Wallet, Briefcase } from 'lucide-react'
 
 interface TodayShift {
   id: string
@@ -16,6 +16,7 @@ interface TodayShift {
 interface Props {
   pendingShifts: number
   pendingRequests: number
+  pendingVacantApplications: number
   todayShifts: TodayShift[]
   todayLabel: string
   totalThisMonth: number
@@ -62,7 +63,7 @@ function StatTile({
 }
 
 export function AdminAnalytics({
-  pendingShifts, pendingRequests, todayShifts, todayLabel,
+  pendingShifts, pendingRequests, pendingVacantApplications, todayShifts, todayLabel,
   totalThisMonth, totalPrevMonth, trend, castRanking, weekday,
   activeCastCount, avgDailySales,
 }: Props) {
@@ -106,7 +107,7 @@ export function AdminAnalytics({
         .aa-animate { animation: aa-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both; }
 
         .stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 14px; }
-        @media (min-width: 768px) { .stat-grid { grid-template-columns: repeat(5, 1fr); gap: 12px; } }
+        @media (min-width: 768px) { .stat-grid { grid-template-columns: repeat(6, 1fr); gap: 12px; } }
 
         .stat-tile {
           background: var(--surface-card);
@@ -206,6 +207,7 @@ export function AdminAnalytics({
         <StatTile icon={Users} label="稼働キャスト" value={activeCastCount} sub="今月・実績あり" delay={90} />
         <StatTile icon={Calendar} label="未確定シフト" value={pendingShifts} sub="要確認" delay={120} />
         <StatTile icon={FileEdit} label="修正申請" value={pendingRequests} sub="未処理" delay={150} />
+        <StatTile icon={Briefcase} label="空き枠申請" value={pendingVacantApplications} sub="未処理" delay={165} />
         <StatTile icon={Trophy} label="トップキャスト" value={castRanking[0]?.amount ?? 0} prefix="¥" sub={castRanking[0]?.name ?? '—'} delay={180} />
       </div>
 

@@ -7,6 +7,7 @@ import { CastAppearanceSettings } from '@/components/settings/cast-appearance-se
 import { CastProfileSettings } from '@/components/settings/cast-profile-settings'
 import { CastCalendarSyncSettings } from '@/components/settings/cast-calendar-sync-settings'
 import { CastLogoutButton } from '@/components/settings/cast-logout-button'
+import { PasswordChangeSettings } from '@/components/settings/password-change-settings'
 
 export default async function CastSettingsPage() {
   const supabase = await createClient()
@@ -15,7 +16,7 @@ export default async function CastSettingsPage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('accent_skin, display_name, photo_url, birthdate, show_birthdate, calendar_token')
+    .select('accent_skin, display_name, photo_url, birthdate, show_birthdate, calendar_token, period_start_date, period_end_date')
     .eq('id', user.id)
     .single()
 
@@ -41,9 +42,12 @@ export default async function CastSettingsPage() {
         initialPhotoUrl={profile?.photo_url ?? null}
         initialBirthdate={profile?.birthdate ?? null}
         initialShowBirthdate={profile?.show_birthdate ?? false}
+        initialPeriodStartDate={profile?.period_start_date ?? null}
+        initialPeriodEndDate={profile?.period_end_date ?? null}
       />
       <CastAppearanceSettings userId={user.id} initialSkin={profile?.accent_skin ?? null} />
       <CastCalendarSyncSettings userId={user.id} initialCalendarToken={profile?.calendar_token ?? null} />
+      <PasswordChangeSettings />
       <CastLogoutButton />
     </div>
   )

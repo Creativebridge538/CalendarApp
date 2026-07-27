@@ -10,8 +10,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Logo } from '@/components/logo'
 
+async function resolveLoginId(loginId: string): Promise<string | null> {
+  const res = await fetch('/api/auth/resolve-login-id', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ login_id: loginId }),
+  })
+  if (!res.ok) return null
+  const json = await res.json()
+  return json.email ?? null
+}
+
 export default function LoginPage() {
-  const [email, setEmail] = useState('')
+  const [loginId, setLoginId] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
@@ -23,10 +34,17 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
 
+    const email = await resolveLoginId(loginId)
+    if (!email) {
+      setError('ユーザーIDまたはパスワードが正しくありません')
+      setLoading(false)
+      return
+    }
+
     const { error } = await supabase.auth.signInWithPassword({ email, password })
 
     if (error) {
-      setError('メールアドレスまたはパスワードが正しくありません')
+      setError('ユーザーIDまたはパスワードが正しくありません')
       setLoading(false)
       return
     }
@@ -36,11 +54,17 @@ export default function LoginPage() {
   }
 
   async function handleResetPassword() {
-    if (!email) {
-      setError('メールアドレスを入力してください')
+    if (!loginId) {
+      setError('ユーザーIDを入力してください')
       return
     }
     setLoading(true)
+    const email = await resolveLoginId(loginId)
+    if (!email) {
+      setError('ユーザーIDまたはパスワードが正しくありません')
+      setLoading(false)
+      return
+    }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
       redirectTo: `${window.location.origin}/auth/callback?next=/settings/password`,
     })
@@ -69,7 +93,7 @@ export default function LoginPage() {
             </div>
             <CardTitle className="text-2xl font-bold text-center">ログイン</CardTitle>
             <CardDescription className="text-center">
-              メールアドレスとパスワードを入力してください
+              ユーザーIDとパスワードを入力してください
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -80,15 +104,15 @@ export default function LoginPage() {
                 </Alert>
               )}
               <div className="space-y-2">
-                <Label htmlFor="email">メールアドレス</Label>
+                <Label htmlFor="login-id">ユーザーID</Label>
                 <Input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="example@email.com"
+                  id="login-id"
+                  type="text"
+                  value={loginId}
+                  onChange={(e) => setLoginId(e.target.value)}
+                  placeholder="user_id"
                   required
-                  autoComplete="email"
+                  autoComplete="username"
                 />
               </div>
               <div className="space-y-2">

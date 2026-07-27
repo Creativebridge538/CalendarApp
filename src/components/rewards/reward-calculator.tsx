@@ -93,6 +93,12 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
     const body = `${year}年${month}月の報酬: ¥${Number(reward.total_reward).toLocaleString()}`
     await supabase.from('notifications').insert({ user_id: reward.cast_id, title, body, link: '/cast/rewards' })
     sendPushNotification(reward.cast_id, title, body, '/cast/rewards')
+    // メール通知は任意送信。失敗しても確定処理自体はすでに成功しているので握りつぶす
+    fetch('/api/rewards/notify', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cast_id: reward.cast_id, year, month, total_reward: Number(reward.total_reward) }),
+    }).catch(() => {})
   }
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }

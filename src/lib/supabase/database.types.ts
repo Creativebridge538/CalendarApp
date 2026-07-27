@@ -748,8 +748,11 @@ export type Database = {
           email: string
           id: string
           is_active: boolean
+          login_id: string
           monthly_goal: number | null
           notes: string | null
+          period_end_date: string | null
+          period_start_date: string | null
           phone: string | null
           photo_url: string | null
           profile_answers: Json
@@ -769,8 +772,11 @@ export type Database = {
           email: string
           id: string
           is_active?: boolean
+          login_id: string
           monthly_goal?: number | null
           notes?: string | null
+          period_end_date?: string | null
+          period_start_date?: string | null
           phone?: string | null
           photo_url?: string | null
           profile_answers?: Json
@@ -790,8 +796,11 @@ export type Database = {
           email?: string
           id?: string
           is_active?: boolean
+          login_id?: string
           monthly_goal?: number | null
           notes?: string | null
+          period_end_date?: string | null
+          period_start_date?: string | null
           phone?: string | null
           photo_url?: string | null
           profile_answers?: Json
