@@ -1,21 +1,21 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import Link from 'next/link'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   TrendingUp, TrendingDown, Minus, Target, Pencil, StickyNote, Lock,
-  CircleDollarSign, CalendarDays, CalendarRange, BarChart3, FileText,
+  CircleDollarSign, CalendarDays, CalendarRange, BarChart3,
 } from 'lucide-react'
+import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 
 const PLATFORM_LABEL: Record<string, string> = {
   manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
@@ -151,13 +151,7 @@ export function CastRewardDashboard({
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
               </p>
-              <Link
-                href={`/admin/rewards/notice?cast_id=${userId}&year=${year}&month=${month}`}
-                target="_blank"
-                className={buttonVariants({ size: 'sm', variant: 'tonal' })}
-              >
-                <FileText className="h-3.5 w-3.5 mr-1" />支払通知書
-              </Link>
+              <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" />
             </div>
           )}
 

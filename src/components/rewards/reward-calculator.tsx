@@ -9,10 +9,11 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Calculator, Lock, FileText, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calculator, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
+import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 
 type Reward = Database['public']['Tables']['reward_calculations']['Row']
 
@@ -175,13 +176,7 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
                       </>
                     )}
                     {reward && (
-                      <Link
-                        href={`/admin/rewards/notice?cast_id=${cast.id}&year=${year}&month=${month}`}
-                        target="_blank"
-                        className={buttonVariants({ size: 'sm', variant: 'ghost' })}
-                      >
-                        <FileText className="h-3.5 w-3.5 mr-1" />通知書
-                      </Link>
+                      <PaymentNoticeButton castId={cast.id} year={year} month={month} label="通知書" />
                     )}
                   </TableCell>
                 </TableRow>

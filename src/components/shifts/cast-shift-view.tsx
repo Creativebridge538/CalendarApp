@@ -20,6 +20,7 @@ import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, Lis
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
+import { MonthYearPicker } from './month-year-picker'
 import { Logo } from '@/components/logo'
 
 type ShiftStatus = Database['public']['Enums']['shift_status']
@@ -361,7 +362,14 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                   <ChevronLeft className="h-3.5 w-3.5" />
                 </button>
                 <h1 className="text-base font-bold tracking-tight truncate px-0.5 min-w-0">
-                  {view === 'month' && format(calAnchor, 'yyyy年M月', { locale: ja })}
+                  {view === 'month' && (
+                    <MonthYearPicker
+                      value={calAnchor}
+                      onChange={d => { setCalDirection(d > calAnchor ? 'next' : 'prev'); setCalAnchor(d) }}
+                    >
+                      {format(calAnchor, 'yyyy年M月', { locale: ja })}
+                    </MonthYearPicker>
+                  )}
                   {view === 'week' && (() => {
                     const weekStart = startOfWeek(calAnchor)
                     const weekEnd = addDays(weekStart, 6)

@@ -32,7 +32,7 @@ const adminNav = [
 const castNav = [
   { href: '/cast/shifts',       label: 'シフト',         icon: Calendar },
   { href: '/cast/vacant-slots', label: '空き枠',         icon: Briefcase },
-  { href: '/cast/rewards',      label: '分析',           icon: Award },
+  { href: '/cast/rewards',      label: '収益',           icon: Award },
   { href: '/cast/settings',     label: '設定',           icon: Settings },
 ]
 

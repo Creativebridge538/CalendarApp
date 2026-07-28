@@ -9,6 +9,7 @@ import { ja } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import { MonthYearPicker } from '@/components/shifts/month-year-picker'
 import type { Database } from '@/lib/supabase/database.types'
 
 type ShiftStatus = Database['public']['Enums']['shift_status']
@@ -87,9 +88,13 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
 
       {!isControlled && (
         <div className="flex items-center justify-between mb-3 px-1 md:px-0">
-          <h2 className="text-lg font-bold tracking-tight">
+          <MonthYearPicker
+            value={current}
+            onChange={d => { setInternalDirection(d > internalCurrent ? 'next' : 'prev'); setInternalCurrent(d) }}
+            className="text-lg font-bold tracking-tight"
+          >
             {format(current, 'yyyy年M月', { locale: ja })}
-          </h2>
+          </MonthYearPicker>
           <div className="flex gap-1.5">
             <Button size="icon" variant="outline" className="h-8 w-8 rounded-full" onClick={goPrev}>
               <ChevronLeft className="h-4 w-4" />
