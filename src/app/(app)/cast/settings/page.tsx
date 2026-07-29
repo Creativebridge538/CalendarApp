@@ -16,7 +16,7 @@ export default async function CastSettingsPage() {
 
   const { data: profile } = await supabase
     .from('users')
-    .select('accent_skin, display_name, photo_url, birthdate, show_birthdate, calendar_token, period_start_date, period_end_date')
+    .select('accent_skin, accent_font, display_name, photo_url, birthdate, show_birthdate, calendar_token, period_start_date, period_end_date')
     .eq('id', user.id)
     .single()
 
@@ -45,7 +45,11 @@ export default async function CastSettingsPage() {
         initialPeriodStartDate={profile?.period_start_date ?? null}
         initialPeriodEndDate={profile?.period_end_date ?? null}
       />
-      <CastAppearanceSettings userId={user.id} initialSkin={profile?.accent_skin ?? null} />
+      <CastAppearanceSettings
+        userId={user.id}
+        initialSkin={profile?.accent_skin ?? null}
+        initialFont={profile?.accent_font ?? null}
+      />
       <CastCalendarSyncSettings userId={user.id} initialCalendarToken={profile?.calendar_token ?? null} />
       <PasswordChangeSettings />
       <CastLogoutButton />

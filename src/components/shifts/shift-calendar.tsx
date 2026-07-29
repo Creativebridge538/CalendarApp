@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, type CSSProperties } from 'react'
 import {
   startOfMonth, eachDayOfInterval, getDay,
   isSameDay, isSameMonth, addMonths, subMonths, subDays, addDays, format,
@@ -24,19 +24,23 @@ interface Shift {
   rooms?: { name: string } | null
 }
 
-// TimeTreeのような塗りつぶし色チップ（白文字で視認性を確保）
-const STATUS_CHIP: Record<ShiftStatus, string> = {
-  draft:     'bg-slate-400 text-white',
-  submitted: 'bg-blue-500 text-white',
-  confirmed: 'bg-emerald-500 text-white',
-  rejected:  'bg-red-500 text-white',
+// TimeTreeのような塗りつぶし色チップ（白文字で視認性を確保）。着せ替えで --status-* が上書きされる
+const STATUS_VAR: Record<ShiftStatus, string> = {
+  draft: 'var(--status-draft)',
+  submitted: 'var(--status-submitted)',
+  confirmed: 'var(--status-confirmed)',
+  rejected: 'var(--status-rejected)',
 }
 
-const STATUS_LEGEND: Record<ShiftStatus, string> = {
-  draft:     'bg-muted text-muted-foreground',
-  submitted: 'bg-blue-500/15 text-blue-600',
-  confirmed: 'bg-emerald-500/15 text-emerald-600',
-  rejected:  'bg-red-500/15 text-red-600',
+function chipStyle(status: ShiftStatus): CSSProperties {
+  return { backgroundColor: STATUS_VAR[status], color: '#fff' }
+}
+
+function legendStyle(status: ShiftStatus): CSSProperties {
+  return {
+    backgroundColor: `color-mix(in srgb, ${STATUS_VAR[status]} 15%, transparent)`,
+    color: STATUS_VAR[status],
+  }
 }
 
 const STATUS_LABEL: Record<ShiftStatus, string> = {
@@ -163,7 +167,8 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                   {dayShifts.slice(0, 2).map(s => (
                     <div
                       key={s.id}
-                      className={cn('rounded-[3px] px-1 py-0.5 text-[9px] leading-tight text-center font-medium', STATUS_CHIP[s.status])}
+                      className="rounded-[3px] px-1 py-0.5 text-[9px] leading-tight text-center font-medium"
+                      style={chipStyle(s.status)}
                     >
                       {s.start_time.slice(0, 5)}
                     </div>
@@ -176,10 +181,8 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                   {dayShifts.slice(0, 3).map(s => (
                     <div
                       key={s.id}
-                      className={cn(
-                        'rounded-[3px] px-1 py-0.5 text-[10px] leading-tight truncate font-medium',
-                        STATUS_CHIP[s.status]
-                      )}
+                      className="rounded-[3px] px-1 py-0.5 text-[10px] leading-tight truncate font-medium"
+                      style={chipStyle(s.status)}
                       title={`${showCastName && s.cast ? s.cast.display_name + ' ' : ''}${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                     >
                       {showCastName && s.cast && (
@@ -202,8 +205,8 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
 
       {/* 凡例 */}
       <div className="flex flex-wrap gap-2 text-xs mt-3 px-1 md:px-0">
-        {(Object.entries(STATUS_LEGEND) as [ShiftStatus, string][]).map(([status, cls]) => (
-          <span key={status} className={cn('px-2 py-0.5 rounded-full font-medium', cls)}>
+        {(Object.keys(STATUS_LABEL) as ShiftStatus[]).map(status => (
+          <span key={status} className="px-2 py-0.5 rounded-full font-medium" style={legendStyle(status)}>
             {STATUS_LABEL[status]}
           </span>
         ))}

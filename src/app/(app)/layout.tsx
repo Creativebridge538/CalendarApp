@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { AppNav } from '@/components/layout/app-nav'
 import { getAccentSkin } from '@/lib/accent-skins'
+import { getAccentFont } from '@/lib/accent-fonts'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
@@ -11,7 +12,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const { data: profile } = await supabase
     .from('users')
-    .select('role, store_id, accent_skin')
+    .select('role, store_id, accent_skin, accent_font')
     .eq('id', user.id)
     .single()
 
@@ -27,20 +28,32 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // 管理者は店舗テーマ設定に関わらず、常に専用の固定ダークテーマ（analytics基調）を使う
   const theme = role === 'admin' ? 'admin-pro' : ((settings as { theme?: string } | null)?.theme ?? 'default')
 
-  // キャスト個人の「着せ替え」: ブランドアクセント色を個人の選択で上書き（店舗テーマとは別軸）
+  // キャスト個人の「着せ替え」: ブランドアクセント色とフォントは、それぞれ独立して個人が選択できる（店舗テーマとは別軸）
   const castSkin = role === 'cast' ? getAccentSkin(profile?.accent_skin) : null
-  const accentStyle: React.CSSProperties = castSkin
-    ? {
-        '--brand-accent': castSkin.accent,
-        '--brand-accent-2': castSkin.accent2,
-        '--brand-accent-dark': castSkin.dark,
-        '--cast-mobile-bg': castSkin.bg,
-      } as React.CSSProperties
-    : {}
+  const castFont = role === 'cast' ? getAccentFont(profile?.accent_font) : null
+  const accentStyle: React.CSSProperties = {
+    ...(castSkin
+      ? {
+          '--brand-accent': castSkin.accent,
+          '--brand-accent-2': castSkin.accent2,
+          '--brand-accent-dark': castSkin.dark,
+          '--cast-mobile-bg': castSkin.bg,
+          ...(castSkin.status
+            ? {
+                '--status-draft': castSkin.status.draft,
+                '--status-submitted': castSkin.status.submitted,
+                '--status-confirmed': castSkin.status.confirmed,
+                '--status-rejected': castSkin.status.rejected,
+              }
+            : {}),
+        }
+      : {}),
+    ...(castFont?.font ? { '--font-sans': castFont.font } : {}),
+  } as React.CSSProperties
 
   return (
     <div
-      className={`flex h-screen ${castSkin?.isDark ? 'dark' : ''}`}
+      className={`flex h-screen font-sans ${castSkin?.isDark ? 'dark' : ''}`}
       style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
       data-theme={theme}
     >

@@ -90,6 +90,12 @@
   /* キャストのモバイル画面専用: ページ背景に色を敷いて白カードを明確に浮かせる */
   --cast-mobile-bg: #f7f7f8;
 
+  /* シフト状態の色（着せ替えで上書き可能。未指定スキンはこの既定値のまま） */
+  --status-draft: #94a3b8;
+  --status-submitted: #3b82f6;
+  --status-confirmed: #10b981;
+  --status-rejected: #ef4444;
+
   /* エレベーション（iOSネイティブ風のフラットな見た目）: ほぼ罫線に近い薄い影のみ */
   --elevation-1: 0 0 0 1px oklch(0 0 0 / 6%), 0 1px 2px oklch(0 0 0 / 4%);
   --elevation-2: 0 0 0 1px oklch(0 0 0 / 6%), 0 4px 12px oklch(0 0 0 / 8%);

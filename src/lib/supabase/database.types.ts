@@ -320,8 +320,8 @@ export type Database = {
           is_daily_payment: boolean
           notes: string | null
           platform: string
-          raw_units: number | null
           rate_override: number | null
+          raw_units: number | null
           reward_rate_override: number | null
           store_id: string
           updated_at: string
@@ -338,8 +338,8 @@ export type Database = {
           is_daily_payment?: boolean
           notes?: string | null
           platform?: string
-          raw_units?: number | null
           rate_override?: number | null
+          raw_units?: number | null
           reward_rate_override?: number | null
           store_id: string
           updated_at?: string
@@ -356,8 +356,8 @@ export type Database = {
           is_daily_payment?: boolean
           notes?: string | null
           platform?: string
-          raw_units?: number | null
           rate_override?: number | null
+          raw_units?: number | null
           reward_rate_override?: number | null
           store_id?: string
           updated_at?: string
@@ -740,6 +740,7 @@ export type Database = {
       }
       users: {
         Row: {
+          accent_font: string
           accent_skin: string
           birthdate: string | null
           calendar_token: string | null
@@ -764,6 +765,7 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          accent_font?: string
           accent_skin?: string
           birthdate?: string | null
           calendar_token?: string | null
@@ -788,6 +790,7 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          accent_font?: string
           accent_skin?: string
           birthdate?: string | null
           calendar_token?: string | null
@@ -1087,4 +1090,3 @@ export const Constants = {
     },
   },
 } as const
-
