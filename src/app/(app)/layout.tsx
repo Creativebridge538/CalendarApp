@@ -16,13 +16,28 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     .eq('id', user.id)
     .single()
 
-  const { data: settings } = profile?.store_id
-    ? await supabase
-        .from('store_settings')
-        .select('theme')
-        .eq('store_id', profile.store_id)
-        .single()
-    : { data: null }
+  // owner(SaaS運営者)は店舗に属さないため、この一般ユーザー向けシェルは経由させず内部管理画面に流す
+  if (profile?.role === 'owner') redirect('/internal/stores')
+
+  const [{ data: settings }, { data: store }] = profile?.store_id
+    ? await Promise.all([
+        supabase.from('store_settings').select('theme').eq('store_id', profile.store_id).single(),
+        supabase.from('stores').select('name, is_active').eq('id', profile.store_id).single(),
+      ])
+    : [{ data: null }, { data: null }]
+
+  if (store && !store.is_active) {
+    return (
+      <div className="flex h-screen items-center justify-center p-6 text-center">
+        <div className="space-y-2 max-w-sm">
+          <p className="text-lg font-bold">この店舗は現在ご利用いただけません</p>
+          <p className="text-sm text-muted-foreground">
+            「{store.name}」はサービス提供者により利用停止されています。心当たりがない場合は運営までお問い合わせください。
+          </p>
+        </div>
+      </div>
+    )
+  }
 
   const role = profile?.role ?? 'cast'
   // 管理者は店舗テーマ設定に関わらず、常に専用の固定ダークテーマ（analytics基調）を使う

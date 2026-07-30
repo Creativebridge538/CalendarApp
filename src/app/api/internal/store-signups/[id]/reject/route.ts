@@ -10,7 +10,7 @@ export async function POST(
   const { id } = await params
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
-  if (!isPlatformOwner(user?.email)) {
+  if (!(await isPlatformOwner(supabase, user?.id))) {
     return NextResponse.json({ error: '権限がありません' }, { status: 403 })
   }
 

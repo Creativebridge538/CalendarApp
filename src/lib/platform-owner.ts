@@ -1,9 +1,12 @@
-/** SaaS運営者（新規店舗の申込を承認できる人）かどうかを判定する */
-export function isPlatformOwner(email: string | null | undefined): boolean {
-  if (!email) return false
-  const owners = (process.env.PLATFORM_OWNER_EMAILS ?? '')
-    .split(',')
-    .map(e => e.trim().toLowerCase())
-    .filter(Boolean)
-  return owners.includes(email.toLowerCase())
+import type { SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from '@/lib/supabase/database.types'
+
+/** 店舗に属さない role='owner' アカウントかどうかを判定する（SaaS運営者専用） */
+export async function isPlatformOwner(
+  supabase: SupabaseClient<Database>,
+  userId: string | null | undefined
+): Promise<boolean> {
+  if (!userId) return false
+  const { data } = await supabase.from('users').select('role').eq('id', userId).single()
+  return data?.role === 'owner'
 }

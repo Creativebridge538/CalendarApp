@@ -724,16 +724,19 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_active: boolean
           name: string
         }
         Insert: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name: string
         }
         Update: {
           created_at?: string
           id?: string
+          is_active?: boolean
           name?: string
         }
         Relationships: []
@@ -952,7 +955,7 @@ export type Database = {
       deadline_type: "monthly" | "weekly" | "none"
       request_status: "pending" | "approved" | "rejected"
       shift_status: "draft" | "submitted" | "confirmed" | "rejected"
-      user_role: "admin" | "cast"
+      user_role: "admin" | "cast" | "owner"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1086,7 +1089,8 @@ export const Constants = {
       deadline_type: ["monthly", "weekly", "none"],
       request_status: ["pending", "approved", "rejected"],
       shift_status: ["draft", "submitted", "confirmed", "rejected"],
-      user_role: ["admin", "cast"],
+      user_role: ["admin", "cast", "owner"],
     },
   },
 } as const
+
