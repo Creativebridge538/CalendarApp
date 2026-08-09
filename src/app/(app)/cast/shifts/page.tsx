@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { eachDayOfInterval, format } from 'date-fns'
 import { CastShiftView } from '@/components/shifts/cast-shift-view'
+import { getMonthToDateSummary } from '@/lib/reward-summary'
 
 export default async function CastShiftsPage() {
   const supabase = await createClient()
@@ -22,13 +23,14 @@ export default async function CastShiftsPage() {
     }
   }
 
-  const [{ data: shifts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems }, { data: store }] = await Promise.all([
+  const [{ data: shifts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems }, { data: store }, rewardSummary] = await Promise.all([
     supabase.from('shifts').select('*, rooms(name), areas(name)').eq('cast_id', user.id).order('date', { ascending: false }),
     supabase.from('rooms').select('id, name, area_id').eq('store_id', profile.store_id).eq('is_active', true),
     supabase.from('areas').select('id, name').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
     supabase.from('store_settings').select('*').eq('store_id', profile.store_id).single(),
     supabase.from('shift_checklist_items').select('id, label, item_type, options').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
     supabase.from('stores').select('name').eq('id', profile.store_id).single(),
+    getMonthToDateSummary(supabase, user.id),
   ])
 
   return (
@@ -44,6 +46,7 @@ export default async function CastShiftsPage() {
         userId={user.id}
         checklistItems={checklistItems ?? []}
         periodDates={periodDates}
+        rewardSummary={rewardSummary}
       />
     </div>
   )

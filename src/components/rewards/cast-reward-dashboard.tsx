@@ -12,10 +12,12 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  TrendingUp, TrendingDown, Minus, Target, Pencil, StickyNote, Lock,
+  TrendingUp, TrendingDown, Minus, Pencil, StickyNote, Lock,
   CircleDollarSign, CalendarDays, CalendarRange, BarChart3,
 } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
+import { GoalRing } from '@/components/rewards/goal-ring'
+import { cn } from '@/lib/utils'
 
 const PLATFORM_LABEL: Record<string, string> = {
   manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
@@ -34,11 +36,14 @@ interface Props {
   year: number
   month: number
   thisMonthTotal: number
-  prevMonthTotal: number
+  prevMonthToDateTotal: number
   monthlyGoal: number | null
-  calendarDays: { date: string | null; day: number | null; amount: number; isToday: boolean }[]
-  workedDaysThisMonth: number
+  calendarDays: { date: string | null; day: number | null; amount: number; hours: number; isToday: boolean }[]
   avgPerWorkedDay: number
+  attendanceDaysThisMonth: number
+  shiftCountThisMonth: number
+  totalHoursThisMonth: number
+  platformBreakdown: { platform: string; amount: number }[]
   trend: { date: string; amount: number }[]
   weekday: { label: string; amount: number }[]
   dayDetails: Record<string, DayDetail>
@@ -66,9 +71,10 @@ function useCountUp(target: number, durationMs = 900) {
 const WEEKDAY_HEADS = ['日', '月', '火', '水', '木', '金', '土']
 
 export function CastRewardDashboard({
-  userId, monthLabel, year, month, thisMonthTotal, prevMonthTotal, monthlyGoal: initialGoal,
-  calendarDays, workedDaysThisMonth, avgPerWorkedDay, trend, weekday, dayDetails,
-  usdJpyRate, finalizedReward,
+  userId, monthLabel, year, month, thisMonthTotal, prevMonthToDateTotal, monthlyGoal: initialGoal,
+  calendarDays, avgPerWorkedDay,
+  attendanceDaysThisMonth, shiftCountThisMonth, totalHoursThisMonth, platformBreakdown,
+  trend, weekday, dayDetails, usdJpyRate, finalizedReward,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'calendar' | 'report'>('calendar')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -76,10 +82,11 @@ export function CastRewardDashboard({
   const [goalOpen, setGoalOpen] = useState(false)
   const [goalInput, setGoalInput] = useState(initialGoal != null ? String(initialGoal) : '')
   const [savingGoal, setSavingGoal] = useState(false)
+  const [breakdownOpen, setBreakdownOpen] = useState(false)
   const supabase = createClient()
 
   const animatedTotal = useCountUp(thisMonthTotal, 1100)
-  const delta = prevMonthTotal > 0 ? ((thisMonthTotal - prevMonthTotal) / prevMonthTotal) * 100 : null
+  const prevMonthDelta = prevMonthToDateTotal > 0 ? ((thisMonthTotal - prevMonthToDateTotal) / prevMonthToDateTotal) * 100 : null
   const goalProgress = monthlyGoal && monthlyGoal > 0 ? Math.min(100, (thisMonthTotal / monthlyGoal) * 100) : null
 
   async function saveGoal() {
@@ -128,99 +135,94 @@ export function CastRewardDashboard({
 
       <Card elevated>
         <CardContent className="pt-5 space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <div>
-              <p className="text-xs text-muted-foreground">今月の売上合計</p>
-              <p className="text-3xl font-extrabold tabular-nums mt-0.5">¥{animatedTotal.toLocaleString()}</p>
+          <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">{month}月ここまで</p>
+              <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                <p className="text-3xl font-extrabold tabular-nums">¥{animatedTotal.toLocaleString()}</p>
+                <button
+                  type="button"
+                  onClick={() => setBreakdownOpen(true)}
+                  className="text-xs font-medium rounded-full border px-2.5 py-1 shrink-0 hover:bg-muted transition-colors"
+                >
+                  内訳
+                </button>
+              </div>
+              {prevMonthDelta != null && (
+                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                  {prevMonthDelta > 0.5 ? <TrendingUp className="h-3 w-3 text-positive" /> : prevMonthDelta < -0.5 ? <TrendingDown className="h-3 w-3 text-destructive" /> : <Minus className="h-3 w-3" />}
+                  先月の同じ日まで {prevMonthDelta > 0 ? '+' : ''}{prevMonthDelta.toFixed(1)}%
+                </p>
+              )}
             </div>
-            {delta != null && (
-              <span
-                className={
-                  'inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ' +
-                  (delta > 0.5 ? 'text-positive bg-positive/12' : delta < -0.5 ? 'text-destructive bg-destructive/12' : 'text-muted-foreground bg-muted')
-                }
-              >
-                {delta > 0.5 ? <TrendingUp className="h-3 w-3" /> : delta < -0.5 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
-                先月比 {delta > 0 ? '+' : ''}{delta.toFixed(1)}%
-              </span>
-            )}
+
+            <button
+              type="button"
+              onClick={() => { setGoalInput(monthlyGoal != null ? String(monthlyGoal) : ''); setGoalOpen(true) }}
+              className="flex flex-col items-center shrink-0"
+            >
+              <GoalRing percent={goalProgress ?? 0} />
+              <div className="text-[10px] text-muted-foreground text-center mt-1.5 space-y-0.5">
+                <p>出勤 {attendanceDaysThisMonth}日・{shiftCountThisMonth}件</p>
+                <p className="tabular-nums">{totalHoursThisMonth.toFixed(1)}時間</p>
+                <p className="flex items-center justify-center gap-0.5">
+                  {monthlyGoal ? `目標 ¥${monthlyGoal.toLocaleString()}` : '目標未設定'}
+                  <Pencil className="h-2.5 w-2.5" style={{ color: 'var(--brand-accent)' }} />
+                </p>
+              </div>
+            </button>
           </div>
 
           {finalizedReward != null && (
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t">
+              <p className="text-xs text-muted-foreground flex items-center gap-1 pt-3">
                 <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
               </p>
-              <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" />
+              <div className="pt-3">
+                <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" />
+              </div>
             </div>
           )}
-
-          <div>
-            <div className="flex items-center justify-between mb-1.5">
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Target className="h-3 w-3" />
-                {monthlyGoal ? `目標 ¥${monthlyGoal.toLocaleString()} まで ${goalProgress!.toFixed(0)}%` : '目標が設定されていません'}
-              </span>
-              <button
-                type="button"
-                onClick={() => { setGoalInput(monthlyGoal != null ? String(monthlyGoal) : ''); setGoalOpen(true) }}
-                className="text-xs flex items-center gap-0.5 hover:underline"
-                style={{ color: 'var(--brand-accent)' }}
-              >
-                <Pencil className="h-3 w-3" />{monthlyGoal ? '編集' : '設定する'}
-              </button>
-            </div>
-            {monthlyGoal != null && (
-              <div className="h-2 rounded-full bg-muted overflow-hidden">
-                <div
-                  className="h-full rounded-full transition-[width] duration-700 bg-[var(--brand-accent)]"
-                  style={{ width: `${goalProgress}%` }}
-                />
-              </div>
-            )}
-          </div>
         </CardContent>
       </Card>
 
       {activeTab === 'calendar' && (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <Card elevated><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">稼働日数</p><p className="text-lg font-bold mt-0.5">{workedDaysThisMonth}日</p></CardContent></Card>
-            <Card elevated><CardContent className="pt-4 pb-4"><p className="text-xs text-muted-foreground">1日の平均</p><p className="text-lg font-bold mt-0.5">¥{avgPerWorkedDay.toLocaleString()}</p></CardContent></Card>
-          </div>
-
           <Card elevated>
-            <CardContent className="pt-4 pb-4">
-              <div className="grid grid-cols-7 gap-1 text-center text-xs mb-1.5">
-                {WEEKDAY_HEADS.map(d => <div key={d} className="text-muted-foreground font-medium py-1">{d}</div>)}
+            <CardContent className="pt-4 pb-3 px-3">
+              <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground pb-2">
+                {WEEKDAY_HEADS.map((d, i) => (
+                  <div key={d} className={cn(i === 0 && 'text-red-500', i === 6 && 'text-blue-500')}>{d}</div>
+                ))}
               </div>
-              <div className="grid grid-cols-7 gap-1">
+              <div className="grid grid-cols-7 divide-y divide-border border-t border-border">
                 {calendarDays.map((c, i) => (
                   c.date == null ? <div key={i} /> : (
                     <button
                       key={c.date}
+                      type="button"
                       onClick={() => setSelectedDate(selectedDate === c.date ? null : c.date)}
-                      className={
-                        'rounded-lg py-1.5 text-center transition-all duration-150 ' +
-                        (selectedDate === c.date
-                          ? 'bg-[var(--brand-accent)] text-white shadow-[0_2px_6px_oklch(0_0_0_/_15%)]'
-                          : c.amount > 0 ? 'bg-[color-mix(in_oklch,var(--brand-accent)_10%,transparent)] hover:bg-[color-mix(in_oklch,var(--brand-accent)_18%,transparent)]' : 'hover:bg-muted')
-                      }
-                      style={c.isToday && selectedDate !== c.date ? { boxShadow: 'inset 0 0 0 1.5px var(--brand-accent)' } : undefined}
+                      className={cn(
+                        'flex flex-col items-start gap-0.5 min-h-[64px] px-1.5 py-2 text-left transition-colors',
+                        selectedDate === c.date ? 'bg-muted' : c.isToday ? 'bg-[color-mix(in_oklch,var(--brand-accent)_10%,transparent)]' : 'hover:bg-muted/50'
+                      )}
                     >
-                      <div className="text-xs font-semibold">{c.day}</div>
-                      {c.amount > 0 && (
-                        <div
-                          className="text-[9px] mt-0.5 tabular-nums"
-                          style={selectedDate === c.date ? undefined : { color: 'var(--brand-accent)' }}
-                        >
-                          {Math.round(c.amount / 1000)}k
-                        </div>
+                      <span className="text-xs font-medium tabular-nums">{c.day}</span>
+                      {c.isToday ? (
+                        <span className="text-[10px] font-semibold" style={{ color: 'var(--brand-accent)' }}>本日出勤</span>
+                      ) : (
+                        <>
+                          {c.amount > 0 && <span className="text-[12px] font-bold tabular-nums leading-tight">{c.amount.toLocaleString()}</span>}
+                          {c.hours > 0 && <span className="text-[10px] text-muted-foreground tabular-nums">{c.hours.toFixed(1)}h</span>}
+                        </>
                       )}
                     </button>
                   )
                 ))}
               </div>
+              <p className="text-[11px] text-muted-foreground text-center mt-2.5">
+                数字=売上（円）・下段=勤務時間。タップで明細
+              </p>
             </CardContent>
           </Card>
 
@@ -299,6 +301,34 @@ export function CastRewardDashboard({
           )}
         </>
       )}
+
+      <Dialog open={breakdownOpen} onOpenChange={setBreakdownOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>{month}月の内訳</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            {platformBreakdown.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">まだ売上データがありません</p>
+            ) : (
+              <div className="space-y-1.5">
+                {platformBreakdown.map(row => (
+                  <div key={row.platform} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{PLATFORM_LABEL[row.platform] ?? row.platform}</span>
+                    <span className="tabular-nums font-medium">¥{row.amount.toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div className="flex items-center justify-between text-sm pt-2 border-t">
+              <span className="text-muted-foreground">1日の平均</span>
+              <span className="tabular-nums font-medium">¥{avgPerWorkedDay.toLocaleString()}</span>
+            </div>
+            <div className="flex items-center justify-between text-sm font-semibold pt-2 border-t">
+              <span>合計</span>
+              <span className="tabular-nums">¥{thisMonthTotal.toLocaleString()}</span>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={goalOpen} onOpenChange={setGoalOpen}>
         <DialogContent>

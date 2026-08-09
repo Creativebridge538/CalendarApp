@@ -7,6 +7,14 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
 }
 
+function shiftHours(startTime: string, endTime: string): number {
+  const [sh, sm] = startTime.slice(0, 5).split(':').map(Number)
+  const [eh, em] = endTime.slice(0, 5).split(':').map(Number)
+  let minutes = (eh * 60 + em) - (sh * 60 + sm)
+  if (minutes <= 0) minutes += 24 * 60
+  return minutes / 60
+}
+
 export default async function CastRewardsPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -53,27 +61,58 @@ export default async function CastRewardsPage() {
 
   const shiftsByDate = new Map(shiftsList.map(s => [s.date, s]))
 
+  // 日付ごとの勤務時間合計（同日に複数シフトがある場合は合算）
+  const hoursByDate = new Map<string, number>()
+  for (const s of shiftsList) {
+    hoursByDate.set(s.date, (hoursByDate.get(s.date) ?? 0) + shiftHours(s.start_time, s.end_time))
+  }
+
   // 当月カレンダーグリッド（日曜始まり、前後の月の空白セルも含む）
   const monthStartDate = startOfMonth(now)
   const monthEndDate = endOfMonth(now)
   const leadingBlanks = monthStartDate.getDay()
   const daysInMonth = monthEndDate.getDate()
-  const calendarDays: { date: string | null; day: number | null; amount: number; isToday: boolean }[] = []
-  for (let i = 0; i < leadingBlanks; i++) calendarDays.push({ date: null, day: null, amount: 0, isToday: false })
+  const calendarDays: { date: string | null; day: number | null; amount: number; hours: number; isToday: boolean }[] = []
+  for (let i = 0; i < leadingBlanks; i++) calendarDays.push({ date: null, day: null, amount: 0, hours: 0, isToday: false })
   for (let d = 1; d <= daysInMonth; d++) {
     const date = format(new Date(now.getFullYear(), now.getMonth(), d), 'yyyy-MM-dd')
-    calendarDays.push({ date, day: d, amount: salesByDate.get(date)?.total ?? 0, isToday: date === today })
+    calendarDays.push({
+      date, day: d,
+      amount: salesByDate.get(date)?.total ?? 0,
+      hours: hoursByDate.get(date) ?? 0,
+      isToday: date === today,
+    })
   }
 
   const thisMonthTotal = [...salesByDate.entries()]
     .filter(([date]) => date >= monthStart && date <= monthEnd)
     .reduce((sum, [, v]) => sum + v.total, 0)
-  const prevMonthTotal = salesList
-    .filter(s => s.date >= prevMonthStart && s.date <= prevMonthEnd)
+  // 「先月の同じ日まで」との比較用に、先月分も当月と同じ日数分で切り詰めて合計する
+  const prevMonthCutoffDay = Math.min(now.getDate(), Number(prevMonthEnd.slice(-2)))
+  const prevMonthCutoff = format(new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), prevMonthCutoffDay), 'yyyy-MM-dd')
+  const prevMonthToDateTotal = salesList
+    .filter(s => s.date >= prevMonthStart && s.date <= prevMonthCutoff)
     .reduce((sum, s) => sum + Number(s.amount), 0)
 
   const workedDaysThisMonth = [...salesByDate.keys()].filter(d => d >= monthStart && d <= monthEnd).length
   const avgPerWorkedDay = workedDaysThisMonth > 0 ? Math.round(thisMonthTotal / workedDaysThisMonth) : 0
+
+  // 出勤日数・件数・時間はシフト実績ベース（売上が未入力の日も含む）
+  const attendanceDaysThisMonth = new Set(shiftsList.map(s => s.date)).size
+  const shiftCountThisMonth = shiftsList.length
+  const totalHoursThisMonth = shiftsList.reduce((sum, s) => sum + shiftHours(s.start_time, s.end_time), 0)
+
+  // 今月のプラットフォーム別内訳
+  const platformBreakdownMap = new Map<string, number>()
+  for (const [date, v] of salesByDate.entries()) {
+    if (date < monthStart || date > monthEnd) continue
+    for (const row of v.rows) {
+      platformBreakdownMap.set(row.platform, (platformBreakdownMap.get(row.platform) ?? 0) + row.amount)
+    }
+  }
+  const platformBreakdown = [...platformBreakdownMap.entries()]
+    .map(([platform, amount]) => ({ platform, amount }))
+    .sort((a, b) => b.amount - a.amount)
 
   // 直近30日の推移
   const trend = Array.from({ length: 30 }, (_, idx) => {
@@ -148,11 +187,14 @@ export default async function CastRewardsPage() {
         year={now.getFullYear()}
         month={now.getMonth() + 1}
         thisMonthTotal={thisMonthTotal}
-        prevMonthTotal={prevMonthTotal}
+        prevMonthToDateTotal={prevMonthToDateTotal}
         monthlyGoal={profile.monthly_goal != null ? Number(profile.monthly_goal) : null}
         calendarDays={calendarDays}
-        workedDaysThisMonth={workedDaysThisMonth}
         avgPerWorkedDay={avgPerWorkedDay}
+        attendanceDaysThisMonth={attendanceDaysThisMonth}
+        shiftCountThisMonth={shiftCountThisMonth}
+        totalHoursThisMonth={totalHoursThisMonth}
+        platformBreakdown={platformBreakdown}
         trend={trend}
         weekday={weekday}
         dayDetails={dayDetails}

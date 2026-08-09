@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -22,6 +23,9 @@ import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
 import { MonthYearPicker } from './month-year-picker'
 import { Logo } from '@/components/logo'
+import { GoalRing } from '@/components/rewards/goal-ring'
+import type { MonthToDateSummary } from '@/lib/reward-summary'
+import { cn } from '@/lib/utils'
 
 type ShiftStatus = Database['public']['Enums']['shift_status']
 
@@ -98,6 +102,7 @@ interface Props {
   userId: string
   checklistItems: { id: string; label: string; item_type: string; options: string[] }[]
   periodDates?: Set<string>
+  rewardSummary: MonthToDateSummary
 }
 
 const HOUR_HEIGHT = 56
@@ -203,7 +208,7 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, periodDates }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, periodDates, rewardSummary }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [menuOpen, setMenuOpen] = useState(false)
@@ -249,6 +254,12 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     router.push('/login')
     router.refresh()
   }
+  const rewardDelta = rewardSummary.prevMonthToDateTotal > 0
+    ? ((rewardSummary.thisMonthTotal - rewardSummary.prevMonthToDateTotal) / rewardSummary.prevMonthToDateTotal) * 100
+    : null
+  const rewardGoalProgress = rewardSummary.monthlyGoal && rewardSummary.monthlyGoal > 0
+    ? Math.min(100, (rewardSummary.thisMonthTotal / rewardSummary.monthlyGoal) * 100)
+    : null
   const locationMode = settings?.location_mode ?? 'room'
   const areaLabel = settings?.area_label ?? 'エリア'
   const roomLabel = settings?.room_label ?? 'ルーム'
@@ -558,6 +569,29 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         <CardContent className="px-0 md:px-6">
           {view === 'month' && (
             <>
+              <Link
+                href="/cast/rewards"
+                className="flex items-center gap-3 mx-4 md:mx-0 mb-3 px-3 py-2.5 rounded-lg border hover:bg-muted/40 transition-colors"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="text-[10px] text-muted-foreground">{rewardSummary.monthLabel}ここまでの売上</p>
+                  <div className="flex items-baseline gap-1.5 flex-wrap">
+                    <p className="text-base font-bold tabular-nums">¥{rewardSummary.thisMonthTotal.toLocaleString()}</p>
+                    {rewardDelta != null && (
+                      <span className={cn(
+                        'text-[10px] font-semibold',
+                        rewardDelta > 0.5 ? 'text-positive' : rewardDelta < -0.5 ? 'text-destructive' : 'text-muted-foreground'
+                      )}>
+                        {rewardDelta > 0 ? '+' : ''}{rewardDelta.toFixed(1)}%
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {rewardSummary.monthlyGoal != null && (
+                  <GoalRing percent={rewardGoalProgress ?? 0} size={36} stroke={4} textClassName="text-[9px] font-bold" />
+                )}
+                <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
+              </Link>
               <ShiftCalendar shifts={shifts} onDayClick={handleDayClick} current={calAnchor} direction={calDirection} periodDates={periodDates} />
               <p className="text-xs text-muted-foreground text-center mt-2 px-4 md:px-0">日付をタップしてシフトを提出・編集できます</p>
             </>
