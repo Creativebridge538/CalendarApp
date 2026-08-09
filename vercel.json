@@ -2,5 +2,6 @@
   "installCommand": "corepack enable && pnpm install",
   "env": {
     "ENABLE_COREPACK": "1"
-  }
+  },
+  "regions": ["icn1"]
 }
