@@ -89,7 +89,7 @@ export function SignupReviewList({ pending: initialPending, recent: initialRecen
                 <Button size="sm" onClick={() => handleApprove(req)} disabled={processing === req.id}>
                   <Check className="h-3.5 w-3.5 mr-1" />承認する
                 </Button>
-                <Button size="sm" variant="outline" className="text-red-600" onClick={() => { setRejectTarget(req); setRejectReason('') }} disabled={processing === req.id}>
+                <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(req); setRejectReason('') }} disabled={processing === req.id}>
                   <X className="h-3.5 w-3.5 mr-1" />却下する
                 </Button>
               </div>

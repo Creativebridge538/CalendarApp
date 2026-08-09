@@ -1,0 +1,10 @@
+[
+  {
+    "date": "2026-08-03",
+    "scope": "app",
+    "macrostructure": "n/a (app, not a landing page)",
+    "theme": "custom (studio-indigo family, locked in design.md)",
+    "enrichment": "none",
+    "brief": "CalendarApp · multi-tenant shift/reward SaaS · fix raw-Tailwind semantic-color leaks + unset default accent skin flagged by hallmark audit"
+  }
+]

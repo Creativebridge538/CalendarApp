@@ -137,7 +137,7 @@ export function CastRewardDashboard({
               <span
                 className={
                   'inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full ' +
-                  (delta > 0.5 ? 'text-green-700 bg-green-100' : delta < -0.5 ? 'text-red-700 bg-red-100' : 'text-muted-foreground bg-muted')
+                  (delta > 0.5 ? 'text-positive bg-positive/12' : delta < -0.5 ? 'text-destructive bg-destructive/12' : 'text-muted-foreground bg-muted')
                 }
               >
                 {delta > 0.5 ? <TrendingUp className="h-3 w-3" /> : delta < -0.5 ? <TrendingDown className="h-3 w-3" /> : <Minus className="h-3 w-3" />}
@@ -260,11 +260,11 @@ export function CastRewardDashboard({
                   </div>
                 )}
                 {detail.shift?.admin_note && (
-                  <div className="flex gap-2 bg-amber-50 border border-amber-200 rounded-lg p-2.5">
-                    <StickyNote className="h-3.5 w-3.5 text-amber-700 shrink-0 mt-0.5" />
+                  <div className="flex gap-2 bg-note/10 border border-note/30 rounded-lg p-2.5">
+                    <StickyNote className="h-3.5 w-3.5 text-note shrink-0 mt-0.5" />
                     <div>
-                      <p className="text-[10px] font-semibold text-amber-700">スタッフより</p>
-                      <p className="text-xs text-amber-800 mt-0.5">{detail.shift.admin_note}</p>
+                      <p className="text-[10px] font-semibold text-note">スタッフより</p>
+                      <p className="text-xs text-foreground mt-0.5">{detail.shift.admin_note}</p>
                     </div>
                   </div>
                 )}

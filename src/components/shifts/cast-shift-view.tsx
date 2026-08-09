@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format, isAfter, addMonths, subMonths, addDays, subDays, startOfWeek, isSameDay } from 'date-fns'
@@ -16,7 +16,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut } from 'lucide-react'
+import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
@@ -49,7 +49,42 @@ const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive
   draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive',
 }
 const STATUS_DOT: Record<ShiftStatus, string> = {
-  draft: '#94a3b8', submitted: '#3987e5', confirmed: '#10b981', rejected: '#ef4444',
+  draft: 'var(--status-draft)', submitted: 'var(--status-submitted)',
+  confirmed: 'var(--status-confirmed)', rejected: 'var(--status-rejected)',
+}
+
+// 深夜営業のシフトは「25:00」のような24時を超えた表記で入力できるようにする（DB保存時は24時間に正規化）
+const HOUR_OPTIONS = Array.from({ length: 30 }, (_, i) => String(i).padStart(2, '0'))
+const MINUTE_OPTIONS = ['00', '15', '30', '45']
+
+function normalizeTime(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number)
+  return `${String(h % 24).padStart(2, '0')}:${String(m).padStart(2, '0')}`
+}
+
+function TimeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [h, m] = value.split(':')
+  return (
+    <div className="flex items-center gap-0.5 rounded-md border px-1.5 py-1">
+      <select
+        value={h}
+        onChange={e => onChange(`${e.target.value}:${m}`)}
+        className="bg-transparent text-sm tabular-nums outline-none"
+        aria-label="時"
+      >
+        {HOUR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+      <span className="text-sm text-muted-foreground">:</span>
+      <select
+        value={m}
+        onChange={e => onChange(`${h}:${e.target.value}`)}
+        className="bg-transparent text-sm tabular-nums outline-none"
+        aria-label="分"
+      >
+        {MINUTE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+      </select>
+    </div>
+  )
 }
 
 interface Props {
@@ -75,12 +110,13 @@ function timeToMinutes(hhmm: string): number {
 
 /** 週表示・日表示共通の時間軸グリッド（Googleカレンダー等と同じ、時刻に応じて予定ブロックを配置する形式） */
 function ShiftTimeGrid({
-  days, shiftsOn, onDayClick, periodDates,
+  days, shiftsOn, onDayClick, periodDates, locationLabelOf,
 }: {
   days: Date[]
   shiftsOn: (day: Date) => Shift[]
   onDayClick: (day: Date) => void
   periodDates?: Set<string>
+  locationLabelOf: (shift: Shift) => string | null
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const daysKey = days.map(d => d.toISOString()).join(',')
@@ -151,10 +187,11 @@ function ShiftTimeGrid({
                     key={s.id}
                     type="button"
                     onClick={e => { e.stopPropagation(); onDayClick(day) }}
-                    className="absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-left text-white text-[10px] font-medium overflow-hidden leading-tight"
+                    className="absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-left text-white text-[10px] font-medium overflow-hidden whitespace-nowrap leading-tight"
                     style={{ top, height, backgroundColor: STATUS_DOT[s.status] }}
+                    title={`${locationLabelOf(s) ? locationLabelOf(s) + ' ' : ''}${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                   >
-                    {s.start_time.slice(0, 5)}〜{s.end_time.slice(0, 5)}
+                    {locationLabelOf(s) ?? STATUS_LABEL[s.status]}
                   </button>
                 )
               })}
@@ -186,8 +223,26 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   const [modTarget, setModTarget] = useState<Shift | null>(null)
   const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', checklist_answers: {} as ChecklistAnswers })
   const [modForm, setModForm] = useState({ new_date: '', new_start_time: '', new_end_time: '', reason: '' })
+  const [bulkDates, setBulkDates] = useState<Set<string>>(new Set())
+  const [bulkTimes, setBulkTimes] = useState<Record<string, { start: string; end: string }>>({})
+  const [bulkTemplates, setBulkTemplates] = useState([{ start: '19:00', end: '24:00' }, { start: '20:00', end: '25:00' }])
+  const [templateEditorOpen, setTemplateEditorOpen] = useState(false)
+  const [newTemplate, setNewTemplate] = useState({ start: '19:00', end: '24:00' })
+  const [bulkSheetOpen, setBulkSheetOpen] = useState(false)
+  const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkForm, setBulkForm] = useState({ area_id: '', room_id: '', notes: '', checklist_answers: {} as ChecklistAnswers })
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // 下部タブバー中央の「作成」ボタン（/cast/shifts?new=1）から来た場合、まとめて追加フローを自動で開く
+  useEffect(() => {
+    if (searchParams.get('new') === '1') {
+      startBulkAdd()
+      router.replace('/cast/shifts', { scroll: false })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -199,6 +254,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   const roomLabel = settings?.room_label ?? 'ルーム'
   const filteredRooms = locationMode === 'area_and_room' && form.area_id
     ? rooms.filter(r => r.area_id === form.area_id)
+    : rooms
+  const bulkFilteredRooms = locationMode === 'area_and_room' && bulkForm.area_id
+    ? rooms.filter(r => r.area_id === bulkForm.area_id)
     : rooms
 
   function locationLabelOf(shift: Shift): string | null {
@@ -242,6 +300,57 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     setDayDetailDate(format(date, 'yyyy-MM-dd'))
   }
 
+  function toggleBulkDate(date: Date) {
+    const key = format(date, 'yyyy-MM-dd')
+    setBulkDates(prev => {
+      const next = new Set(prev)
+      if (next.has(key)) {
+        next.delete(key)
+        setBulkTimes(t => { const nt = { ...t }; delete nt[key]; return nt })
+      } else {
+        next.add(key)
+        setBulkTimes(t => ({ ...t, [key]: t[key] ?? bulkTemplates[0] }))
+      }
+      return next
+    })
+  }
+
+  function startBulkAdd() {
+    setBulkDates(new Set())
+    setBulkTimes({})
+    setBulkForm({ area_id: '', room_id: '', notes: '', checklist_answers: {} })
+    setMenuOpen(false)
+    setBulkSheetOpen(true)
+  }
+
+  function cancelBulkAdd() {
+    setBulkDates(new Set())
+    setBulkTimes({})
+    setTemplateEditorOpen(false)
+    setBulkSheetOpen(false)
+  }
+
+  function applyTemplateToAll(t: { start: string; end: string }) {
+    setBulkTimes(prev => {
+      const next = { ...prev }
+      bulkDates.forEach(d => { next[d] = t })
+      return next
+    })
+  }
+
+  function addTemplate() {
+    setBulkTemplates(prev => [...prev, newTemplate])
+    setTemplateEditorOpen(false)
+  }
+
+  function removeTemplate(index: number) {
+    setBulkTemplates(prev => prev.filter((_, i) => i !== index))
+  }
+
+  function setBulkDateTime(date: string, field: 'start' | 'end', value: string) {
+    setBulkTimes(prev => ({ ...prev, [date]: { ...(prev[date] ?? bulkTemplates[0]), [field]: value } }))
+  }
+
   function goPrev() {
     setCalDirection('prev')
     setCalAnchor(d => view === 'week' ? subDays(d, 7) : view === 'day' ? subDays(d, 1) : subMonths(d, 1))
@@ -270,6 +379,24 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
 
   function setChecklistSelect(id: string, value: string) {
     setForm(f => {
+      const next = { ...f.checklist_answers }
+      if (value) next[id] = value
+      else delete next[id]
+      return { ...f, checklist_answers: next }
+    })
+  }
+
+  function toggleBulkChecklistItem(id: string) {
+    setBulkForm(f => {
+      const next = { ...f.checklist_answers }
+      if (next[id]) delete next[id]
+      else next[id] = true
+      return { ...f, checklist_answers: next }
+    })
+  }
+
+  function setBulkChecklistSelect(id: string, value: string) {
+    setBulkForm(f => {
       const next = { ...f.checklist_answers }
       if (value) next[id] = value
       else delete next[id]
@@ -311,6 +438,37 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
       toast.success('シフトを提出しました')
     }
     setOpen(false)
+  }
+
+  async function handleBulkSave() {
+    const dates = Array.from(bulkDates).sort()
+    if (dates.length === 0) return
+    setBulkSaving(true)
+    const payload = dates.map(date => {
+      const t = bulkTimes[date] ?? bulkTemplates[0]
+      return {
+        cast_id: castId,
+        store_id: storeId,
+        date,
+        start_time: normalizeTime(t.start),
+        end_time: normalizeTime(t.end),
+        area_id: (locationMode === 'area_only' || locationMode === 'area_and_room') ? bulkForm.area_id || null : null,
+        room_id: (locationMode === 'room' || locationMode === 'area_and_room') ? bulkForm.room_id || null : null,
+        notes: bulkForm.notes || null,
+        checklist_answers: bulkForm.checklist_answers,
+        status: 'submitted' as ShiftStatus,
+      }
+    })
+    const { data, error } = await supabase.from('shifts').insert(payload).select('*, rooms(name), areas(name)')
+    setBulkSaving(false)
+    if (error) { toast.error('まとめての提出に失敗しました'); return }
+    setShifts([
+      ...(data ?? []).map(d => ({ ...d, checklist_answers: (d.checklist_answers ?? {}) as ChecklistAnswers })),
+      ...shifts,
+    ])
+    toast.success(`${dates.length}件のシフトを提出しました`)
+    setBulkSheetOpen(false)
+    cancelBulkAdd()
   }
 
   async function handleCancel(shift: Shift) {
@@ -394,9 +552,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               >
                 <Search className="h-5 w-5" />
               </button>
-              <Button variant="elevated" size="sm" className="rounded-full" onClick={() => openNew()}>
-                <Plus className="h-3.5 w-3.5 mr-1" />追加
-              </Button>
             </div>
           </div>
         </CardHeader>
@@ -414,11 +569,12 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               shiftsOn={shiftsOn}
               onDayClick={handleDayClick}
               periodDates={periodDates}
+              locationLabelOf={locationLabelOf}
             />
           )}
 
           {view === 'day' && (
-            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} periodDates={periodDates} />
+            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} periodDates={periodDates} locationLabelOf={locationLabelOf} />
           )}
           {view === 'list' && (
             <>
@@ -455,7 +611,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                               <Button size="sm" variant="outline" className="flex-1" onClick={() => openEdit(shift)}>
                                 <Pencil className="h-3.5 w-3.5 mr-1" />編集
                               </Button>
-                              <Button size="sm" variant="outline" className="text-red-600" onClick={() => handleCancel(shift)}>
+                              <Button size="sm" variant="destructive" onClick={() => handleCancel(shift)}>
                                 <Trash2 className="h-3.5 w-3.5" />
                               </Button>
                             </>
@@ -543,7 +699,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                 <button
                   key={mode}
                   type="button"
-                  onClick={() => { setView(mode); setMenuOpen(false) }}
+                  onClick={() => { setView(mode); setMenuOpen(false); if (mode !== 'month') cancelBulkAdd() }}
                   className={`w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors ${view === mode ? 'bg-muted font-medium' : 'hover:bg-muted/60'}`}
                 >
                   <Icon className="h-4 w-4 shrink-0" />
@@ -551,12 +707,21 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                   {view === mode && <Check className="h-4 w-4 ml-auto" style={{ color: 'var(--brand-accent)' }} />}
                 </button>
               ))}
+              <div className="my-1 border-t" />
+              <button
+                type="button"
+                onClick={startBulkAdd}
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm transition-colors hover:bg-muted/60"
+              >
+                <CalendarPlus className="h-4 w-4 shrink-0" />
+                まとめて追加
+              </button>
             </nav>
             <div className="px-2 py-2 border-t">
               <button
                 type="button"
                 onClick={handleLogout}
-                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm text-red-600 hover:bg-red-50 transition-colors"
+                className="w-full flex items-center gap-2.5 px-3 py-2.5 rounded-md text-sm text-destructive hover:bg-destructive/10 transition-colors"
               >
                 <LogOut className="h-4 w-4 shrink-0" />
                 ログアウト
@@ -701,7 +866,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                           <Button variant="elevated" size="sm" className="flex-1" onClick={() => { setDayDetailDate(null); openEdit(shift) }}>
                             <Pencil className="h-3.5 w-3.5 mr-1" />編集
                           </Button>
-                          <Button size="icon-sm" variant="outline" className="text-red-600" onClick={() => handleCancel(shift)} aria-label="取消">
+                          <Button size="icon-sm" variant="destructive" onClick={() => handleCancel(shift)} aria-label="取消">
                             <Trash2 className="h-3.5 w-3.5" />
                           </Button>
                         </>
@@ -843,6 +1008,192 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
               <Button variant="elevated" onClick={handleSave} disabled={!form.date}>提出</Button>
             </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={bulkSheetOpen} onOpenChange={setBulkSheetOpen}>
+        <DialogContent variant="sheet" onDismiss={() => setBulkSheetOpen(false)}>
+          <DialogHeader><DialogTitle>まとめてシフト提出</DialogTitle></DialogHeader>
+          <div className="space-y-5 mt-2">
+            <div>
+              <Label className="text-xs text-muted-foreground">日付を選ぶ（複数タップできます）</Label>
+              <div className="mt-1.5">
+                <ShiftCalendar shifts={shifts} onDayClick={toggleBulkDate} selectedDates={bulkDates} />
+              </div>
+            </div>
+
+            {bulkDates.size > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">選んだ日（{bulkDates.size}件）</Label>
+                <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto">
+                  {Array.from(bulkDates).sort().map(date => (
+                    <span key={date} className="inline-flex items-center gap-1 rounded-full bg-muted px-2 py-1 text-xs">
+                      {format(new Date(`${date}T00:00:00`), 'M/d(E)', { locale: ja })}
+                      <button
+                        type="button"
+                        onClick={() => setBulkDates(prev => {
+                          const next = new Set(prev)
+                          next.delete(date)
+                          setBulkTimes(t => { const nt = { ...t }; delete nt[date]; return nt })
+                          return next
+                        })}
+                        className="text-muted-foreground hover:text-foreground"
+                        aria-label={`${date}を選択解除`}
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {bulkDates.size > 0 && (
+            <>
+            <div>
+              <div className="flex items-center justify-between">
+                <Label className="text-xs text-muted-foreground">テンプレの時間（タップで全日に適用）</Label>
+                <button
+                  type="button"
+                  onClick={() => setTemplateEditorOpen(o => !o)}
+                  className="text-xs rounded-full border px-3 py-1 shrink-0"
+                >
+                  設定
+                </button>
+              </div>
+              <div className="flex flex-col gap-2 mt-2">
+                {bulkTemplates.map((t, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => applyTemplateToAll(t)}
+                      className="flex-1 rounded-lg border px-3 py-2.5 text-sm text-left font-medium hover:bg-muted/40 transition-colors"
+                    >
+                      {t.start}〜{t.end}
+                    </button>
+                    {templateEditorOpen && (
+                      <button
+                        type="button"
+                        onClick={() => removeTemplate(i)}
+                        className="p-1.5 rounded-full text-muted-foreground hover:bg-muted shrink-0"
+                        aria-label="テンプレを削除"
+                      >
+                        <X className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+              {templateEditorOpen && (
+                <div className="flex items-center gap-2 mt-2 flex-wrap">
+                  <TimeSelect value={newTemplate.start} onChange={v => setNewTemplate({ ...newTemplate, start: v })} />
+                  <span className="text-sm text-muted-foreground">〜</span>
+                  <TimeSelect value={newTemplate.end} onChange={v => setNewTemplate({ ...newTemplate, end: v })} />
+                  <Button size="sm" variant="outline" onClick={addTemplate}>テンプレに追加</Button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <Label className="text-xs text-muted-foreground">選んだ日の時間（1日ずつ変えられます）</Label>
+              <div className="flex flex-col gap-2 mt-2">
+                {Array.from(bulkDates).sort().map(date => {
+                  const t = bulkTimes[date] ?? bulkTemplates[0]
+                  return (
+                    <div key={date} className="flex items-center gap-2">
+                      <span className="text-sm w-16 shrink-0">
+                        {format(new Date(`${date}T00:00:00`), 'M/d(E)', { locale: ja })}
+                      </span>
+                      <TimeSelect value={t.start} onChange={v => setBulkDateTime(date, 'start', v)} />
+                      <span className="text-sm text-muted-foreground">〜</span>
+                      <TimeSelect value={t.end} onChange={v => setBulkDateTime(date, 'end', v)} />
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+
+            {(locationMode === 'area_only' || locationMode === 'area_and_room') && areas.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{areaLabel}</Label>
+                <Select value={bulkForm.area_id || 'none'} onValueChange={v => setBulkForm({ ...bulkForm, area_id: v === 'none' ? '' : (v ?? ''), room_id: '' })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={`${areaLabel}を選択`}>
+                      {bulkForm.area_id ? (areas.find(a => a.id === bulkForm.area_id)?.name ?? '未選択') : '未選択'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未選択</SelectItem>
+                    {areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(locationMode === 'room' || (locationMode === 'area_and_room' && bulkForm.area_id)) && bulkFilteredRooms.length > 0 && (
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground">{roomLabel}</Label>
+                <Select value={bulkForm.room_id || 'none'} onValueChange={v => setBulkForm({ ...bulkForm, room_id: v === 'none' ? '' : (v ?? '') })}>
+                  <SelectTrigger className="w-full">
+                    <SelectValue placeholder={`${roomLabel}を選択（任意）`}>
+                      {bulkForm.room_id ? (bulkFilteredRooms.find(r => r.id === bulkForm.room_id)?.name ?? '未選択') : '未選択'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未選択</SelectItem>
+                    {bulkFilteredRooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">備考</Label>
+              <Textarea value={bulkForm.notes} onChange={e => setBulkForm({ ...bulkForm, notes: e.target.value })} rows={2} />
+            </div>
+            {checklistItems.length > 0 && (
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground">確認項目</Label>
+                {checklistItems.map(item => (
+                  item.item_type === 'select' ? (
+                    <div key={item.id} className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground font-normal">{item.label}</Label>
+                      <Select
+                        value={(bulkForm.checklist_answers[item.id] as string) || 'none'}
+                        onValueChange={v => setBulkChecklistSelect(item.id, v === 'none' ? '' : (v ?? ''))}
+                      >
+                        <SelectTrigger className="w-full">
+                          <SelectValue>{(bulkForm.checklist_answers[item.id] as string) || '未選択'}</SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">未選択</SelectItem>
+                          {item.options.map(opt => <SelectItem key={opt} value={opt}>{opt}</SelectItem>)}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  ) : (
+                    <label key={item.id} className="flex items-center gap-2 text-sm cursor-pointer">
+                      <Checkbox
+                        checked={!!bulkForm.checklist_answers[item.id]}
+                        onCheckedChange={() => toggleBulkChecklistItem(item.id)}
+                        className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
+                      />
+                      {item.label}
+                    </label>
+                  )
+                ))}
+              </div>
+            )}
+            </>
+            )}
+
+            <Button
+              className="w-full rounded-full"
+              variant="elevated"
+              disabled={bulkDates.size === 0 || bulkSaving}
+              onClick={handleBulkSave}
+            >
+              {bulkSaving ? '提出中...' : `${bulkDates.size}件のシフトを提出`}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

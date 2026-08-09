@@ -123,11 +123,11 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                       申請: {app.cast?.display_name ?? '—'}
                     </TableCell>
                     <TableCell colSpan={2} className="space-x-1">
-                      <Button size="sm" variant="outline" className="text-green-600 h-7"
+                      <Button size="sm" variant="outline" className="text-positive h-7"
                         onClick={() => handleApplication(app.id, slot.id, app.cast_id, true)}>
                         <Check className="h-3 w-3 mr-1" />承認
                       </Button>
-                      <Button size="sm" variant="outline" className="text-red-600 h-7"
+                      <Button size="sm" variant="destructive" className="h-7"
                         onClick={() => handleApplication(app.id, slot.id, app.cast_id, false)}>
                         <X className="h-3 w-3 mr-1" />却下
                       </Button>

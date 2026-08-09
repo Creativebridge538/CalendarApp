@@ -21,7 +21,7 @@ export function CastLogoutButton() {
         <button
           type="button"
           onClick={handleLogout}
-          className="w-full flex items-center gap-2.5 px-4 py-3.5 text-red-600 hover:bg-red-50 transition-colors rounded-xl"
+          className="w-full flex items-center gap-2.5 px-4 py-3.5 text-destructive hover:bg-destructive/10 transition-colors rounded-xl"
         >
           <LogOut className="h-4 w-4 shrink-0" />
           <span className="text-sm font-medium">ログアウト</span>

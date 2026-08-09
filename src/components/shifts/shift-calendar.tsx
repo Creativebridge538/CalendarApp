@@ -33,7 +33,7 @@ const STATUS_VAR: Record<ShiftStatus, string> = {
 }
 
 function chipStyle(status: ShiftStatus): CSSProperties {
-  return { backgroundColor: STATUS_VAR[status], color: '#fff' }
+  return { backgroundColor: `color-mix(in srgb, ${STATUS_VAR[status]} 82%, transparent)`, color: '#fff' }
 }
 
 function legendStyle(status: ShiftStatus): CSSProperties {
@@ -58,9 +58,11 @@ interface Props {
   direction?: 'next' | 'prev'
   /** yyyy-MM-dd の集合。整理日の控えめなドット表示に使用 */
   periodDates?: Set<string>
+  /** yyyy-MM-dd の集合。指定した日をまとめて追加モードの選択中として強調表示 */
+  selectedDates?: Set<string>
 }
 
-export function ShiftCalendar({ shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection, periodDates }: Props) {
+export function ShiftCalendar({ shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection, periodDates, selectedDates }: Props) {
   const [internalCurrent, setInternalCurrent] = useState(() => new Date())
   const [internalDirection, setInternalDirection] = useState<'next' | 'prev'>('next')
   const isControlled = controlledCurrent !== undefined
@@ -95,7 +97,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
           <MonthYearPicker
             value={current}
             onChange={d => { setInternalDirection(d > internalCurrent ? 'next' : 'prev'); setInternalCurrent(d) }}
-            className="text-lg font-bold tracking-tight"
+            className="text-xl font-extrabold tracking-tight"
           >
             {format(current, 'yyyy年M月', { locale: ja })}
           </MonthYearPicker>
@@ -112,10 +114,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
 
       <div>
         {/* 曜日ヘッダー */}
-        <div
-          className="grid grid-cols-7 text-center text-xs font-semibold text-muted-foreground pb-2 border-b-2"
-          style={{ borderColor: 'var(--brand-accent)' }}
-        >
+        <div className="grid grid-cols-7 text-center text-xs font-medium text-muted-foreground pb-2 border-b border-border">
           {WEEKDAYS.map((d, i) => (
             <div key={d} className={cn(i === 0 && 'text-red-500', i === 6 && 'text-blue-500')}>
               {d}
@@ -127,7 +126,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
         <div
           key={monthStart.toISOString()}
           className={cn(
-            'grid grid-cols-7 divide-x divide-y divide-border/40',
+            'grid grid-cols-7 divide-y divide-border border-t border-border',
             direction === 'next' ? 'cal-grid-next' : 'cal-grid-prev'
           )}
         >
@@ -136,25 +135,36 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
             const dayShifts = inMonth ? shiftsOn(day) : []
             const isToday = inMonth && isSameDay(day, new Date())
             const dow = getDay(day)
-            const isPeriod = inMonth && periodDates?.has(format(day, 'yyyy-MM-dd'))
+            const dayKey = format(day, 'yyyy-MM-dd')
+            const isPeriod = inMonth && periodDates?.has(dayKey)
+            const isSelected = inMonth && selectedDates?.has(dayKey)
 
             return (
               <div
                 key={day.toISOString()}
                 onClick={onDayClick && inMonth ? () => onDayClick(day) : undefined}
                 className={cn(
-                  'relative h-[84px] md:h-[112px] pt-1 px-1.5 pb-1.5 flex flex-col items-stretch gap-0.5 overflow-hidden',
+                  'relative h-[84px] md:h-[112px] pt-2 pb-0 flex flex-col items-stretch gap-1 overflow-hidden',
                   !inMonth && 'opacity-40',
-                  onDayClick && inMonth && 'cursor-pointer active:bg-muted/40 md:hover:bg-muted/20 transition-colors'
+                  onDayClick && inMonth && 'cursor-pointer active:bg-muted/40 md:hover:bg-muted/20 transition-colors',
+                  isSelected && 'bg-[color-mix(in_srgb,var(--brand-accent)_12%,transparent)] ring-1 ring-inset ring-[var(--brand-accent)]'
                 )}
               >
                 {isPeriod && (
                   <span className="absolute top-1 right-1.5 h-1.5 w-1.5 rounded-full bg-pink-400" title="整理日" />
                 )}
+                {isSelected && (
+                  <span
+                    className="absolute top-1 left-1.5 h-3.5 w-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"
+                    style={{ backgroundColor: 'var(--brand-accent)' }}
+                  >
+                    ✓
+                  </span>
+                )}
                 {/* 日付 */}
                 <span className={cn(
-                  'text-[10px] font-semibold w-4 h-4 mx-auto flex items-center justify-center rounded-full transition-colors shrink-0',
-                  isToday && 'bg-[var(--brand-accent)] text-white',
+                  'text-xs font-medium w-5 h-5 mx-auto flex items-center justify-center rounded-full transition-colors shrink-0 tabular-nums',
+                  isToday && 'bg-[var(--brand-accent)] text-white font-semibold',
                   !isToday && dow === 0 && 'text-red-500',
                   !isToday && dow === 6 && 'text-blue-500',
                   !isToday && dow !== 0 && dow !== 6 && 'text-foreground',
@@ -162,33 +172,34 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                   {format(day, 'd')}
                 </span>
 
-                {/* シフト一覧: モバイルは開始時刻だけの簡易チップ、デスクトップは時間まで表示 */}
-                <div className="flex flex-col gap-0.5 min-w-0 w-full md:hidden">
+                {/* シフト一覧: 色でステータス、テキストはルーム名（無ければ状態名）を表示。チップには軽い影をつけて浮かせる */}
+                <div className="flex flex-col gap-0.5 min-w-0 w-full px-0.5 md:hidden">
                   {dayShifts.slice(0, 2).map(s => (
                     <div
                       key={s.id}
-                      className="rounded-[3px] px-1 py-0.5 text-[9px] leading-tight text-center font-medium"
+                      className="w-full rounded-[4px] px-1 py-0.5 text-[9px] leading-tight tracking-tight text-center font-semibold overflow-hidden whitespace-nowrap"
                       style={chipStyle(s.status)}
+                      title={`${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                     >
-                      {s.start_time.slice(0, 5)}
+                      {s.rooms?.name ?? STATUS_LABEL[s.status]}
                     </div>
                   ))}
                   {dayShifts.length > 2 && (
                     <span className="text-[10px] text-muted-foreground text-center tracking-wider leading-none">•••</span>
                   )}
                 </div>
-                <div className="hidden md:flex flex-col gap-0.5 min-w-0">
+                <div className="hidden md:flex flex-col gap-0.5 min-w-0 px-0.5">
                   {dayShifts.slice(0, 3).map(s => (
                     <div
                       key={s.id}
-                      className="rounded-[3px] px-1 py-0.5 text-[10px] leading-tight truncate font-medium"
+                      className="w-full rounded-[4px] px-1 py-0.5 text-[10px] leading-tight tracking-tight overflow-hidden whitespace-nowrap font-semibold"
                       style={chipStyle(s.status)}
                       title={`${showCastName && s.cast ? s.cast.display_name + ' ' : ''}${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                     >
                       {showCastName && s.cast && (
-                        <span className="font-semibold">{s.cast.display_name} </span>
+                        <span className="font-bold">{s.cast.display_name} </span>
                       )}
-                      {s.start_time.slice(0, 5)}〜{s.end_time.slice(0, 5)}
+                      {s.rooms?.name ?? STATUS_LABEL[s.status]}
                     </div>
                   ))}
                   {dayShifts.length > 3 && (

@@ -1,3 +1,4 @@
+/* Hallmark · genre: modern-minimal · design-system: design.md · designed-as-app */
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
@@ -27,6 +28,8 @@
   --color-input: var(--input);
   --color-border: var(--border);
   --color-destructive: var(--destructive);
+  --color-positive: var(--positive);
+  --color-note: var(--note);
   --color-accent-foreground: var(--accent-foreground);
   --color-accent: var(--accent);
   --color-muted-foreground: var(--muted-foreground);
@@ -65,6 +68,8 @@
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
+  --positive: oklch(0.527 0.145 152);
+  --note: oklch(0.6 0.14 75);
   --border: oklch(0.922 0 0);
   --input: oklch(0.922 0 0);
   --ring: oklch(0.708 0 0);
@@ -83,18 +88,22 @@
   --sidebar-border: oklch(0.922 0 0);
   --sidebar-ring: oklch(0.708 0 0);
 
-  /* ブランドアクセント: FAB等の最重要アクションは店舗テーマ（Mono等）に関わらず常にこの色で目立たせる */
-  --brand-accent: #3987e5;
-  --brand-accent-2: #5b9ee8;
-  --brand-accent-dark: #2f6fc4;
+  /* ブランドアクセント: FAB等の最重要アクションは店舗テーマ（Mono等）に関わらず常にこの色で目立たせる。
+     TimeTree準拠案（F）のティールグリーン */
+  --brand-accent: #00A99D;
+  --brand-accent-2: #33BDB3;
+  --brand-accent-dark: #00847A;
   /* キャストのモバイル画面専用: ページ背景に色を敷いて白カードを明確に浮かせる */
-  --cast-mobile-bg: #f7f7f8;
+  --cast-mobile-bg: #FFFFFF;
 
   /* シフト状態の色（着せ替えで上書き可能。未指定スキンはこの既定値のまま） */
-  --status-draft: #94a3b8;
-  --status-submitted: #3b82f6;
-  --status-confirmed: #10b981;
-  --status-rejected: #ef4444;
+  --status-draft: #B7B7B7;
+  --status-submitted: #F2A65A;
+  --status-confirmed: #00A99D;
+  --status-rejected: #D96C6C;
+
+  /* アプリ全体の既定フォント。着せ替えで未選択(default)のキャストと管理者はこれを使う */
+  --font-sans: var(--font-zen-maru-gothic), "Hiragino Maru Gothic ProN", -apple-system, "Hiragino Sans", sans-serif;
 
   /* エレベーション（iOSネイティブ風のフラットな見た目）: ほぼ罫線に近い薄い影のみ */
   --elevation-1: 0 0 0 1px oklch(0 0 0 / 6%), 0 1px 2px oklch(0 0 0 / 4%);
@@ -119,6 +128,8 @@
   --accent: oklch(0.269 0 0);
   --accent-foreground: oklch(0.985 0 0);
   --destructive: oklch(0.704 0.191 22.216);
+  --note: oklch(0.68 0.13 75);
+  --positive: oklch(0.65 0.16 152);
   --border: oklch(1 0 0 / 10%);
   --input: oklch(1 0 0 / 15%);
   --ring: oklch(0.556 0 0);
@@ -185,6 +196,8 @@
   --primary-foreground:        oklch(0.985 0 0);
   --ring:                      oklch(0.511 0.262 276);
   --destructive:               oklch(0.650 0.200 25);
+  --positive:                   oklch(0.65 0.16 152);
+  --note:                       oklch(0.68 0.13 75);
 }
 
 /* ── Theme: Emerald (ライト) ─────────────────── */
@@ -215,6 +228,8 @@
   --primary-foreground:        oklch(0.145 0 0);
   --ring:                      oklch(0.702 0.165 54);
   --destructive:               oklch(0.650 0.200 25);
+  --positive:                   oklch(0.65 0.16 152);
+  --note:                       oklch(0.68 0.13 75);
 }
 
 /* ── Theme: Violet (ダーク) ──────────────────── */
@@ -238,6 +253,8 @@
   --primary-foreground:        oklch(0.985 0 0);
   --ring:                      oklch(0.491 0.270 292);
   --destructive:               oklch(0.650 0.200 25);
+  --positive:                   oklch(0.65 0.16 152);
+  --note:                       oklch(0.68 0.13 75);
 }
 
 /* ── Theme: Admin Pro（管理者専用・固定ダーク／金融ダッシュボード基調） ── */
@@ -261,4 +278,6 @@
   --primary-foreground:        oklch(0.985 0 0);
   --ring:                      oklch(0.600 0.175 258);
   --destructive:               oklch(0.635 0.205 25);
+  --positive:                   oklch(0.65 0.16 152);
+  --note:                       oklch(0.68 0.13 75);
 }

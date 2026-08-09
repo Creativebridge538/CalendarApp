@@ -133,7 +133,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
               </div>
               <div className="flex gap-2 pt-1">
                 {store.is_active ? (
-                  <Button size="sm" variant="outline" className="text-red-600" onClick={() => toggleActive(store)} disabled={processing === store.id}>
+                  <Button size="sm" variant="destructive" onClick={() => toggleActive(store)} disabled={processing === store.id}>
                     <Ban className="h-3.5 w-3.5 mr-1" />利用停止する
                   </Button>
                 ) : (

@@ -46,7 +46,7 @@ export function ApplyForm() {
     return (
       <Card className="w-full max-w-md">
         <CardContent className="pt-6 text-center space-y-3">
-          <CheckCircle2 className="h-10 w-10 text-green-600 mx-auto" />
+          <CheckCircle2 className="h-10 w-10 text-positive mx-auto" />
           <p className="font-medium">お申し込みありがとうございます</p>
           <p className="text-sm text-muted-foreground">
             内容を確認の上、担当者よりご登録いただいたメールアドレスへご連絡いたします。

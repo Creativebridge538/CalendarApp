@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, DoorOpen, Calendar, FileEdit,
   Briefcase, BarChart2, Award, Settings, Bell, LogOut,
-  ChevronDown, Menu, X, MapPin, Palette,
+  ChevronDown, Menu, X, MapPin, Palette, Plus,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -203,7 +203,7 @@ function NavContent({
                 設定・着せ替え
               </DropdownMenuItem>
             )}
-            <DropdownMenuItem onClick={onLogout} className="text-red-600">
+            <DropdownMenuItem onClick={onLogout} className="text-destructive">
               <LogOut className="h-4 w-4 mr-2" />
               ログアウト
             </DropdownMenuItem>
@@ -256,33 +256,58 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
         <>
           {/* キャスト: 固定の上部バーは廃止（ハンバーガーはシフト画面自身に持たせる）*/}
 
-          {/* キャスト: 下部タブバー（浮遊するピル型バー、アクティブタブは塗りつぶしピル） */}
-          <div
-            className="md:hidden fixed bottom-0 left-0 right-0 z-40 px-3"
-            style={{ paddingBottom: 'calc(env(safe-area-inset-bottom) + 10px)' }}
+          {/* キャスト: 下部タブバー（フラット・全幅。アクティブはアイコン+ラベルの色が変わるだけ）。
+              中央はシフト作成の浮き出しボタン（iOSネイティブ系タブバーの「作成」ボタンと同じ配置） */}
+          <nav
+            className="md:hidden fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 border-t"
+            style={{
+              ...castBottomBar,
+              borderColor: '#ededed',
+              paddingBottom: 'calc(env(safe-area-inset-bottom) + 6px)',
+            }}
           >
-            <nav
-              className="grid grid-cols-4 rounded-full shadow-[0_4px_20px_oklch(0_0_0_/_15%)] px-1.5 py-1.5 gap-0.5"
-              style={castBottomBar}
-            >
-              {nav.map(({ href, label, icon: Icon }) => {
-                const isActive = pathname === href || pathname.startsWith(href + '/')
-                return (
-                  <Link
-                    key={href}
-                    href={href}
-                    className="min-w-0 h-10 flex items-center justify-center gap-1 px-1 rounded-full overflow-hidden transition-colors"
-                    style={isActive
-                      ? { backgroundColor: 'var(--brand-accent)', color: '#ffffff' }
-                      : { color: castBottomBar.color }}
-                  >
-                    <Icon className="h-4 w-4 shrink-0" />
-                    <span className="text-[11.5px] font-medium truncate">{label}</span>
-                  </Link>
-                )
-              })}
-            </nav>
-          </div>
+            {nav.slice(0, 2).map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex flex-col items-center justify-center gap-0.5 py-2 transition-colors"
+                  style={{ color: isActive ? 'var(--brand-accent)' : castBottomBar.color }}
+                >
+                  <Icon className="h-[18px] w-[18px] shrink-0" />
+                  <span className="text-[10px] font-medium">{label}</span>
+                </Link>
+              )
+            })}
+
+            <div className="relative flex flex-col items-center justify-start pt-0">
+              <Link
+                href="/cast/shifts?new=1"
+                aria-label="シフトを作成"
+                className="-mt-[22px] flex h-[52px] w-[52px] items-center justify-center rounded-full shadow-[0_6px_16px_-4px_color-mix(in_srgb,var(--brand-accent)_60%,transparent)] ring-4 transition-transform active:scale-95"
+                style={{ backgroundColor: 'var(--brand-accent)', ['--tw-ring-color' as string]: castBottomBar.backgroundColor as string }}
+              >
+                <Plus className="h-6 w-6 text-white" strokeWidth={2.5} />
+              </Link>
+              <span className="mt-1.5 text-[10px] font-medium" style={{ color: castBottomBar.color }}>作成</span>
+            </div>
+
+            {nav.slice(2, 4).map(({ href, label, icon: Icon }) => {
+              const isActive = pathname === href || pathname.startsWith(href + '/')
+              return (
+                <Link
+                  key={href}
+                  href={href}
+                  className="flex flex-col items-center justify-center gap-0.5 py-2 transition-colors"
+                  style={{ color: isActive ? 'var(--brand-accent)' : castBottomBar.color }}
+                >
+                  <Icon className="h-[18px] w-[18px] shrink-0" />
+                  <span className="text-[10px] font-medium">{label}</span>
+                </Link>
+              )
+            })}
+          </nav>
         </>
       ) : (
         <>

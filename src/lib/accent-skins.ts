@@ -32,9 +32,9 @@ export const ACCENT_SKINS: AccentSkin[] = [
     status: { draft: '#B8AA9B', submitted: '#5C7FA6', confirmed: '#6E9B6A', rejected: '#C07056' },
   },
   {
-    id: 'studio-indigo', label: 'スタジオ',
-    accent: '#5A7C93', accent2: '#7B9BB0', dark: '#435F73', bg: '#F6F7F9',
-    status: { draft: '#A7AEB9', submitted: '#5E82A8', confirmed: '#5CA084', rejected: '#C36F68' },
+    id: 'studio-indigo', label: 'スタンダード',
+    accent: '#00A99D', accent2: '#33BDB3', dark: '#00847A', bg: '#FFFFFF',
+    status: { draft: '#B7B7B7', submitted: '#F2A65A', confirmed: '#00A99D', rejected: '#D96C6C' },
   },
   {
     id: 'sunshine', label: 'サンシャイン',
@@ -48,7 +48,9 @@ export const ACCENT_SKINS: AccentSkin[] = [
   },
 ]
 
-export const DEFAULT_ACCENT_SKIN = 'blue'
+// studio-indigo は globals.css :root の既定値と同じ配色。着せ替え未設定のキャストは
+// ここ経由で明示的にこの配色を受け取り、admin/ログイン画面はglobals.css側の既定値をそのまま使う
+export const DEFAULT_ACCENT_SKIN = 'studio-indigo'
 
 export function getAccentSkin(id?: string | null): AccentSkin {
   return ACCENT_SKINS.find(s => s.id === id) ?? ACCENT_SKINS.find(s => s.id === DEFAULT_ACCENT_SKIN)!

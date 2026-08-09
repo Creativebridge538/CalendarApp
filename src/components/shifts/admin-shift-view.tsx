@@ -169,7 +169,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
             </SelectContent>
           </Select>
           {conflicts.size > 0 && (
-            <div className="flex items-center gap-1 text-sm text-red-600 ml-2">
+            <div className="flex items-center gap-1 text-sm text-destructive ml-2">
               <AlertCircle className="h-4 w-4" />
               ルーム被り {conflicts.size} 件
             </div>
@@ -222,7 +222,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     <span>·</span>
                     <span className="flex items-center gap-0.5">
                       {shift.rooms?.name ?? 'ルームなし'}
-                      {conflicts.has(shift.id) && <AlertCircle className="h-3 w-3 text-red-500" />}
+                      {conflicts.has(shift.id) && <AlertCircle className="h-3 w-3 text-destructive" />}
                     </span>
                   </div>
                   {checklistBadges(shift.checklist_answers).length > 0 && (
@@ -239,11 +239,11 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   )}
                   {shift.status === 'submitted' && (
                     <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="flex-1 text-green-600 border-green-300"
+                      <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30"
                         onClick={() => openStatusDialog(shift, 'confirmed')}>
                         <Check className="h-3.5 w-3.5 mr-1" /> 確定
                       </Button>
-                      <Button size="sm" variant="outline" className="flex-1 text-red-600 border-red-300"
+                      <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30"
                         onClick={() => openStatusDialog(shift, 'rejected')}>
                         <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
                       </Button>
@@ -276,7 +276,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     <TableCell>{shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}</TableCell>
                     <TableCell>
                       {shift.rooms?.name ?? '—'}
-                      {conflicts.has(shift.id) && <AlertCircle className="h-3.5 w-3.5 text-red-500 inline ml-1" />}
+                      {conflicts.has(shift.id) && <AlertCircle className="h-3.5 w-3.5 text-destructive inline ml-1" />}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -298,11 +298,11 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     <TableCell className="text-right space-x-1">
                       {shift.status === 'submitted' && (
                         <>
-                          <Button size="sm" variant="outline" className="text-green-600 border-green-300"
+                          <Button size="sm" variant="outline" className="text-positive border-positive/30"
                             onClick={() => openStatusDialog(shift, 'confirmed')}>
                             <Check className="h-3.5 w-3.5 mr-1" /> 確定
                           </Button>
-                          <Button size="sm" variant="outline" className="text-red-600 border-red-300"
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/30"
                             onClick={() => openStatusDialog(shift, 'rejected')}>
                             <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
                           </Button>

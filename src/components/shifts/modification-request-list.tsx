@@ -123,10 +123,10 @@ export function ModificationRequestList({ requests: initialRequests }: { request
                   <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
                   <TableCell>{format(new Date(req.created_at), 'M/d', { locale: ja })}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button size="sm" variant="outline" className="text-green-600" onClick={() => handleApprove(req)}>
+                    <Button size="sm" variant="outline" className="text-positive" onClick={() => handleApprove(req)}>
                       <Check className="h-3.5 w-3.5 mr-1" />承認
                     </Button>
-                    <Button size="sm" variant="outline" className="text-red-600" onClick={() => { setRejectTarget(req); setRejectReason('') }}>
+                    <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(req); setRejectReason('') }}>
                       <X className="h-3.5 w-3.5 mr-1" />却下
                     </Button>
                   </TableCell>

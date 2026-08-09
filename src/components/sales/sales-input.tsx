@@ -265,7 +265,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   <TableCell>{sale.notes ?? '—'}</TableCell>
                   <TableCell className="text-right space-x-1">
                     <Button size="icon" variant="ghost" onClick={() => startEdit(sale)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => handleDelete(sale.id)}><Trash2 className="h-3.5 w-3.5 text-red-500" /></Button>
+                    <Button size="icon" variant="ghost" onClick={() => handleDelete(sale.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
                   </TableCell>
                 </TableRow>
               ))}
