@@ -62,7 +62,8 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
   const [view, setView] = useState<'calendar' | 'timeline' | 'list'>('calendar')
-  const [statusDialog, setStatusDialog] = useState<{ shift: Shift; status: ShiftStatus } | null>(null)
+  const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
+  const [detailShift, setDetailShift] = useState<Shift | null>(null)
   const [noteInput, setNoteInput] = useState('')
   const supabase = createClient()
   function checklistBadges(answers: Record<string, boolean | string>) {
@@ -93,27 +94,27 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     return ids
   }, [shifts])
 
-  function openStatusDialog(shift: Shift, status: ShiftStatus) {
-    setStatusDialog({ shift, status })
+  function openDetail(shift: Shift) {
+    setDetailShift(shift)
     setNoteInput(shift.admin_note ?? '')
   }
 
-  async function confirmStatusChange() {
-    if (!statusDialog) return
-    const { shift, status } = statusDialog
-    const update: { status: ShiftStatus; confirmed_at?: string; admin_note: string | null } = { status, admin_note: noteInput || null }
+  async function changeStatus(shift: Shift, status: ShiftStatus, note: string) {
+    const update: { status: ShiftStatus; confirmed_at?: string; admin_note: string | null } = { status, admin_note: note || null }
     if (status === 'confirmed') update.confirmed_at = new Date().toISOString()
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
     if (error) { toast.error('更新に失敗しました'); return }
     setShifts(shifts.map(s => s.id === shift.id ? { ...s, ...update } : s))
     toast.success(status === 'confirmed' ? 'シフトを確定しました' : '差し戻しました')
-    setStatusDialog(null)
+    setDetailShift(null)
 
-    const dateLabel = format(new Date(shift.date), 'M/d(E)', { locale: ja })
-    const title = status === 'confirmed' ? 'シフトが確定されました' : 'シフトが差し戻されました'
-    const body = `${dateLabel} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフト`
-    await supabase.from('notifications').insert({ user_id: shift.cast_id, title, body, link: '/cast/shifts' })
-    sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
+    if (status !== shift.status) {
+      const dateLabel = format(new Date(shift.date), 'M/d(E)', { locale: ja })
+      const title = status === 'confirmed' ? 'シフトが確定されました' : 'シフトが差し戻されました'
+      const body = `${dateLabel} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフト`
+      await supabase.from('notifications').insert({ user_id: shift.cast_id, title, body, link: '/cast/shifts' })
+      sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
+    }
   }
 
   return (
@@ -179,7 +180,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
       </CardHeader>
       <CardContent className="px-0 md:px-6">
         {view === 'calendar' && (
-          <ShiftCalendar shifts={filtered} showCastName={true} />
+          <ShiftCalendar shifts={filtered} showCastName={true} onDayClick={d => setDayDetailDate(format(d, 'yyyy-MM-dd'))} />
         )}
         {view === 'timeline' && (
           <ShiftTimeline
@@ -189,6 +190,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
             locationMode={locationMode}
             areaLabel={areaLabel}
             roomLabel={roomLabel}
+            onShiftClick={id => { const s = shifts.find(x => x.id === id); if (s) openDetail(s) }}
           />
         )}
         {view === 'list' && (
@@ -202,8 +204,9 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               {filtered.map((shift) => (
                 <div
                   key={shift.id}
+                  onClick={() => openDetail(shift)}
                   className={cn(
-                    'rounded-lg border p-3 space-y-2',
+                    'rounded-lg border p-3 space-y-2 cursor-pointer active:bg-muted/40',
                     conflicts.has(shift.id) ? 'border-destructive/40 bg-destructive/10' : 'bg-card'
                   )}
                 >
@@ -233,23 +236,27 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                       ))}
                     </div>
                   )}
+                  {shift.notes && (
+                    <p className="text-xs text-muted-foreground flex items-start gap-1">
+                      <StickyNote className="h-3 w-3 mt-0.5 shrink-0" />
+                      <span><span className="text-[10px] text-muted-foreground/70">キャストの備考: </span>{shift.notes}</span>
+                    </p>
+                  )}
                   {shift.admin_note && (
                     <p className="text-xs text-muted-foreground flex items-start gap-1">
                       <StickyNote className="h-3 w-3 mt-0.5 shrink-0" />{shift.admin_note}
                     </p>
                   )}
-                  {shift.status === 'submitted' && (
-                    <div className="flex gap-2 pt-1">
-                      <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30"
-                        onClick={() => openStatusDialog(shift, 'confirmed')}>
-                        <Check className="h-3.5 w-3.5 mr-1" /> 確定
-                      </Button>
-                      <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30"
-                        onClick={() => openStatusDialog(shift, 'rejected')}>
-                        <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
-                      </Button>
-                    </div>
-                  )}
+                  <div className="flex gap-2 pt-1">
+                    <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30" disabled={shift.status === 'confirmed'}
+                      onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
+                      <Check className="h-3.5 w-3.5 mr-1" /> 確定
+                    </Button>
+                    <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
+                      onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
+                      <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
@@ -262,6 +269,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   <TableHead>キャスト</TableHead>
                   <TableHead>時間</TableHead>
                   <TableHead>ルーム</TableHead>
+                  <TableHead>備考</TableHead>
                   <TableHead>確認項目</TableHead>
                   <TableHead>ステータス</TableHead>
                   <TableHead className="text-right">操作</TableHead>
@@ -269,7 +277,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               </TableHeader>
               <TableBody>
                 {filtered.map((shift) => (
-                  <TableRow key={shift.id} className={conflicts.has(shift.id) ? 'bg-destructive/10' : ''}>
+                  <TableRow key={shift.id} className={cn('cursor-pointer', conflicts.has(shift.id) ? 'bg-destructive/10' : '')} onClick={() => openDetail(shift)}>
                     <TableCell className="font-medium">
                       {format(new Date(shift.date), 'M/d(E)', { locale: ja })}
                     </TableCell>
@@ -278,6 +286,9 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     <TableCell>
                       {shift.rooms?.name ?? '—'}
                       {conflicts.has(shift.id) && <AlertCircle className="h-3.5 w-3.5 text-destructive inline ml-1" />}
+                    </TableCell>
+                    <TableCell className="max-w-40 truncate text-xs text-muted-foreground" title={shift.notes ?? undefined}>
+                      {shift.notes ?? '—'}
                     </TableCell>
                     <TableCell>
                       <div className="flex flex-wrap gap-1">
@@ -297,18 +308,14 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                       </div>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                      {shift.status === 'submitted' && (
-                        <>
-                          <Button size="sm" variant="outline" className="text-positive border-positive/30"
-                            onClick={() => openStatusDialog(shift, 'confirmed')}>
-                            <Check className="h-3.5 w-3.5 mr-1" /> 確定
-                          </Button>
-                          <Button size="sm" variant="outline" className="text-destructive border-destructive/30"
-                            onClick={() => openStatusDialog(shift, 'rejected')}>
-                            <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
-                          </Button>
-                        </>
-                      )}
+                      <Button size="sm" variant="outline" className="text-positive border-positive/30" disabled={shift.status === 'confirmed'}
+                        onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
+                        <Check className="h-3.5 w-3.5 mr-1" /> 確定
+                      </Button>
+                      <Button size="sm" variant="outline" className="text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
+                        onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
+                        <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -318,28 +325,86 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
         )}
       </CardContent>
 
-      <Dialog open={!!statusDialog} onOpenChange={open => { if (!open) setStatusDialog(null) }}>
+      {/* カレンダー/タイムラインからの日別シフト一覧 */}
+      <Dialog open={!!dayDetailDate} onOpenChange={open => { if (!open) setDayDetailDate(null) }}>
+        <DialogContent variant="sheet" onDismiss={() => setDayDetailDate(null)}>
+          <DialogHeader>
+            <DialogTitle>
+              {dayDetailDate && format(new Date(`${dayDetailDate}T00:00:00`), 'M月d日(E)', { locale: ja })} のシフト
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-1.5 mt-2 max-h-[60dvh] overflow-y-auto">
+            {(dayDetailDate ? filtered.filter(s => s.date === dayDetailDate) : []).length === 0 && (
+              <p className="text-sm text-muted-foreground text-center py-6">この日のシフトはありません</p>
+            )}
+            {(dayDetailDate ? filtered.filter(s => s.date === dayDetailDate) : []).map(shift => (
+              <button
+                key={shift.id}
+                type="button"
+                onClick={() => { setDayDetailDate(null); openDetail(shift) }}
+                className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted/40 transition-colors text-left border-b last:border-b-0"
+              >
+                <span className="flex-1 min-w-0">
+                  <span className="block text-sm font-medium truncate">{shift.cast?.display_name ?? '—'}</span>
+                  <span className="block text-xs text-muted-foreground truncate">
+                    {shift.start_time.slice(0, 5)}〜{shift.end_time.slice(0, 5)}
+                    {shift.rooms?.name && ` ・ ${shift.rooms.name}`}
+                  </span>
+                </span>
+                <Badge variant={STATUS_VARIANT[shift.status]} className="shrink-0">{STATUS_LABEL[shift.status]}</Badge>
+              </button>
+            ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* 個別シフトの詳細・確定/差し戻し */}
+      <Dialog open={!!detailShift} onOpenChange={open => { if (!open) setDetailShift(null) }}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>{statusDialog?.status === 'confirmed' ? 'シフトを確定' : 'シフトを差し戻し'}</DialogTitle>
+            <DialogTitle>シフト詳細</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4 mt-2">
-            {statusDialog && (
-              <p className="text-sm text-muted-foreground">
-                {statusDialog.shift.cast?.display_name ?? '—'} ／ {format(new Date(statusDialog.shift.date), 'M/d(E)', { locale: ja })} {statusDialog.shift.start_time.slice(0, 5)}〜{statusDialog.shift.end_time.slice(0, 5)}
-              </p>
-            )}
-            <div className="space-y-1.5">
-              <label className="text-sm font-medium">メモ（任意・管理者のみ閲覧できます）</label>
-              <Textarea value={noteInput} onChange={e => setNoteInput(e.target.value)} rows={3} placeholder="例: 遅刻連絡あり、来月から時給改定など" />
+          {detailShift && (
+            <div className="space-y-4 mt-2">
+              <div className="flex items-center justify-between">
+                <p className="text-sm">
+                  <span className="font-medium">{detailShift.cast?.display_name ?? '—'}</span>
+                  <span className="text-muted-foreground"> ／ {format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} {detailShift.start_time.slice(0, 5)}〜{detailShift.end_time.slice(0, 5)}</span>
+                </p>
+                <Badge variant={STATUS_VARIANT[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
+              </div>
+              {detailShift.rooms?.name && (
+                <p className="text-sm text-muted-foreground">ルーム: {detailShift.rooms.name}</p>
+              )}
+              {checklistBadges(detailShift.checklist_answers).length > 0 && (
+                <div className="flex flex-wrap gap-1">
+                  {checklistBadges(detailShift.checklist_answers).map(label => (
+                    <Badge key={label} variant="outline" className="text-[10px]">{label}</Badge>
+                  ))}
+                </div>
+              )}
+              {detailShift.notes && (
+                <div className="rounded-lg border p-2.5 text-sm">
+                  <p className="text-[10px] font-semibold text-muted-foreground">キャストの備考</p>
+                  <p className="mt-0.5">{detailShift.notes}</p>
+                </div>
+              )}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">管理者メモ（任意・管理者のみ閲覧できます）</label>
+                <Textarea value={noteInput} onChange={e => setNoteInput(e.target.value)} rows={3} placeholder="例: 遅刻連絡あり、来月から時給改定など" />
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" className="text-destructive border-destructive/30" disabled={detailShift.status === 'rejected'}
+                  onClick={() => changeStatus(detailShift, 'rejected', noteInput)}>
+                  <X className="h-3.5 w-3.5 mr-1" /> 差し戻す
+                </Button>
+                <Button className="text-white bg-positive hover:bg-positive/90" disabled={detailShift.status === 'confirmed'}
+                  onClick={() => changeStatus(detailShift, 'confirmed', noteInput)}>
+                  <Check className="h-3.5 w-3.5 mr-1" /> 確定する
+                </Button>
+              </div>
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setStatusDialog(null)}>キャンセル</Button>
-              <Button onClick={confirmStatusChange}>
-                {statusDialog?.status === 'confirmed' ? '確定する' : '差し戻す'}
-              </Button>
-            </div>
-          </div>
+          )}
         </DialogContent>
       </Dialog>
     </Card>

@@ -99,6 +99,7 @@ interface Props {
   rooms: { id: string; name: string; area_id: string | null }[]
   areas: { id: string; name: string }[]
   castId: string
+  castName: string | null
   storeId: string
   storeName: string | null
   settings: Settings | null
@@ -211,7 +212,7 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, castName, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
@@ -466,6 +467,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
       status: 'submitted' as ShiftStatus,
     }
     if (editing) {
+      const wasRejected = editing.status === 'rejected'
       const { error } = await supabase.from('shifts').update(payload).eq('id', editing.id)
       if (error) { toast.error('更新に失敗しました'); return }
       setShifts(shifts.map(s => s.id === editing.id ? {
@@ -474,6 +476,17 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         areas: areas.find(a => a.id === form.area_id) ?? null,
       } : s))
       toast.success('シフトを更新しました')
+      if (wasRejected) {
+        const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
+        if (admins?.length) {
+          const title = 'シフトが再提出されました'
+          const body = `${castName ?? 'キャスト'} ／ ${format(new Date(`${form.date}T00:00:00`), 'M/d(E)', { locale: ja })} ${form.start_time}〜${form.end_time}`
+          await supabase.from('notifications').insert(
+            admins.map(a => ({ user_id: a.id, title, body, link: '/admin/shifts' }))
+          )
+          admins.forEach(a => sendPushNotification(a.id, title, body, '/admin/shifts'))
+        }
+      }
     } else {
       const { data, error } = await supabase.from('shifts').insert({ ...payload, store_id: storeId }).select('*, rooms(name), areas(name)').single()
       if (error) { toast.error('提出に失敗しました'); return }

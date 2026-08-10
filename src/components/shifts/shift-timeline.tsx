@@ -28,6 +28,7 @@ interface Props {
   locationMode: string
   areaLabel: string
   roomLabel: string
+  onShiftClick?: (shiftId: string) => void
 }
 
 const HOUR_W = 72
@@ -46,7 +47,7 @@ function timeToHours(t: string): number {
   return h + m / 60
 }
 
-export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, roomLabel }: Props) {
+export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, roomLabel, onShiftClick }: Props) {
   const tabs = useMemo(() => {
     if (locationMode === 'area_only' || locationMode === 'area_and_room') {
       return [{ id: 'all', name: 'すべて' }, ...areas.map(a => ({ id: a.id, name: a.name }))]
@@ -202,17 +203,20 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                     const color = CAST_COLORS[colorIdx >= 0 ? colorIdx % CAST_COLORS.length : 0]
 
                     return (
-                      <div
+                      <button
                         key={shift.id}
+                        type="button"
+                        onClick={() => onShiftClick?.(shift.id)}
                         title={`${shift.cast?.display_name ?? '?'}  ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)}`}
                         className={cn(
-                          'absolute top-1.5 bottom-1.5 rounded text-white text-xs flex items-center px-1.5 overflow-hidden select-none cursor-default',
+                          'absolute top-1.5 bottom-1.5 rounded text-white text-xs flex items-center px-1.5 overflow-hidden select-none text-left',
+                          onShiftClick ? 'cursor-pointer hover:brightness-110' : 'cursor-default',
                           shift.status !== 'confirmed' && 'opacity-60',
                         )}
                         style={{ left, width, backgroundColor: color }}
                       >
                         <span className="truncate font-medium">{shift.cast?.display_name ?? '?'}</span>
-                      </div>
+                      </button>
                     )
                   })}
                 </div>
