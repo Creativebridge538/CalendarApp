@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut, Smartphone } from 'lucide-react'
+import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
@@ -629,20 +629,19 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 </div>
                 <div className="min-w-0 flex-1">
                   <p className="text-base font-bold">ホーム画面に追加する</p>
-                  <p className="text-sm text-muted-foreground mt-0.5">アプリのように使えて、プッシュ通知も受け取れるようになります</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">プッシュ通知も受け取れるようになります</p>
                 </div>
                 <button type="button" onClick={() => setShowPwaBanner(false)} className="p-1 -mt-1 -mr-1 text-muted-foreground shrink-0" aria-label="閉じる">
                   <X className="h-4 w-4" />
                 </button>
               </div>
 
-              <div className="rounded-lg bg-muted/50 p-3.5 mb-3">
-                <p className="text-sm font-semibold mb-2.5">Safariで開いてください</p>
+              <div className="rounded-lg bg-muted/50 p-3.5 mb-3 space-y-2.5">
                 <ol className="space-y-2.5">
                   {[
-                    '下部の共有ボタンをタップ',
-                    '「ホーム画面に追加」を選ぶ',
-                    '右上の「追加」をタップ',
+                    '画面下(または上)の「…」をタップ(共有アイコンが直接あればそれをタップ)',
+                    '「共有」→「ホーム画面に追加」を選ぶ',
+                    '「ウェブアプリとして開く」をONにして「追加」',
                   ].map((step, i) => (
                     <li key={step} className="flex items-start gap-2.5">
                       <span
@@ -655,6 +654,10 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                     </li>
                   ))}
                 </ol>
+                <div className="flex items-start gap-2 rounded-lg bg-[color-mix(in_oklch,var(--status-submitted)_18%,transparent)] p-2.5">
+                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: 'var(--status-submitted)' }} />
+                  <p className="text-xs leading-5">手順3の「ウェブアプリとして開く」が通知受け取りに必要です</p>
+                </div>
               </div>
 
               <div className="flex items-center gap-3">
