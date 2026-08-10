@@ -393,6 +393,10 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     setBulkTimes(prev => ({ ...prev, [date]: { ...(prev[date] ?? bulkTemplates[0]), [field]: value } }))
   }
 
+  function applyTemplateToDate(date: string, t: { start: string; end: string }) {
+    setBulkTimes(prev => ({ ...prev, [date]: t }))
+  }
+
   function goPrev() {
     setCalDirection('prev')
     setCalAnchor(d => view === 'week' ? subDays(d, 7) : view === 'day' ? subDays(d, 1) : subMonths(d, 1))
@@ -1319,17 +1323,39 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
 
             <div>
               <Label className="text-xs text-muted-foreground">選んだ日の時間（1日ずつ変えられます）</Label>
-              <div className="flex flex-col gap-2 mt-2">
+              <div className="flex flex-col gap-3 mt-2">
                 {Array.from(bulkDates).sort().map(date => {
                   const t = bulkTimes[date] ?? bulkTemplates[0]
                   return (
-                    <div key={date} className="flex items-center gap-2">
-                      <span className="text-sm w-16 shrink-0">
-                        {format(new Date(`${date}T00:00:00`), 'M/d(E)', { locale: ja })}
-                      </span>
-                      <TimeSelect value={t.start} onChange={v => setBulkDateTime(date, 'start', v)} />
-                      <span className="text-sm text-muted-foreground">〜</span>
-                      <TimeSelect value={t.end} onChange={v => setBulkDateTime(date, 'end', v)} />
+                    <div key={date} className="rounded-lg border p-2 space-y-1.5">
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-medium">
+                          {format(new Date(`${date}T00:00:00`), 'M/d(E)', { locale: ja })}
+                        </span>
+                        <div className="flex flex-wrap justify-end gap-1">
+                          {bulkTemplates.map((tpl, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onClick={() => applyTemplateToDate(date, tpl)}
+                              className={cn(
+                                'text-xs rounded-full border px-2.5 py-1 shrink-0 transition-colors',
+                                t.start === tpl.start && t.end === tpl.end
+                                  ? 'text-white border-transparent'
+                                  : 'hover:bg-muted/40'
+                              )}
+                              style={t.start === tpl.start && t.end === tpl.end ? { backgroundColor: 'var(--brand-accent)' } : undefined}
+                            >
+                              {tpl.start}〜{tpl.end}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <TimeSelect value={t.start} onChange={v => setBulkDateTime(date, 'start', v)} />
+                        <span className="text-sm text-muted-foreground">〜</span>
+                        <TimeSelect value={t.end} onChange={v => setBulkDateTime(date, 'end', v)} />
+                      </div>
                     </div>
                   )
                 })}
