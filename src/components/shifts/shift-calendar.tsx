@@ -199,7 +199,7 @@ export function ShiftCalendar({
                       style={chipStyle(s.status)}
                       title={`${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                     >
-                      {s.status === 'submitted' && `${s.start_time.slice(0, 5)} `}
+                      {`${s.start_time.slice(0, 5)} `}
                       {s.rooms?.name ?? STATUS_LABEL[s.status]}
                     </div>
                   ))}
@@ -218,7 +218,7 @@ export function ShiftCalendar({
                       {showCastName && s.cast && (
                         <span className="font-bold">{s.cast.display_name} </span>
                       )}
-                      {s.status === 'submitted' && `${s.start_time.slice(0, 5)} `}
+                      {`${s.start_time.slice(0, 5)} `}
                       {s.rooms?.name ?? STATUS_LABEL[s.status]}
                     </div>
                   ))}
