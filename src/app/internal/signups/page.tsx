@@ -7,7 +7,8 @@ import { SignupReviewList } from '@/components/internal/signup-review-list'
 
 export default async function InternalSignupsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
   if (!(await isPlatformOwner(supabase, user?.id))) redirect('/dashboard')
 
   const admin = createAdminClient()

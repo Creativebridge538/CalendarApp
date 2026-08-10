@@ -5,7 +5,8 @@ import { getMonthToDateSummary } from '@/lib/reward-summary'
 
 export default async function CastShiftsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('users').select('role, store_id, display_name, reward_rate').eq('id', user.id).single()

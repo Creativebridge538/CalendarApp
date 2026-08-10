@@ -8,7 +8,8 @@ import { LoginIdSettings } from '@/components/settings/login-id-settings'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { session } } = await supabase.auth.getSession()
+  const user = session?.user ?? null
   if (!user) redirect('/login')
 
   const { data: profile } = await supabase.from('users').select('role, store_id, login_id').eq('id', user.id).single()
