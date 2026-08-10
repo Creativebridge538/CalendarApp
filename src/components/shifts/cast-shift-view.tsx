@@ -264,6 +264,16 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   const rewardGoalProgress = rewardSummary.monthlyGoal && rewardSummary.monthlyGoal > 0
     ? Math.min(100, (rewardSummary.thisMonthTotal / rewardSummary.monthlyGoal) * 100)
     : null
+  // 締切を過ぎたら新規シフトの提出をブロックする。
+  // monthly: 毎月deadline_day以降は月末までブロック(翌月1日にリセット)。
+  // weekly: その週のdeadline_day(曜日)〜土曜までブロック(次の日曜にリセット)。
+  const isPastDeadline = (() => {
+    if (!settings || settings.deadline_type === 'none') return false
+    const now = new Date()
+    if (settings.deadline_type === 'monthly') return now.getDate() >= settings.deadline_day
+    if (settings.deadline_type === 'weekly') return now.getDay() >= settings.deadline_day
+    return false
+  })()
   const locationMode = settings?.location_mode ?? 'room'
   const areaLabel = settings?.area_label ?? 'エリア'
   const roomLabel = settings?.room_label ?? 'ルーム'
@@ -296,6 +306,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   function openNew(date?: string) {
+    if (isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); return }
     setEditing(null)
     setForm({ date: date ?? '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} })
     setOpen(true)
@@ -331,6 +342,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   function startBulkAdd() {
+    if (isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); setMenuOpen(false); return }
     setBulkDates(new Set())
     setBulkTimes({})
     setBulkForm({ area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} })
@@ -586,6 +598,11 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         <CardContent className="px-0 md:px-6">
           {view === 'month' && (
             <>
+              {isPastDeadline && (
+                <div className="mx-4 md:mx-0 mb-3 px-3 py-2 rounded-lg border border-destructive/30 bg-destructive/10 text-xs text-destructive">
+                  シフト提出の締切を過ぎています。新規の提出はできません。管理者にお問い合わせください
+                </div>
+              )}
               <Link
                 href="/cast/rewards"
                 className="flex items-center gap-3 mx-4 md:mx-0 mb-3 px-3 py-2.5 rounded-lg border hover:bg-muted/40 transition-colors"

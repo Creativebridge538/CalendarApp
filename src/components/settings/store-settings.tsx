@@ -119,9 +119,27 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [logoUrl, setLogoUrl] = useState(initialSettings?.logo_url ?? null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [usdJpyRate, setUsdJpyRate] = useState(String(initialSettings?.usd_jpy_rate ?? ''))
+  const [fetchingRate, setFetchingRate] = useState(false)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(parsePlatformSettings(initialSettings?.platform_settings))
   const supabase = createClient()
   const router = useRouter()
+
+  async function fetchLatestRate() {
+    setFetchingRate(true)
+    try {
+      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=JPY')
+      if (!res.ok) throw new Error('fetch failed')
+      const data = await res.json()
+      const rate = data?.rates?.JPY
+      if (typeof rate !== 'number') throw new Error('no rate')
+      setUsdJpyRate(rate.toFixed(2))
+      toast.success(`最新レートを取得しました（¥${rate.toFixed(2)}）`)
+    } catch {
+      toast.error('レートの自動取得に失敗しました。手入力してください')
+    } finally {
+      setFetchingRate(false)
+    }
+  }
 
   async function saveStoreName() {
     if (initialStore) {
@@ -367,12 +385,17 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
         <CardContent className="space-y-5">
           <div className="space-y-1.5">
             <Label>USD → JPY 参考レート</Label>
-            <Input
-              type="number" step="0.01" min="0" placeholder="例: 150.25"
-              value={usdJpyRate} onChange={e => setUsdJpyRate(e.target.value)}
-            />
+            <div className="flex gap-2">
+              <Input
+                type="number" step="0.01" min="0" placeholder="例: 150.25"
+                value={usdJpyRate} onChange={e => setUsdJpyRate(e.target.value)}
+              />
+              <Button type="button" variant="outline" onClick={fetchLatestRate} disabled={fetchingRate} className="shrink-0">
+                {fetchingRate ? '取得中...' : '自動取得'}
+              </Button>
+            </div>
             <p className="text-xs text-muted-foreground">
-              STRIPCHAT・DXライブの売上入力時、この時点のレートがスナップショットとして記録されます
+              「自動取得」で当日の参考レートを取得できます（手入力での上書きも可能）。STRIPCHAT・DXライブの売上入力時、この時点のレートがスナップショットとして記録されます
             </p>
           </div>
 
