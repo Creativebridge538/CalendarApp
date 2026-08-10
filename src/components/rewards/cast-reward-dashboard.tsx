@@ -134,7 +134,7 @@ export function CastRewardDashboard({
       </div>
 
       <Card elevated>
-        <CardContent className="pt-5 space-y-3">
+        <CardContent className="pt-4 space-y-2">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">{month}月ここまで</p>
@@ -161,10 +161,9 @@ export function CastRewardDashboard({
               onClick={() => { setGoalInput(monthlyGoal != null ? String(monthlyGoal) : ''); setGoalOpen(true) }}
               className="flex flex-col items-center shrink-0"
             >
-              <GoalRing percent={goalProgress ?? 0} />
-              <div className="text-[10px] text-muted-foreground text-center mt-1.5 space-y-0.5">
-                <p>出勤 {attendanceDaysThisMonth}日・{shiftCountThisMonth}件</p>
-                <p className="tabular-nums">{totalHoursThisMonth.toFixed(1)}時間</p>
+              <GoalRing percent={goalProgress ?? 0} size={56} stroke={5} textClassName="text-xs font-bold" />
+              <div className="text-[10px] text-muted-foreground text-center mt-1 space-y-0">
+                <p className="tabular-nums">出勤{attendanceDaysThisMonth}日・{shiftCountThisMonth}件・{totalHoursThisMonth.toFixed(1)}h</p>
                 <p className="flex items-center justify-center gap-0.5">
                   {monthlyGoal ? `目標 ¥${monthlyGoal.toLocaleString()}` : '目標未設定'}
                   <Pencil className="h-2.5 w-2.5" style={{ color: 'var(--brand-accent)' }} />
@@ -174,13 +173,11 @@ export function CastRewardDashboard({
           </div>
 
           {finalizedReward != null && (
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-1 border-t">
-              <p className="text-xs text-muted-foreground flex items-center gap-1 pt-3">
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
               </p>
-              <div className="pt-3">
-                <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" />
-              </div>
+              <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" />
             </div>
           )}
         </CardContent>
