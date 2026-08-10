@@ -29,6 +29,7 @@ interface Shift {
   status: ShiftStatus
   notes: string | null
   admin_note: string | null
+  is_period_day: boolean
   cast_id: string
   area_id: string | null
   room_id: string | null
@@ -47,17 +48,16 @@ interface Props {
   areaLabel: string
   roomLabel: string
   checklistItems: { id: string; label: string; item_type: string }[]
-  periodDates?: Set<string>
 }
 
 const STATUS_LABEL: Record<ShiftStatus, string> = {
-  draft: '下書き', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し',
+  draft: '下書き', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し', modification_requested: '修正依頼中',
 }
 const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive',
+  draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive', modification_requested: 'secondary',
 }
 
-export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems, periodDates }: Props) {
+export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
@@ -146,13 +146,14 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
           <Select value={filterStatus} onValueChange={v => { if (v) setFilterStatus(v) }}>
             <SelectTrigger className="w-36">
               <SelectValue>
-                {{ all: '全ステータス', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し', draft: '下書き' }[filterStatus] ?? filterStatus}
+                {{ all: '全ステータス', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し', draft: '下書き', modification_requested: '修正依頼中' }[filterStatus] ?? filterStatus}
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全ステータス</SelectItem>
               <SelectItem value="submitted">提出済み</SelectItem>
               <SelectItem value="confirmed">確定</SelectItem>
+              <SelectItem value="modification_requested">修正依頼中</SelectItem>
               <SelectItem value="rejected">差し戻し</SelectItem>
               <SelectItem value="draft">下書き</SelectItem>
             </SelectContent>
@@ -178,7 +179,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
       </CardHeader>
       <CardContent className="px-0 md:px-6">
         {view === 'calendar' && (
-          <ShiftCalendar shifts={filtered} showCastName={true} periodDates={periodDates} />
+          <ShiftCalendar shifts={filtered} showCastName={true} />
         )}
         {view === 'timeline' && (
           <ShiftTimeline

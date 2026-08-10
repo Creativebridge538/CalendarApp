@@ -34,6 +34,8 @@ type ChecklistAnswers = Record<string, boolean | string>
 interface Shift {
   id: string; date: string; start_time: string; end_time: string
   status: ShiftStatus; notes: string | null
+  admin_note: string | null
+  is_period_day: boolean
   checklist_answers: ChecklistAnswers
   room_id: string | null
   area_id: string | null
@@ -47,14 +49,15 @@ interface Settings {
 }
 
 const STATUS_LABEL: Record<ShiftStatus, string> = {
-  draft: '下書き', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し',
+  draft: '下書き', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し', modification_requested: '修正依頼中',
 }
 const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-  draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive',
+  draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive', modification_requested: 'secondary',
 }
 const STATUS_DOT: Record<ShiftStatus, string> = {
   draft: 'var(--status-draft)', submitted: 'var(--status-submitted)',
   confirmed: 'var(--status-confirmed)', rejected: 'var(--status-rejected)',
+  modification_requested: 'var(--status-modification-requested)',
 }
 
 // 深夜営業のシフトは「25:00」のような24時を超えた表記で入力できるようにする（DB保存時は24時間に正規化）
@@ -69,11 +72,11 @@ function normalizeTime(hhmm: string): string {
 function TimeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
   const [h, m] = value.split(':')
   return (
-    <div className="flex items-center gap-0.5 rounded-md border px-1.5 py-1">
+    <div className="flex items-center gap-1">
       <select
         value={h}
         onChange={e => onChange(`${e.target.value}:${m}`)}
-        className="bg-transparent text-sm tabular-nums outline-none"
+        className="min-h-11 min-w-14 rounded-md border bg-background px-2 text-base font-medium tabular-nums text-center"
         aria-label="時"
       >
         {HOUR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -82,7 +85,7 @@ function TimeSelect({ value, onChange }: { value: string; onChange: (value: stri
       <select
         value={m}
         onChange={e => onChange(`${h}:${e.target.value}`)}
-        className="bg-transparent text-sm tabular-nums outline-none"
+        className="min-h-11 min-w-14 rounded-md border bg-background px-2 text-base font-medium tabular-nums text-center"
         aria-label="分"
       >
         {MINUTE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
@@ -101,8 +104,8 @@ interface Props {
   settings: Settings | null
   userId: string
   checklistItems: { id: string; label: string; item_type: string; options: string[] }[]
-  periodDates?: Set<string>
   rewardSummary: MonthToDateSummary
+  amountByDate: Record<string, number>
 }
 
 const HOUR_HEIGHT = 56
@@ -115,12 +118,11 @@ function timeToMinutes(hhmm: string): number {
 
 /** 週表示・日表示共通の時間軸グリッド（Googleカレンダー等と同じ、時刻に応じて予定ブロックを配置する形式） */
 function ShiftTimeGrid({
-  days, shiftsOn, onDayClick, periodDates, locationLabelOf,
+  days, shiftsOn, onDayClick, locationLabelOf,
 }: {
   days: Date[]
   shiftsOn: (day: Date) => Shift[]
   onDayClick: (day: Date) => void
-  periodDates?: Set<string>
   locationLabelOf: (shift: Shift) => string | null
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -143,7 +145,7 @@ function ShiftTimeGrid({
         <div className="w-9 shrink-0" />
         {days.map(day => {
           const isToday = isSameDay(day, new Date())
-          const isPeriod = periodDates?.has(format(day, 'yyyy-MM-dd'))
+          const isPeriod = shiftsOn(day).some(s => s.is_period_day)
           return (
             <div key={day.toISOString()} className="flex-1 text-center py-1.5 min-w-0 relative">
               <div className={`text-[10px] ${day.getDay() === 0 ? 'text-red-500' : day.getDay() === 6 ? 'text-blue-500' : 'text-muted-foreground'}`}>
@@ -208,9 +210,10 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, periodDates, rewardSummary }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
+  const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -226,7 +229,8 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
   const [editing, setEditing] = useState<Shift | null>(null)
   const [modTarget, setModTarget] = useState<Shift | null>(null)
-  const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', checklist_answers: {} as ChecklistAnswers })
+  const [cancelTarget, setCancelTarget] = useState<Shift | null>(null)
+  const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} as ChecklistAnswers })
   const [modForm, setModForm] = useState({ new_date: '', new_start_time: '', new_end_time: '', reason: '' })
   const [bulkDates, setBulkDates] = useState<Set<string>>(new Set())
   const [bulkTimes, setBulkTimes] = useState<Record<string, { start: string; end: string }>>({})
@@ -235,7 +239,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   const [newTemplate, setNewTemplate] = useState({ start: '19:00', end: '24:00' })
   const [bulkSheetOpen, setBulkSheetOpen] = useState(false)
   const [bulkSaving, setBulkSaving] = useState(false)
-  const [bulkForm, setBulkForm] = useState({ area_id: '', room_id: '', notes: '', checklist_answers: {} as ChecklistAnswers })
+  const [bulkForm, setBulkForm] = useState({ area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} as ChecklistAnswers })
   const supabase = createClient()
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -282,9 +286,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     return shifts.filter(s => s.date === key)
   }
 
-  // 確定済みシフトは常に修正申請が必要。それ以外は直接編集・取消可能
+  // 確定済み・修正依頼中のシフトは常に修正申請経由。それ以外は直接編集・取消可能
   function canEditDirectly(shift: Shift): boolean {
-    return shift.status !== 'confirmed'
+    return shift.status !== 'confirmed' && shift.status !== 'modification_requested'
   }
 
   function canRequestModification(shift: Shift): boolean {
@@ -293,7 +297,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
 
   function openNew(date?: string) {
     setEditing(null)
-    setForm({ date: date ?? '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', checklist_answers: {} })
+    setForm({ date: date ?? '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} })
     setOpen(true)
   }
 
@@ -302,7 +306,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     setForm({
       date: shift.date, start_time: shift.start_time.slice(0, 5), end_time: shift.end_time.slice(0, 5),
       area_id: shift.area_id ?? '', room_id: shift.room_id ?? '',
-      notes: shift.notes ?? '', checklist_answers: shift.checklist_answers,
+      notes: shift.notes ?? '', is_period_day: shift.is_period_day, checklist_answers: shift.checklist_answers,
     })
     setOpen(true)
   }
@@ -329,7 +333,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   function startBulkAdd() {
     setBulkDates(new Set())
     setBulkTimes({})
-    setBulkForm({ area_id: '', room_id: '', notes: '', checklist_answers: {} })
+    setBulkForm({ area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} })
     setMenuOpen(false)
     setBulkSheetOpen(true)
   }
@@ -430,6 +434,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
       area_id: (locationMode === 'area_only' || locationMode === 'area_and_room') ? form.area_id || null : null,
       room_id: (locationMode === 'room' || locationMode === 'area_and_room') ? form.room_id || null : null,
       notes: form.notes || null,
+      is_period_day: form.is_period_day,
       checklist_answers: form.checklist_answers,
       status: 'submitted' as ShiftStatus,
     }
@@ -466,6 +471,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         area_id: (locationMode === 'area_only' || locationMode === 'area_and_room') ? bulkForm.area_id || null : null,
         room_id: (locationMode === 'room' || locationMode === 'area_and_room') ? bulkForm.room_id || null : null,
         notes: bulkForm.notes || null,
+        is_period_day: bulkForm.is_period_day,
         checklist_answers: bulkForm.checklist_answers,
         status: 'submitted' as ShiftStatus,
       }
@@ -482,22 +488,33 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     cancelBulkAdd()
   }
 
-  async function handleCancel(shift: Shift) {
-    if (!confirm(`${format(new Date(shift.date), 'M/d(E)', { locale: ja })} のシフトを取り消しますか？`)) return
+  function handleCancel(shift: Shift) {
+    setCancelTarget(shift)
+  }
+
+  async function confirmCancel() {
+    if (!cancelTarget) return
+    const shift = cancelTarget
     const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
+    setCancelTarget(null)
     if (error) { toast.error('取消に失敗しました'); return }
     setShifts(shifts.filter(s => s.id !== shift.id))
+    setDayDetailDate(null)
     toast.success('シフトを取り消しました')
   }
 
   async function handleModification() {
     if (!modTarget || !modForm.reason) { toast.error('理由を入力してください'); return }
-    const { error } = await supabase.from('shift_modification_requests').insert({
-      shift_id: modTarget.id, requested_by: userId,
-      new_date: modForm.new_date || null, new_start_time: modForm.new_start_time || null, new_end_time: modForm.new_end_time || null,
-      reason: modForm.reason,
-    })
-    if (error) { toast.error('申請に失敗しました'); return }
+    const [{ error }, { error: statusError }] = await Promise.all([
+      supabase.from('shift_modification_requests').insert({
+        shift_id: modTarget.id, requested_by: userId,
+        new_date: modForm.new_date || null, new_start_time: modForm.new_start_time || null, new_end_time: modForm.new_end_time || null,
+        reason: modForm.reason,
+      }),
+      supabase.from('shifts').update({ status: 'modification_requested' }).eq('id', modTarget.id),
+    ])
+    if (error || statusError) { toast.error('申請に失敗しました'); return }
+    setShifts(shifts.map(s => s.id === modTarget.id ? { ...s, status: 'modification_requested' as ShiftStatus } : s))
     toast.success('修正申請を送信しました')
     setModOpen(false)
     const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
@@ -586,14 +603,50 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                       </span>
                     )}
                   </div>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
+                    出勤 {rewardSummary.attendanceDaysThisMonth}日・{rewardSummary.shiftCountThisMonth}件 ・ {rewardSummary.totalHoursThisMonth.toFixed(1)}時間
+                  </p>
                 </div>
                 {rewardSummary.monthlyGoal != null && (
-                  <GoalRing percent={rewardGoalProgress ?? 0} size={36} stroke={4} textClassName="text-[9px] font-bold" />
+                  <div className="flex flex-col items-center shrink-0">
+                    <GoalRing percent={rewardGoalProgress ?? 0} size={36} stroke={4} textClassName="text-[9px] font-bold" />
+                    <p className="text-[9px] text-muted-foreground mt-0.5 tabular-nums">目標</p>
+                  </div>
                 )}
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </Link>
-              <ShiftCalendar shifts={shifts} onDayClick={handleDayClick} current={calAnchor} direction={calDirection} periodDates={periodDates} />
-              <p className="text-xs text-muted-foreground text-center mt-2 px-4 md:px-0">日付をタップしてシフトを提出・編集できます</p>
+              <div className="flex justify-end mx-4 md:mx-0 mb-2">
+                <div className="inline-flex rounded-full bg-muted p-0.5">
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMode('time')}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                      calendarMode === 'time' ? 'bg-[var(--brand-accent)] text-white' : 'text-muted-foreground'
+                    )}
+                  >
+                    時間表示
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCalendarMode('amount')}
+                    className={cn(
+                      'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                      calendarMode === 'amount' ? 'bg-[var(--brand-accent)] text-white' : 'text-muted-foreground'
+                    )}
+                  >
+                    金額表示
+                  </button>
+                </div>
+              </div>
+              <ShiftCalendar
+                shifts={shifts}
+                onDayClick={handleDayClick}
+                current={calAnchor}
+                direction={calDirection}
+                mode={calendarMode}
+                amountByDate={amountByDate}
+              />
             </>
           )}
 
@@ -602,13 +655,12 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               days={Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(calAnchor), i))}
               shiftsOn={shiftsOn}
               onDayClick={handleDayClick}
-              periodDates={periodDates}
               locationLabelOf={locationLabelOf}
             />
           )}
 
           {view === 'day' && (
-            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} periodDates={periodDates} locationLabelOf={locationLabelOf} />
+            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} locationLabelOf={locationLabelOf} />
           )}
           {view === 'list' && (
             <>
@@ -866,6 +918,18 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                       <span className="text-sm">{STATUS_LABEL[shift.status]}</span>
                     </div>
 
+                    {shift.status === 'rejected' && shift.admin_note && (
+                      <div className="border-t px-4 py-3">
+                        <div className="flex gap-2 bg-destructive/10 border border-destructive/30 rounded-lg p-2.5">
+                          <StickyNote className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[10px] font-semibold text-destructive">差し戻し理由</p>
+                            <p className="text-xs text-foreground mt-0.5">{shift.admin_note}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {locationLabel && (
                       <div className="border-t px-4 py-3 flex items-center gap-2.5 text-sm">
                         <MapPin className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -1005,6 +1069,14 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               </div>
             )}
             <div className="space-y-1.5"><Label>備考</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} /></div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={form.is_period_day}
+                onCheckedChange={c => setForm({ ...form, is_period_day: !!c })}
+                className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
+              />
+              整理日
+            </label>
             {checklistItems.length > 0 && (
               <div className="space-y-3">
                 <Label>確認項目</Label>
@@ -1184,6 +1256,14 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
               <Label className="text-xs text-muted-foreground">備考</Label>
               <Textarea value={bulkForm.notes} onChange={e => setBulkForm({ ...bulkForm, notes: e.target.value })} rows={2} />
             </div>
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox
+                checked={bulkForm.is_period_day}
+                onCheckedChange={c => setBulkForm({ ...bulkForm, is_period_day: !!c })}
+                className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
+              />
+              選んだ日をすべて整理日にする
+            </label>
             {checklistItems.length > 0 && (
               <div className="space-y-3">
                 <Label className="text-xs text-muted-foreground">確認項目</Label>
@@ -1228,6 +1308,23 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
             >
               {bulkSaving ? '提出中...' : `${bulkDates.size}件のシフトを提出`}
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!cancelTarget} onOpenChange={openState => { if (!openState) setCancelTarget(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>シフトを取り消しますか?</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            {cancelTarget && (
+              <p className="text-sm text-muted-foreground">
+                {format(new Date(cancelTarget.date), 'M月d日(E)', { locale: ja })} のシフトを取り消します。この操作は元に戻せません。
+              </p>
+            )}
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setCancelTarget(null)}>キャンセル</Button>
+              <Button variant="destructive" onClick={confirmCancel}>取り消す</Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

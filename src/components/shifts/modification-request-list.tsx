@@ -62,10 +62,13 @@ export function ModificationRequestList({ requests: initialRequests }: { request
 
   async function handleReject() {
     if (!rejectTarget || !rejectReason.trim()) return
-    const { error } = await supabase.from('shift_modification_requests').update({
-      status: 'rejected', reject_reason: rejectReason, reviewed_at: new Date().toISOString(),
-    }).eq('id', rejectTarget.id)
-    if (error) { toast.error('却下に失敗しました'); return }
+    const [{ error }, { error: statusError }] = await Promise.all([
+      supabase.from('shift_modification_requests').update({
+        status: 'rejected', reject_reason: rejectReason, reviewed_at: new Date().toISOString(),
+      }).eq('id', rejectTarget.id),
+      supabase.from('shifts').update({ status: 'confirmed' }).eq('id', rejectTarget.shift_id),
+    ])
+    if (error || statusError) { toast.error('却下に失敗しました'); return }
     setRequests(requests.filter(r => r.id !== rejectTarget.id))
     toast.success('却下しました')
     const title = 'シフト修正申請が却下されました'

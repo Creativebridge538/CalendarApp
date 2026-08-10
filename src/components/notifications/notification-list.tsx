@@ -112,6 +112,19 @@ export function NotificationList({ notifications: initial, userId }: { notificat
           </div>
         </div>
       )}
+      {pushState === 'unsubscribed' && (
+        <div className="px-6 pb-3">
+          <div className="rounded-lg border p-3 space-y-1" style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'color-mix(in oklch, var(--brand-accent) 8%, transparent)' }}>
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <BellRing className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--brand-accent)' }} />
+              通知をオンにしませんか?
+            </p>
+            <p className="text-xs text-muted-foreground">
+              シフトの確定・差し戻しや修正申請の結果を、アプリを開かなくても受け取れます。下の「オンにする」から設定できます。
+            </p>
+          </div>
+        </div>
+      )}
       {pushState !== 'loading' && pushState !== 'unsupported' && (
         <div className="px-6 pb-3 space-y-2 text-sm">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">

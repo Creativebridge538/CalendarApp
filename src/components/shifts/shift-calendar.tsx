@@ -20,6 +20,7 @@ interface Shift {
   start_time: string
   end_time: string
   status: ShiftStatus
+  is_period_day?: boolean
   cast?: { display_name: string | null } | null
   rooms?: { name: string } | null
 }
@@ -30,6 +31,7 @@ const STATUS_VAR: Record<ShiftStatus, string> = {
   submitted: 'var(--status-submitted)',
   confirmed: 'var(--status-confirmed)',
   rejected: 'var(--status-rejected)',
+  modification_requested: 'var(--status-modification-requested)',
 }
 
 function chipStyle(status: ShiftStatus): CSSProperties {
@@ -44,7 +46,7 @@ function legendStyle(status: ShiftStatus): CSSProperties {
 }
 
 const STATUS_LABEL: Record<ShiftStatus, string> = {
-  draft: '下書き', submitted: '提出済', confirmed: '確定', rejected: '差し戻し',
+  draft: '下書き', submitted: '提出済', confirmed: '確定', rejected: '差し戻し', modification_requested: '修正依頼中',
 }
 
 const WEEKDAYS = ['日', '月', '火', '水', '木', '金', '土']
@@ -56,13 +58,17 @@ interface Props {
   /** 指定すると月の状態は呼び出し元が管理し、内蔵のヘッダー（タイトル・前後ボタン）は表示しない */
   current?: Date
   direction?: 'next' | 'prev'
-  /** yyyy-MM-dd の集合。整理日の控えめなドット表示に使用 */
-  periodDates?: Set<string>
   /** yyyy-MM-dd の集合。指定した日をまとめて追加モードの選択中として強調表示 */
   selectedDates?: Set<string>
+  /** 'amount' の場合、各日をシフトチップの代わりに amountByDate の金額で表示する */
+  mode?: 'time' | 'amount'
+  amountByDate?: Record<string, number>
 }
 
-export function ShiftCalendar({ shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection, periodDates, selectedDates }: Props) {
+export function ShiftCalendar({
+  shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection,
+  selectedDates, mode = 'time', amountByDate,
+}: Props) {
   const [internalCurrent, setInternalCurrent] = useState(() => new Date())
   const [internalDirection, setInternalDirection] = useState<'next' | 'prev'>('next')
   const isControlled = controlledCurrent !== undefined
@@ -136,7 +142,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
             const isToday = inMonth && isSameDay(day, new Date())
             const dow = getDay(day)
             const dayKey = format(day, 'yyyy-MM-dd')
-            const isPeriod = inMonth && periodDates?.has(dayKey)
+            const isPeriod = inMonth && dayShifts.some(s => s.is_period_day)
             const isSelected = inMonth && selectedDates?.has(dayKey)
 
             return (
@@ -172,8 +178,20 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                   {format(day, 'd')}
                 </span>
 
+                {/* 金額表示モード: シフトチップの代わりにその日の売上合計を表示 */}
+                {mode === 'amount' && inMonth && (amountByDate?.[dayKey] ?? 0) > 0 && (
+                  <div className="flex flex-col items-center px-0.5 min-w-0 w-full">
+                    <span
+                      className="w-full rounded-[4px] px-1 py-0.5 text-[10px] md:text-[11px] leading-tight tracking-tight text-center font-bold overflow-hidden whitespace-nowrap tabular-nums"
+                      style={{ backgroundColor: 'color-mix(in srgb, var(--brand-accent) 15%, transparent)', color: 'var(--brand-accent)' }}
+                    >
+                      {amountByDate![dayKey].toLocaleString()}
+                    </span>
+                  </div>
+                )}
+
                 {/* シフト一覧: 色でステータス、テキストはルーム名（無ければ状態名）を表示。チップには軽い影をつけて浮かせる */}
-                <div className="flex flex-col gap-0.5 min-w-0 w-full px-0.5 md:hidden">
+                <div className={cn('flex-col gap-0.5 min-w-0 w-full px-0.5 md:hidden', mode === 'time' ? 'flex' : 'hidden')}>
                   {dayShifts.slice(0, 2).map(s => (
                     <div
                       key={s.id}
@@ -181,6 +199,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                       style={chipStyle(s.status)}
                       title={`${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                     >
+                      {s.status === 'submitted' && `${s.start_time.slice(0, 5)} `}
                       {s.rooms?.name ?? STATUS_LABEL[s.status]}
                     </div>
                   ))}
@@ -188,7 +207,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                     <span className="text-[10px] text-muted-foreground text-center tracking-wider leading-none">•••</span>
                   )}
                 </div>
-                <div className="hidden md:flex flex-col gap-0.5 min-w-0 px-0.5">
+                <div className={cn('md:flex-col gap-0.5 min-w-0 px-0.5 hidden', mode === 'time' && 'md:flex')}>
                   {dayShifts.slice(0, 3).map(s => (
                     <div
                       key={s.id}
@@ -199,6 +218,7 @@ export function ShiftCalendar({ shifts, showCastName = false, onDayClick, curren
                       {showCastName && s.cast && (
                         <span className="font-bold">{s.cast.display_name} </span>
                       )}
+                      {s.status === 'submitted' && `${s.start_time.slice(0, 5)} `}
                       {s.rooms?.name ?? STATUS_LABEL[s.status]}
                     </div>
                   ))}

@@ -1,12 +1,16 @@
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
+import { shiftHours } from '@/lib/shift-hours'
 
 export interface MonthToDateSummary {
   monthLabel: string
   thisMonthTotal: number
   prevMonthToDateTotal: number
   monthlyGoal: number | null
+  attendanceDaysThisMonth: number
+  shiftCountThisMonth: number
+  totalHoursThisMonth: number
 }
 
 /** シフト画面の「小さい収益サマリー」用。収益ダッシュボードの本体計算とは独立して、必要最小限だけ取得する */
@@ -25,9 +29,10 @@ export async function getMonthToDateSummary(
   const prevMonthCutoffDay = Math.min(now.getDate(), Number(prevMonthEnd.slice(-2)))
   const prevMonthCutoff = format(new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), prevMonthCutoffDay), 'yyyy-MM-dd')
 
-  const [{ data: sales }, { data: profile }] = await Promise.all([
+  const [{ data: sales }, { data: profile }, { data: shifts }] = await Promise.all([
     supabase.from('sales').select('date, amount').eq('cast_id', castId).gte('date', prevMonthStart).lte('date', today),
     supabase.from('users').select('monthly_goal').eq('id', castId).single(),
+    supabase.from('shifts').select('date, start_time, end_time').eq('cast_id', castId).gte('date', monthStart).lte('date', monthEnd),
   ])
 
   const salesList = sales ?? []
@@ -38,10 +43,15 @@ export async function getMonthToDateSummary(
     .filter(s => s.date >= prevMonthStart && s.date <= prevMonthCutoff)
     .reduce((sum, s) => sum + Number(s.amount), 0)
 
+  const shiftsList = shifts ?? []
+
   return {
     monthLabel: `${now.getMonth() + 1}月`,
     thisMonthTotal,
     prevMonthToDateTotal,
     monthlyGoal: profile?.monthly_goal != null ? Number(profile.monthly_goal) : null,
+    attendanceDaysThisMonth: new Set(shiftsList.map(s => s.date)).size,
+    shiftCountThisMonth: shiftsList.length,
+    totalHoursThisMonth: shiftsList.reduce((sum, s) => sum + shiftHours(s.start_time, s.end_time), 0),
   }
 }

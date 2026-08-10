@@ -101,6 +101,7 @@
   --status-submitted: #F2A65A;
   --status-confirmed: #00A99D;
   --status-rejected: #D96C6C;
+  --status-modification-requested: #8B5CF6;
 
   /* アプリ全体の既定フォント。着せ替えで未選択(default)のキャストと管理者はこれを使う */
   --font-sans: var(--font-zen-maru-gothic), "Hiragino Maru Gothic ProN", -apple-system, "Hiragino Sans", sans-serif;
@@ -165,6 +166,11 @@
     @apply font-sans;
     overscroll-behavior: none;
     height: 100%;
+  }
+  /* 実際のスクロールはbody/htmlではなく各所のoverflow-y-autoコンテナ側で起きるため、
+     そちらにもバウンス(ラバーバンド)防止を効かせる */
+  .overflow-y-auto, .overflow-auto {
+    overscroll-behavior: none;
   }
 }
 

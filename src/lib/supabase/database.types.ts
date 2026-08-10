@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.15"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -520,6 +525,7 @@ export type Database = {
           date: string
           end_time: string
           id: string
+          is_period_day: boolean
           notes: string | null
           room_id: string | null
           start_time: string
@@ -538,6 +544,7 @@ export type Database = {
           date: string
           end_time: string
           id?: string
+          is_period_day?: boolean
           notes?: string | null
           room_id?: string | null
           start_time: string
@@ -556,6 +563,7 @@ export type Database = {
           date?: string
           end_time?: string
           id?: string
+          is_period_day?: boolean
           notes?: string | null
           room_id?: string | null
           start_time?: string
@@ -954,7 +962,12 @@ export type Database = {
     Enums: {
       deadline_type: "monthly" | "weekly" | "none"
       request_status: "pending" | "approved" | "rejected"
-      shift_status: "draft" | "submitted" | "confirmed" | "rejected"
+      shift_status:
+        | "draft"
+        | "submitted"
+        | "confirmed"
+        | "rejected"
+        | "modification_requested"
       user_role: "admin" | "cast" | "owner"
     }
     CompositeTypes: {
@@ -1088,9 +1101,14 @@ export const Constants = {
     Enums: {
       deadline_type: ["monthly", "weekly", "none"],
       request_status: ["pending", "approved", "rejected"],
-      shift_status: ["draft", "submitted", "confirmed", "rejected"],
+      shift_status: [
+        "draft",
+        "submitted",
+        "confirmed",
+        "rejected",
+        "modification_requested",
+      ],
       user_role: ["admin", "cast", "owner"],
     },
   },
 } as const
-

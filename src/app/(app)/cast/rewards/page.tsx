@@ -2,17 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { CastRewardDashboard } from '@/components/rewards/cast-reward-dashboard'
+import { shiftHours } from '@/lib/shift-hours'
 
 function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
-}
-
-function shiftHours(startTime: string, endTime: string): number {
-  const [sh, sm] = startTime.slice(0, 5).split(':').map(Number)
-  const [eh, em] = endTime.slice(0, 5).split(':').map(Number)
-  let minutes = (eh * 60 + em) - (sh * 60 + sm)
-  if (minutes <= 0) minutes += 24 * 60
-  return minutes / 60
 }
 
 export default async function CastRewardsPage() {

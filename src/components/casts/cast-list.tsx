@@ -3,7 +3,6 @@
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -23,15 +22,8 @@ import { cn } from '@/lib/utils'
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
   'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'is_active' | 'email' | 'profile_answers'
-  | 'photo_url' | 'period_start_date' | 'period_end_date' | 'login_id'
+  | 'photo_url' | 'login_id'
 >
-
-function periodLabel(cast: CastUser): string | null {
-  if (!cast.period_start_date || !cast.period_end_date) return null
-  const start = format(new Date(`${cast.period_start_date}T00:00:00`), 'M/d')
-  const end = format(new Date(`${cast.period_end_date}T00:00:00`), 'M/d')
-  return `整理日: ${start}〜${end}`
-}
 
 interface CastListProps {
   casts: CastUser[]
@@ -194,9 +186,6 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                 <TableRow key={cast.id} className={!cast.is_active ? 'opacity-50' : ''}>
                   <TableCell className="font-medium">
                     {cast.display_name ?? '—'}
-                    {periodLabel(cast) && (
-                      <span className="block text-xs font-normal text-pink-500">{periodLabel(cast)}</span>
-                    )}
                   </TableCell>
                   <TableCell>{cast.real_name ?? '—'}</TableCell>
                   <TableCell>{cast.phone ?? '—'}</TableCell>
@@ -255,9 +244,6 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                       )}
                     </div>
                     <span className="text-sm font-medium truncate w-full">{cast.display_name ?? 'キャスト名'}</span>
-                    {periodLabel(cast) && (
-                      <span className="text-[10px] text-pink-500 truncate w-full">{periodLabel(cast)}</span>
-                    )}
                   </button>
                 ))}
               </div>
