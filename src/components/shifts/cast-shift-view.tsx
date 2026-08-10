@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut } from 'lucide-react'
+import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut, Smartphone } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
@@ -158,7 +158,7 @@ function ShiftTimeGrid({
                 {format(day, 'd')}
               </span>
               {isPeriod && (
-                <span className="absolute top-0 right-1/2 translate-x-4 h-1.5 w-1.5 rounded-full bg-pink-400" title="整理日" />
+                <span className="absolute top-0 right-1/2 translate-x-4 h-1.5 w-1.5 rounded-full bg-pink-400" title="生理日" />
               )}
             </div>
           )
@@ -214,6 +214,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
+  const [showPwaBanner, setShowPwaBanner] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -252,6 +253,20 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
+
+  // ホーム画面未追加（ブラウザ表示）の場合、PWA化の案内を出す。「次回以降表示しない」はlocalStorageに記録
+  useEffect(() => {
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+      || (window.navigator as Navigator & { standalone?: boolean }).standalone === true
+    const dismissedForever = localStorage.getItem('pwa-banner-dismissed') === '1'
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- window/localStorage はマウント後にしか読めないため
+    setShowPwaBanner(!isStandalone && !dismissedForever)
+  }, [])
+
+  function dismissPwaBannerForever() {
+    localStorage.setItem('pwa-banner-dismissed', '1')
+    setShowPwaBanner(false)
+  }
 
   async function handleLogout() {
     await supabase.auth.signOut()
@@ -306,7 +321,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   function openNew(date?: string) {
-    if (isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); return }
     setEditing(null)
     setForm({ date: date ?? '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} })
     setOpen(true)
@@ -342,7 +356,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   function startBulkAdd() {
-    if (isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); setMenuOpen(false); return }
     setBulkDates(new Set())
     setBulkTimes({})
     setBulkForm({ area_id: '', room_id: '', notes: '', is_period_day: false, checklist_answers: {} })
@@ -438,6 +451,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   async function handleSave() {
+    if (!editing && isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); return }
     const payload = {
       cast_id: castId,
       date: form.date,
@@ -469,6 +483,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
   }
 
   async function handleBulkSave() {
+    if (isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); return }
     const dates = Array.from(bulkDates).sort()
     if (dates.length === 0) return
     setBulkSaving(true)
@@ -595,14 +610,33 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
             </div>
           </div>
         </CardHeader>
+        {showPwaBanner && (
+          <div className="mx-4 md:mx-6 mb-3 px-3 py-2.5 rounded-lg border" style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'color-mix(in oklch, var(--brand-accent) 8%, transparent)' }}>
+            <div className="flex items-start gap-2">
+              <Smartphone className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--brand-accent)' }} />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium">ホーム画面に追加しませんか?</p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  アプリのように使えて、プッシュ通知も受け取れるようになります。Safariの共有ボタン→「ホーム画面に追加」でできます。
+                </p>
+                <div className="flex items-center gap-3 mt-2">
+                  <button type="button" onClick={() => setShowPwaBanner(false)} className="text-xs font-medium" style={{ color: 'var(--brand-accent)' }}>
+                    後で
+                  </button>
+                  <button type="button" onClick={dismissPwaBannerForever} className="text-xs text-muted-foreground">
+                    次回以降表示しない
+                  </button>
+                </div>
+              </div>
+              <button type="button" onClick={() => setShowPwaBanner(false)} className="p-0.5 text-muted-foreground shrink-0" aria-label="閉じる">
+                <X className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          </div>
+        )}
         <CardContent className="px-0 md:px-6">
           {view === 'month' && (
             <>
-              {isPastDeadline && (
-                <div className="mx-4 md:mx-0 mb-3 px-3 py-2 rounded-lg border border-destructive/30 bg-destructive/10 text-xs text-destructive">
-                  シフト提出の締切を過ぎています。新規の提出はできません。管理者にお問い合わせください
-                </div>
-              )}
               <Link
                 href="/cast/rewards"
                 className="flex items-center gap-3 mx-4 md:mx-0 mb-3 px-3 py-2.5 rounded-lg border hover:bg-muted/40 transition-colors"
@@ -1048,6 +1082,11 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? 'シフト編集' : 'シフト提出'}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
+            {!editing && isPastDeadline && (
+              <div className="px-3 py-2 rounded-lg border border-destructive/30 bg-destructive/10 text-xs text-destructive">
+                シフト提出の締切を過ぎています。このまま提出はできません。管理者にお問い合わせください
+              </div>
+            )}
             <div className="space-y-1.5"><Label>日付 *</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5 min-w-0"><Label>開始時間</Label><Input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></div>
@@ -1092,7 +1131,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                 onCheckedChange={c => setForm({ ...form, is_period_day: !!c })}
                 className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
               />
-              整理日
+              生理日
             </label>
             {checklistItems.length > 0 && (
               <div className="space-y-3">
@@ -1139,6 +1178,11 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
         <DialogContent variant="sheet" onDismiss={() => setBulkSheetOpen(false)}>
           <DialogHeader><DialogTitle>まとめてシフト提出</DialogTitle></DialogHeader>
           <div className="space-y-5 mt-2">
+            {isPastDeadline && (
+              <div className="px-3 py-2 rounded-lg border border-destructive/30 bg-destructive/10 text-xs text-destructive">
+                シフト提出の締切を過ぎています。このまま提出はできません。管理者にお問い合わせください
+              </div>
+            )}
             <div>
               <Label className="text-xs text-muted-foreground">日付を選ぶ（複数タップできます）</Label>
               <div className="mt-1.5">
@@ -1279,7 +1323,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                 onCheckedChange={c => setBulkForm({ ...bulkForm, is_period_day: !!c })}
                 className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
               />
-              選んだ日をすべて整理日にする
+              選んだ日をすべて生理日にする
             </label>
             {checklistItems.length > 0 && (
               <div className="space-y-3">

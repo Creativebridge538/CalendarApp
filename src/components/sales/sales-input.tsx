@@ -159,7 +159,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             <div className="space-y-1.5">
               <Label>キャスト *</Label>
               <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
-                <SelectTrigger><SelectValue placeholder="選択" /></SelectTrigger>
+                <SelectTrigger>
+                  <SelectValue placeholder="選択">
+                    {form.cast_id ? (casts.find(c => c.id === form.cast_id)?.display_name ?? form.cast_id) : undefined}
+                  </SelectValue>
+                </SelectTrigger>
                 <SelectContent alignItemWithTrigger={false}>
                   {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
                 </SelectContent>

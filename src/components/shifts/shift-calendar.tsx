@@ -157,7 +157,7 @@ export function ShiftCalendar({
                 )}
               >
                 {isPeriod && (
-                  <span className="absolute top-1 right-1.5 h-1.5 w-1.5 rounded-full bg-pink-400" title="整理日" />
+                  <span className="absolute top-1 right-1.5 h-1.5 w-1.5 rounded-full bg-pink-400" title="生理日" />
                 )}
                 {isSelected && (
                   <span
