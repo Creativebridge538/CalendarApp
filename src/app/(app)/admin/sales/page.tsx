@@ -24,11 +24,13 @@ export default async function SalesPage({
   const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
   const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
 
-  const [{ data: casts }, { data: sales }, { data: settings }] = await Promise.all([
-    supabase.from('users').select('id, display_name').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true).order('display_name'),
+  const [{ data: casts }, { data: sales }, { data: settings }, { data: shifts }] = await Promise.all([
+    supabase.from('users').select('id, display_name, reward_rate').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true).order('display_name'),
     supabase.from('sales').select('*, cast:users!sales_cast_id_fkey(display_name)').eq('store_id', storeId)
       .gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false }),
     supabase.from('store_settings').select('usd_jpy_rate, platform_settings').eq('store_id', storeId).single(),
+    supabase.from('shifts').select('id, cast_id, date, start_time, end_time, rooms(name)').eq('store_id', storeId)
+      .gte('date', monthStart).lte('date', monthEnd),
   ])
 
   return (
@@ -36,6 +38,7 @@ export default async function SalesPage({
       <SalesInput
         key={`${year}-${month}`}
         casts={casts ?? []} sales={sales ?? []} storeId={storeId} userId={user.id} storeSettings={settings}
+        shifts={shifts ?? []}
         year={year} month={month}
       />
     </div>

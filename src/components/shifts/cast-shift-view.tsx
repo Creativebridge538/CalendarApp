@@ -106,6 +106,7 @@ interface Props {
   checklistItems: { id: string; label: string; item_type: string; options: string[] }[]
   rewardSummary: MonthToDateSummary
   amountByDate: Record<string, number>
+  salesByShiftId: Record<string, { amount: number; reward: number }>
 }
 
 const HOUR_HEIGHT = 56
@@ -210,7 +211,7 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
@@ -998,6 +999,17 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
                       <span className="h-2.5 w-2.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT[shift.status] }} />
                       <span className="text-sm">{STATUS_LABEL[shift.status]}</span>
                     </div>
+
+                    {salesByShiftId[shift.id] && (
+                      <div className="border-t px-4 py-3 flex items-center justify-between text-sm">
+                        <span className="text-muted-foreground">売上 / 女子給</span>
+                        <span className="tabular-nums">
+                          ¥{salesByShiftId[shift.id].amount.toLocaleString()}
+                          <span className="text-muted-foreground"> / </span>
+                          ¥{salesByShiftId[shift.id].reward.toLocaleString()}
+                        </span>
+                      </div>
+                    )}
 
                     {shift.status === 'rejected' && shift.admin_note && (
                       <div className="border-t px-4 py-3">

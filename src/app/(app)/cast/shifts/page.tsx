@@ -8,7 +8,7 @@ export default async function CastShiftsPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('users').select('role, store_id, display_name').eq('id', user.id).single()
+  const { data: profile } = await supabase.from('users').select('role, store_id, display_name, reward_rate').eq('id', user.id).single()
   if (!profile?.store_id) {
     return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
   }
@@ -21,12 +21,22 @@ export default async function CastShiftsPage() {
     supabase.from('shift_checklist_items').select('id, label, item_type, options').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
     supabase.from('stores').select('name').eq('id', profile.store_id).single(),
     getMonthToDateSummary(supabase, user.id),
-    supabase.from('sales').select('date, amount').eq('cast_id', user.id),
+    supabase.from('sales').select('date, amount, shift_id, is_daily_payment, reward_rate_override').eq('cast_id', user.id),
   ])
 
   const amountByDate: Record<string, number> = {}
+  const salesByShiftId: Record<string, { amount: number; reward: number }> = {}
+  const rewardRate = Number(profile.reward_rate)
   for (const s of sales ?? []) {
     amountByDate[s.date] = (amountByDate[s.date] ?? 0) + Number(s.amount)
+    if (s.shift_id) {
+      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+      const prev = salesByShiftId[s.shift_id] ?? { amount: 0, reward: 0 }
+      salesByShiftId[s.shift_id] = {
+        amount: prev.amount + Number(s.amount),
+        reward: prev.reward + Math.floor(Number(s.amount) * rate),
+      }
+    }
   }
 
   return (
@@ -43,6 +53,7 @@ export default async function CastShiftsPage() {
         checklistItems={checklistItems ?? []}
         rewardSummary={rewardSummary}
         amountByDate={amountByDate}
+        salesByShiftId={salesByShiftId}
       />
     </div>
   )

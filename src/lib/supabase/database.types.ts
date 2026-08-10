@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.15"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -328,6 +323,7 @@ export type Database = {
           rate_override: number | null
           raw_units: number | null
           reward_rate_override: number | null
+          shift_id: string | null
           store_id: string
           updated_at: string
           usd_amount: number | null
@@ -346,6 +342,7 @@ export type Database = {
           rate_override?: number | null
           raw_units?: number | null
           reward_rate_override?: number | null
+          shift_id?: string | null
           store_id: string
           updated_at?: string
           usd_amount?: number | null
@@ -364,6 +361,7 @@ export type Database = {
           rate_override?: number | null
           raw_units?: number | null
           reward_rate_override?: number | null
+          shift_id?: string | null
           store_id?: string
           updated_at?: string
           usd_amount?: number | null
@@ -381,6 +379,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "sales_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
           {
@@ -1112,3 +1117,4 @@ export const Constants = {
     },
   },
 } as const
+

@@ -21,15 +21,22 @@ interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
   platform: string; raw_units: number | string | null
   is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
+  shift_id: string | null
   cast: { display_name: string | null } | null
 }
 
+interface ShiftOption {
+  id: string; cast_id: string; date: string; start_time: string; end_time: string
+  rooms: { name: string } | null
+}
+
 interface Props {
-  casts: { id: string; display_name: string | null }[]
+  casts: { id: string; display_name: string | null; reward_rate: number | string }[]
   sales: Sale[]
   storeId: string
   userId: string
   storeSettings: { usd_jpy_rate: number | null; platform_settings: unknown } | null
+  shifts: ShiftOption[]
   year: number
   month: number
 }
@@ -44,13 +51,17 @@ function defaultDateFor(year: number, month: number): string {
   return isCurrentMonth ? format(now, 'yyyy-MM-dd') : `${year}-${String(month).padStart(2, '0')}-01`
 }
 
-export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month }: Props) {
+function effectiveRewardRate(sale: Pick<Sale, 'is_daily_payment' | 'reward_rate_override'>, castRewardRate: number): number {
+  return sale.is_daily_payment && sale.reward_rate_override != null ? Number(sale.reward_rate_override) : castRewardRate
+}
+
+export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, shifts, year, month }: Props) {
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
     amount: '', raw_units: '',
     is_daily_payment: false, rate_override: '', reward_rate_override: '',
-    notes: '',
+    notes: '', shift_id: '',
   }), [year, month])
   const [sales, setSales] = useState(initialSales)
   const [form, setForm] = useState(emptyForm)
@@ -60,7 +71,28 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
   const usdJpyRate = storeSettings?.usd_jpy_rate ?? null
 
+  const castRewardRateById = useMemo(() => {
+    const map: Record<string, number> = {}
+    for (const c of casts) map[c.id] = Number(c.reward_rate)
+    return map
+  }, [casts])
+
+  const shiftById = useMemo(() => {
+    const map: Record<string, ShiftOption> = {}
+    for (const s of shifts) map[s.id] = s
+    return map
+  }, [shifts])
+
+  const candidateShifts = useMemo(() => {
+    if (!form.cast_id || !form.date) return []
+    return shifts.filter(s => s.cast_id === form.cast_id && s.date === form.date)
+  }, [shifts, form.cast_id, form.date])
+
   const monthlyTotal = useMemo(() => sales.reduce((sum, s) => sum + Number(s.amount), 0), [sales])
+  const monthlyRewardTotal = useMemo(() => sales.reduce((sum, s) => {
+    const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0)
+    return sum + Math.floor(Number(s.amount) * rate)
+  }, 0), [sales, castRewardRateById])
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
@@ -92,6 +124,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       rate_override: form.is_daily_payment && isPlatform && form.rate_override ? parseFloat(form.rate_override) : null,
       reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) : null,
       notes: form.notes || null,
+      shift_id: form.shift_id || null,
       store_id: storeId,
       created_by: userId,
     }
@@ -132,7 +165,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
       reward_rate_override: sale.reward_rate_override != null ? String(sale.reward_rate_override) : '',
       notes: sale.notes ?? '',
+      shift_id: sale.shift_id ?? '',
     })
+  }
+
+  function shiftLabel(s: ShiftOption): string {
+    return `${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)}${s.rooms?.name ? ` ・ ${s.rooms.name}` : ''}`
   }
 
   return (
@@ -142,7 +180,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
               <CardTitle>売上入力 — {year}年{month}月</CardTitle>
-              <p className="text-sm text-muted-foreground mt-1">月合計: ¥{monthlyTotal.toLocaleString()}</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                月合計: ¥{monthlyTotal.toLocaleString()}
+                <span className="mx-1.5 text-border">・</span>
+                女子給合計: ¥{monthlyRewardTotal.toLocaleString()}
+              </p>
             </div>
             <div className="flex items-center gap-1">
               <Link href={`/admin/sales?year=${prev.year}&month=${prev.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
@@ -158,7 +200,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label>キャスト *</Label>
-              <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
+              <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v, shift_id: '' }) }}>
                 <SelectTrigger>
                   <SelectValue placeholder="選択">
                     {form.cast_id ? (casts.find(c => c.id === form.cast_id)?.display_name ?? form.cast_id) : undefined}
@@ -171,7 +213,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             </div>
             <div className="space-y-1.5">
               <Label>日付 *</Label>
-              <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+              <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value, shift_id: '' })} />
             </div>
             <div className="space-y-1.5">
               <Label>プラットフォーム</Label>
@@ -194,6 +236,22 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <div className="space-y-1.5">
                 <Label>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'} *</Label>
                 <Input type="number" min="0" value={form.raw_units} onChange={e => setForm({ ...form, raw_units: e.target.value })} placeholder="0" />
+              </div>
+            )}
+            {candidateShifts.length > 0 && (
+              <div className="space-y-1.5 col-span-2 md:col-span-4">
+                <Label>紐づくシフト</Label>
+                <Select value={form.shift_id || 'none'} onValueChange={v => { if (v) setForm({ ...form, shift_id: v === 'none' ? '' : v }) }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="紐付けなし">
+                      {form.shift_id ? shiftLabel(shiftById[form.shift_id]) : '紐付けなし'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    <SelectItem value="none">紐付けなし</SelectItem>
+                    {candidateShifts.map(s => <SelectItem key={s.id} value={s.id}>{shiftLabel(s)}</SelectItem>)}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             <div className="space-y-1.5 col-span-2 md:col-span-4">
@@ -245,34 +303,44 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <TableRow>
                 <TableHead>日付</TableHead>
                 <TableHead>キャスト</TableHead>
+                <TableHead>シフト</TableHead>
                 <TableHead>プラットフォーム</TableHead>
-                <TableHead className="text-right">金額</TableHead>
+                <TableHead className="text-right">売上</TableHead>
+                <TableHead className="text-right">女子給</TableHead>
                 <TableHead>備考</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {sales.length === 0 && (
-                <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">売上データがありません</TableCell></TableRow>
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">売上データがありません</TableCell></TableRow>
               )}
-              {sales.map(sale => (
-                <TableRow key={sale.id}>
-                  <TableCell>{format(new Date(sale.date), 'M/d(E)', { locale: ja })}</TableCell>
-                  <TableCell>{sale.cast?.display_name ?? '—'}</TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-1 flex-wrap">
-                      <Badge variant="outline">{PLATFORM_LABEL[sale.platform] ?? sale.platform}</Badge>
-                      {sale.is_daily_payment && <Badge variant="secondary">日払い</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
-                  <TableCell>{sale.notes ?? '—'}</TableCell>
-                  <TableCell className="text-right space-x-1">
-                    <Button size="icon" variant="ghost" onClick={() => startEdit(sale)}><Pencil className="h-3.5 w-3.5" /></Button>
-                    <Button size="icon" variant="ghost" onClick={() => handleDelete(sale.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
-                  </TableCell>
-                </TableRow>
-              ))}
+              {sales.map(sale => {
+                const linkedShift = sale.shift_id ? shiftById[sale.shift_id] : undefined
+                const reward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
+                return (
+                  <TableRow key={sale.id}>
+                    <TableCell>{format(new Date(sale.date), 'M/d(E)', { locale: ja })}</TableCell>
+                    <TableCell>{sale.cast?.display_name ?? '—'}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                      {linkedShift ? shiftLabel(linkedShift) : '—'}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1 flex-wrap">
+                        <Badge variant="outline">{PLATFORM_LABEL[sale.platform] ?? sale.platform}</Badge>
+                        {sale.is_daily_payment && <Badge variant="secondary">日払い</Badge>}
+                      </div>
+                    </TableCell>
+                    <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">¥{reward.toLocaleString()}</TableCell>
+                    <TableCell>{sale.notes ?? '—'}</TableCell>
+                    <TableCell className="text-right space-x-1">
+                      <Button size="icon" variant="ghost" onClick={() => startEdit(sale)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button size="icon" variant="ghost" onClick={() => handleDelete(sale.id)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                    </TableCell>
+                  </TableRow>
+                )
+              })}
             </TableBody>
           </Table>
         </CardContent>
