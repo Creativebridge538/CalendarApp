@@ -52,6 +52,16 @@ const sheetContentClass = cn(
   "md:data-open:zoom-in-95 md:data-open:slide-in-from-bottom-0 md:data-closed:zoom-out-95 md:data-closed:slide-out-to-bottom-0"
 )
 
+// モバイル幅では画面上からのドロップダウンシート、md以上では従来通り中央のダイアログに戻る
+const topContentClass = cn(
+  "fixed z-50 grid w-full gap-4 overflow-y-auto bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-150 outline-none",
+  "inset-x-0 top-0 bottom-auto left-0 right-0 translate-x-0 translate-y-0 max-h-[85dvh] rounded-b-2xl rounded-t-none pb-2",
+  "pt-[calc(1rem+env(safe-area-inset-top))]",
+  "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-top data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-top",
+  "md:top-1/2 md:left-1/2 md:right-auto md:bottom-auto md:inset-x-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4",
+  "md:data-open:zoom-in-95 md:data-open:slide-in-from-top-0 md:data-closed:zoom-out-95 md:data-closed:slide-out-to-top-0"
+)
+
 function DialogContent({
   className,
   children,
@@ -61,7 +71,7 @@ function DialogContent({
   ...props
 }: DialogPrimitive.Popup.Props & {
   showCloseButton?: boolean
-  variant?: "center" | "sheet"
+  variant?: "center" | "sheet" | "top"
   /** variant="sheet" の時、ハンドルを下にドラッグして閉じた際に呼ばれる */
   onDismiss?: () => void
 }) {
@@ -95,7 +105,10 @@ function DialogContent({
       <DialogPrimitive.Popup
         ref={popupRef}
         data-slot="dialog-content"
-        className={cn(variant === "sheet" ? sheetContentClass : centerContentClass, className)}
+        className={cn(
+          variant === "sheet" ? sheetContentClass : variant === "top" ? topContentClass : centerContentClass,
+          className
+        )}
         {...props}
       >
         {variant === "sheet" && (

@@ -611,26 +611,31 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
           </div>
         </CardHeader>
         {showPwaBanner && (
-          <div className="mx-4 md:mx-6 mb-3 px-3 py-2.5 rounded-lg border" style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'color-mix(in oklch, var(--brand-accent) 8%, transparent)' }}>
-            <div className="flex items-start gap-2">
-              <Smartphone className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--brand-accent)' }} />
-              <div className="min-w-0 flex-1">
-                <p className="text-sm font-medium">ホーム画面に追加しませんか?</p>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  アプリのように使えて、プッシュ通知も受け取れるようになります。Safariの共有ボタン→「ホーム画面に追加」でできます。
-                </p>
-                <div className="flex items-center gap-3 mt-2">
-                  <button type="button" onClick={() => setShowPwaBanner(false)} className="text-xs font-medium" style={{ color: 'var(--brand-accent)' }}>
-                    後で
-                  </button>
-                  <button type="button" onClick={dismissPwaBannerForever} className="text-xs text-muted-foreground">
-                    次回以降表示しない
-                  </button>
+          <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
+            <div
+              className="pointer-events-auto w-full md:max-w-sm px-3 py-2.5 rounded-xl border shadow-lg animate-in slide-in-from-bottom-4 fade-in-0 duration-300"
+              style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'var(--popover)' }}
+            >
+              <div className="flex items-start gap-2">
+                <Smartphone className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--brand-accent)' }} />
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium">ホーム画面に追加しませんか?</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    アプリのように使えて、プッシュ通知も受け取れるようになります。Safariの共有ボタン→「ホーム画面に追加」でできます。
+                  </p>
+                  <div className="flex items-center gap-3 mt-2">
+                    <button type="button" onClick={() => setShowPwaBanner(false)} className="text-xs font-medium" style={{ color: 'var(--brand-accent)' }}>
+                      後で
+                    </button>
+                    <button type="button" onClick={dismissPwaBannerForever} className="text-xs text-muted-foreground">
+                      次回以降表示しない
+                    </button>
+                  </div>
                 </div>
+                <button type="button" onClick={() => setShowPwaBanner(false)} className="p-0.5 text-muted-foreground shrink-0" aria-label="閉じる">
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
-              <button type="button" onClick={() => setShowPwaBanner(false)} className="p-0.5 text-muted-foreground shrink-0" aria-label="閉じる">
-                <X className="h-3.5 w-3.5" />
-              </button>
             </div>
           </div>
         )}
@@ -869,7 +874,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
       )}
 
       <Dialog open={searchOpen} onOpenChange={open => { setSearchOpen(open); if (!open) setSearchQuery('') }}>
-        <DialogContent variant="sheet" onDismiss={() => setSearchOpen(false)}>
+        <DialogContent variant="top">
           <DialogHeader><DialogTitle>シフトを検索</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             <Input
