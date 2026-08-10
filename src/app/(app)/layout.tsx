@@ -40,8 +40,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const role = profile?.role ?? 'cast'
-  // 管理者は店舗テーマ設定に関わらず、常に専用の固定ダークテーマ（analytics基調）を使う
-  const theme = role === 'admin' ? 'admin-pro' : ((settings as { theme?: string } | null)?.theme ?? 'default')
+  const theme = (settings as { theme?: string } | null)?.theme ?? 'default'
 
   // キャスト個人の「着せ替え」: ブランドアクセント色とフォントは、それぞれ独立して個人が選択できる（店舗テーマとは別軸）
   const castSkin = role === 'cast' ? getAccentSkin(profile?.accent_skin) : null

@@ -263,27 +263,3 @@
   --note:                       oklch(0.68 0.13 75);
 }
 
-/* ── Theme: Admin Pro（管理者専用・固定ダーク／金融ダッシュボード基調） ── */
-[data-theme="admin-pro"] {
-  --app-bg:                    oklch(0.085 0.004 255);
-  --background:                oklch(0.100 0.004 255);
-  --foreground:                oklch(0.965 0 0);
-  --card:                      oklch(0.145 0.006 255);
-  --card-foreground:           oklch(0.965 0 0);
-  --popover:                   oklch(0.145 0.006 255);
-  --popover-foreground:        oklch(0.965 0 0);
-  --muted:                     oklch(0.180 0.006 255);
-  --muted-foreground:          oklch(0.620 0.010 255);
-  --secondary:                 oklch(0.180 0.006 255);
-  --secondary-foreground:      oklch(0.965 0 0);
-  --accent:                    oklch(0.195 0.008 255);
-  --accent-foreground:         oklch(0.965 0 0);
-  --border:                    oklch(1 0 0 / 8%);
-  --input:                     oklch(1 0 0 / 12%);
-  --primary:                   oklch(0.600 0.175 258);
-  --primary-foreground:        oklch(0.985 0 0);
-  --ring:                      oklch(0.600 0.175 258);
-  --destructive:               oklch(0.635 0.205 25);
-  --positive:                   oklch(0.65 0.16 152);
-  --note:                       oklch(0.68 0.13 75);
-}
