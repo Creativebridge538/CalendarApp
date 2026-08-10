@@ -63,6 +63,8 @@ const STATUS_DOT: Record<ShiftStatus, string> = {
 // 深夜営業のシフトは「25:00」のような24時を超えた表記で入力できるようにする（DB保存時は24時間に正規化）
 const HOUR_OPTIONS = Array.from({ length: 30 }, (_, i) => String(i).padStart(2, '0'))
 const MINUTE_OPTIONS = ['00', '15', '30', '45']
+// 「19」を選んで「15」を選んで…と2段階にせず、"19:15" を1回で選べるようにする
+const TIME_OPTIONS = HOUR_OPTIONS.flatMap(h => MINUTE_OPTIONS.map(m => `${h}:${m}`))
 
 function normalizeTime(hhmm: string): string {
   const [h, m] = hhmm.split(':').map(Number)
@@ -70,27 +72,15 @@ function normalizeTime(hhmm: string): string {
 }
 
 function TimeSelect({ value, onChange }: { value: string; onChange: (value: string) => void }) {
-  const [h, m] = value.split(':')
   return (
-    <div className="flex items-center gap-1">
-      <select
-        value={h}
-        onChange={e => onChange(`${e.target.value}:${m}`)}
-        className="min-h-11 min-w-14 rounded-md border bg-background px-2 text-base font-medium tabular-nums text-center"
-        aria-label="時"
-      >
-        {HOUR_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-      <span className="text-sm text-muted-foreground">:</span>
-      <select
-        value={m}
-        onChange={e => onChange(`${h}:${e.target.value}`)}
-        className="min-h-11 min-w-14 rounded-md border bg-background px-2 text-base font-medium tabular-nums text-center"
-        aria-label="分"
-      >
-        {MINUTE_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
-      </select>
-    </div>
+    <select
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      className="min-h-11 min-w-24 rounded-md border bg-background px-2 text-base font-medium tabular-nums text-center"
+      aria-label="時刻"
+    >
+      {TIME_OPTIONS.map(o => <option key={o} value={o}>{o}</option>)}
+    </select>
   )
 }
 
