@@ -38,13 +38,6 @@ function chipStyle(status: ShiftStatus): CSSProperties {
   return { backgroundColor: `color-mix(in srgb, ${STATUS_VAR[status]} 82%, transparent)`, color: '#fff' }
 }
 
-function legendStyle(status: ShiftStatus): CSSProperties {
-  return {
-    backgroundColor: `color-mix(in srgb, ${STATUS_VAR[status]} 15%, transparent)`,
-    color: STATUS_VAR[status],
-  }
-}
-
 const STATUS_LABEL: Record<ShiftStatus, string> = {
   draft: '下書き', submitted: '提出済', confirmed: '確定', rejected: '差し戻し', modification_requested: '修正依頼中',
 }
@@ -232,15 +225,6 @@ export function ShiftCalendar({
             )
           })}
         </div>
-      </div>
-
-      {/* 凡例 */}
-      <div className="flex flex-wrap gap-2 text-xs mt-3 px-1 md:px-0">
-        {(Object.keys(STATUS_LABEL) as ShiftStatus[]).map(status => (
-          <span key={status} className="px-2 py-0.5 rounded-full font-medium" style={legendStyle(status)}>
-            {STATUS_LABEL[status]}
-          </span>
-        ))}
       </div>
     </div>
   )
