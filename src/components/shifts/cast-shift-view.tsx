@@ -611,31 +611,56 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, sto
           </div>
         </CardHeader>
         {showPwaBanner && (
-          <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center px-3 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pointer-events-none">
-            <div
-              className="pointer-events-auto w-full md:max-w-sm px-3 py-2.5 rounded-xl border shadow-lg animate-in slide-in-from-bottom-4 fade-in-0 duration-300"
-              style={{ borderColor: 'var(--brand-accent)', backgroundColor: 'var(--popover)' }}
-            >
-              <div className="flex items-start gap-2">
-                <Smartphone className="h-4 w-4 shrink-0 mt-0.5" style={{ color: 'var(--brand-accent)' }} />
-                <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium">ホーム画面に追加しませんか?</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    アプリのように使えて、プッシュ通知も受け取れるようになります。Safariの共有ボタン→「ホーム画面に追加」でできます。
-                  </p>
-                  <div className="flex items-center gap-3 mt-2">
-                    <button type="button" onClick={() => setShowPwaBanner(false)} className="text-xs font-medium" style={{ color: 'var(--brand-accent)' }}>
-                      後で
-                    </button>
-                    <button type="button" onClick={dismissPwaBannerForever} className="text-xs text-muted-foreground">
-                      次回以降表示しない
-                    </button>
-                  </div>
+          <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none md:px-3 md:pb-3">
+            <div className="pointer-events-auto w-full md:max-w-sm rounded-t-2xl md:rounded-2xl border-t md:border shadow-xl animate-in slide-in-from-bottom fade-in-0 duration-300 bg-popover p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-4">
+              <div className="mx-auto -mt-1 mb-2 h-1 w-9 rounded-full bg-foreground/15 md:hidden" />
+
+              <div className="flex items-start gap-3 mb-4">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: 'var(--brand-accent)' }}>
+                  <Smartphone className="h-5 w-5 text-white" />
                 </div>
-                <button type="button" onClick={() => setShowPwaBanner(false)} className="p-0.5 text-muted-foreground shrink-0" aria-label="閉じる">
-                  <X className="h-3.5 w-3.5" />
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-bold">ホーム画面に追加する</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">アプリのように使えて、プッシュ通知も受け取れるようになります</p>
+                </div>
+                <button type="button" onClick={() => setShowPwaBanner(false)} className="p-1 -mt-1 -mr-1 text-muted-foreground shrink-0" aria-label="閉じる">
+                  <X className="h-4 w-4" />
                 </button>
               </div>
+
+              <div className="rounded-lg bg-muted/50 p-3.5 mb-3">
+                <p className="text-sm font-semibold mb-2.5">Safariで開いてください</p>
+                <ol className="space-y-2.5">
+                  {[
+                    '下部の共有ボタンをタップ',
+                    '「ホーム画面に追加」を選ぶ',
+                    '右上の「追加」をタップ',
+                  ].map((step, i) => (
+                    <li key={step} className="flex items-start gap-2.5">
+                      <span
+                        className="h-5 w-5 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0"
+                        style={{ backgroundColor: 'var(--brand-accent)' }}
+                      >
+                        {i + 1}
+                      </span>
+                      <span className="text-sm leading-5">{step}</span>
+                    </li>
+                  ))}
+                </ol>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowPwaBanner(false)}
+                  className="flex-1 h-10 rounded-lg border text-sm font-medium hover:bg-muted/40 transition-colors"
+                >
+                  後で
+                </button>
+              </div>
+              <button type="button" onClick={dismissPwaBannerForever} className="w-full text-center text-xs text-muted-foreground mt-2.5">
+                次回以降表示しない
+              </button>
             </div>
           </div>
         )}
