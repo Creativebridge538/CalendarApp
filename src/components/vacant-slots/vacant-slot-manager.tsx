@@ -175,7 +175,11 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
               <div className="space-y-1.5">
                 <Label>ルーム</Label>
                 <Select value={form.room_id} onValueChange={v => setForm({ ...form, room_id: v ?? '' })}>
-                  <SelectTrigger><SelectValue placeholder="選択（任意）" /></SelectTrigger>
+                  <SelectTrigger>
+                    <SelectValue placeholder="選択（任意）">
+                      {form.room_id ? rooms.find(r => r.id === form.room_id)?.name : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
                   <SelectContent>{rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
                 </Select>
               </div>
