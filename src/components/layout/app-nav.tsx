@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -213,6 +213,18 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
     backgroundColor: '#ffffff',
     color: '#8e8e93',
   }
+
+  // iOS PWA: パスワード欄のあるログイン画面からの遷移直後、WebKitがネイティブの
+  // オリジン表示バーを閉じた後にレイアウトの再計算をすぐ行わず、スクロール可能な
+  // main の上部に空白が残ることがある。手動でスクロールすると直ることから、
+  // 遷移直後に強制的に1px分スクロールしてWebKit側の再計算を促す
+  useEffect(() => {
+    const main = document.querySelector('main')
+    if (!main) return
+    const top = main.scrollTop
+    main.scrollTop = top + 1
+    requestAnimationFrame(() => { main.scrollTop = top })
+  }, [pathname])
 
   async function handleLogout() {
     await supabase.auth.signOut()
