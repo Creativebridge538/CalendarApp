@@ -16,10 +16,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Switch } from '@/components/ui/switch'
 import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
-import { Plus, Check, X, ChevronDown } from 'lucide-react'
+import { Plus, Check, X, ChevronDown, Trash2 } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 
-interface Application { id: string; status: string; cast_id: string; cast: { display_name: string | null } | null }
+interface Application { id: string; status: string; cast_id: string; shift_id: string | null; cast: { display_name: string | null } | null }
 interface Slot {
   id: string; date: string; start_time: string; end_time: string; notes: string | null; is_published: boolean
   room_id: string | null
@@ -46,7 +46,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
       store_id: storeId, created_by: userId,
       date: form.date, start_time: form.start_time, end_time: form.end_time,
       room_id: form.room_id || null, notes: form.notes || null, is_published: false,
-    }).select('*, rooms(name), vacant_slot_applications(id, status, cast_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
+    }).select('*, rooms(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
     if (error) { toast.error('登録に失敗しました'); return }
     setSlots([data, ...slots])
     toast.success('空き枠を登録しました')
@@ -60,17 +60,40 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     toast.success(slot.is_published ? '非公開にしました' : '公開しました')
   }
 
+  async function deleteSlot(slot: Slot) {
+    if (!confirm('この空き枠を削除しますか？申請中の仮予定もあわせて削除されます。')) return
+    // 承認待ちの申請に紐づく仮予定（提出済みシフト）は空き枠と一緒に消す
+    const pendingShiftIds = slot.vacant_slot_applications
+      .filter(a => a.status === 'pending' && a.shift_id)
+      .map(a => a.shift_id!)
+    if (pendingShiftIds.length > 0) {
+      await supabase.from('shifts').delete().in('id', pendingShiftIds)
+    }
+    const { error } = await supabase.from('vacant_slots').delete().eq('id', slot.id)
+    if (error) { toast.error('削除に失敗しました'); return }
+    setSlots(slots.filter(s => s.id !== slot.id))
+    toast.success('空き枠を削除しました')
+  }
+
   async function handleApplication(appId: string, slotId: string, castId: string, approve: boolean) {
     const updates: { status: 'approved' | 'rejected'; reviewed_at: string } = { status: approve ? 'approved' : 'rejected', reviewed_at: new Date().toISOString() }
     const { error: e1 } = await supabase.from('vacant_slot_applications').update(updates).eq('id', appId)
     if (e1) { toast.error('処理に失敗しました'); return }
 
     const slot = slots.find(s => s.id === slotId)
-    if (approve && slot) {
-      await supabase.from('shifts').insert({
-        cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
-        date: slot.date, start_time: slot.start_time, end_time: slot.end_time, status: 'confirmed',
-      })
+    const app = slot?.vacant_slot_applications.find(a => a.id === appId)
+    if (approve) {
+      if (app?.shift_id) {
+        // 申請時に作成済みの仮予定（提出済み）を確定に切り替える
+        await supabase.from('shifts').update({ status: 'confirmed' }).eq('id', app.shift_id)
+      } else if (slot) {
+        await supabase.from('shifts').insert({
+          cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
+          date: slot.date, start_time: slot.start_time, end_time: slot.end_time, status: 'confirmed',
+        })
+      }
+    } else if (app?.shift_id) {
+      await supabase.from('shifts').delete().eq('id', app.shift_id)
     }
     setSlots(slots.map(s => s.id === slotId ? {
       ...s,
@@ -101,11 +124,12 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
               <TableHead>ルーム</TableHead>
               <TableHead>公開</TableHead>
               <TableHead>申請</TableHead>
+              <TableHead className="text-right">操作</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {slots.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">空き枠がありません</TableCell></TableRow>
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">空き枠がありません</TableCell></TableRow>
             )}
             {slots.map(slot => (
               <Fragment key={slot.id}>
@@ -118,6 +142,11 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                   </TableCell>
                   <TableCell>
                     <Badge variant="outline">{slot.vacant_slot_applications.filter(a => a.status === 'pending').length} 件待ち</Badge>
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button size="icon" variant="ghost" onClick={() => deleteSlot(slot)} aria-label="削除">
+                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    </Button>
                   </TableCell>
                 </TableRow>
                 {slot.vacant_slot_applications.filter(a => a.status === 'pending').map(app => (

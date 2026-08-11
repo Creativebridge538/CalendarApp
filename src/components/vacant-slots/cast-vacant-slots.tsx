@@ -11,8 +11,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { sendPushNotification } from '@/lib/push'
 
-interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; rooms: { name: string } | null }
-interface Application { vacant_slot_id: string; status: string }
+interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; room_id: string | null; rooms: { name: string } | null }
+interface Application { vacant_slot_id: string; status: string; shift_id: string | null }
 
 interface Props {
   slots: Slot[]
@@ -30,19 +30,31 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
   }
 
   async function cancelApplication(slotId: string) {
+    const app = applications.find(a => a.vacant_slot_id === slotId)
     const { error } = await supabase.from('vacant_slot_applications').delete()
       .eq('vacant_slot_id', slotId).eq('cast_id', castId)
     if (error) { toast.error('取消に失敗しました'); return }
+    if (app?.shift_id) await supabase.from('shifts').delete().eq('id', app.shift_id)
     setApplications(applications.filter(a => a.vacant_slot_id !== slotId))
     toast.success('申請を取り消しました')
   }
 
   async function apply(slotId: string) {
-    const { error } = await supabase.from('vacant_slot_applications').insert({ vacant_slot_id: slotId, cast_id: castId })
-    if (error) { toast.error('申請に失敗しました'); return }
-    setApplications([...applications, { vacant_slot_id: slotId, status: 'pending' }])
-    toast.success('申請しました')
     const slot = slots.find(s => s.id === slotId)
+    if (!slot) return
+
+    // 申請した時点でキャストのカレンダーにも仮予定（提出済み扱い）として反映する
+    const { data: shift, error: shiftError } = await supabase.from('shifts').insert({
+      cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
+      date: slot.date, start_time: slot.start_time, end_time: slot.end_time,
+      status: 'submitted', notes: '空き枠への応募',
+    }).select('id').single()
+    if (shiftError) { toast.error('申請に失敗しました'); return }
+
+    const { error } = await supabase.from('vacant_slot_applications').insert({ vacant_slot_id: slotId, cast_id: castId, shift_id: shift.id })
+    if (error) { toast.error('申請に失敗しました'); await supabase.from('shifts').delete().eq('id', shift.id); return }
+    setApplications([...applications, { vacant_slot_id: slotId, status: 'pending', shift_id: shift.id }])
+    toast.success('申請しました')
     const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
     if (admins?.length && slot) {
       const title = '空き枠申請が届きました'

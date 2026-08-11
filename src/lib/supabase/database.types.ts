@@ -853,6 +853,7 @@ export type Database = {
           id: string
           reviewed_at: string | null
           reviewed_by: string | null
+          shift_id: string | null
           status: Database["public"]["Enums"]["request_status"]
           vacant_slot_id: string
         }
@@ -862,6 +863,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          shift_id?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           vacant_slot_id: string
         }
@@ -871,6 +873,7 @@ export type Database = {
           id?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
+          shift_id?: string | null
           status?: Database["public"]["Enums"]["request_status"]
           vacant_slot_id?: string
         }
@@ -887,6 +890,13 @@ export type Database = {
             columns: ["reviewed_by"]
             isOneToOne: false
             referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "vacant_slot_applications_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
             referencedColumns: ["id"]
           },
           {

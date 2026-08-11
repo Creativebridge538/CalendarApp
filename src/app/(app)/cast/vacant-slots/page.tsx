@@ -20,7 +20,7 @@ export default async function CastVacantSlotsPage() {
       .gte('date', new Date().toISOString().split('T')[0])
       .order('date'),
     supabase.from('vacant_slot_applications')
-      .select('vacant_slot_id, status')
+      .select('vacant_slot_id, status, shift_id')
       .eq('cast_id', user.id),
   ])
 

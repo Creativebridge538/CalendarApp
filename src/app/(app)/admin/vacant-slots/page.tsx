@@ -13,7 +13,7 @@ export default async function VacantSlotsPage() {
 
   const [{ data: slots }, { data: rooms }] = await Promise.all([
     supabase.from('vacant_slots')
-      .select('*, rooms(name), vacant_slot_applications(id, status, cast_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))')
+      .select('*, rooms(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))')
       .eq('store_id', storeId).order('date', { ascending: false }).limit(50),
     supabase.from('rooms').select('id, name').eq('store_id', storeId).eq('is_active', true),
   ])
