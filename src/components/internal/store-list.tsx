@@ -155,7 +155,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
       </Card>
 
       <Dialog open={!!renameTarget} onOpenChange={open => { if (!open) setRenameTarget(null) }}>
-        <DialogContent>
+        <DialogContent sidebarOffset={false}>
           <DialogHeader><DialogTitle>店舗名を編集</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
@@ -171,7 +171,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
       </Dialog>
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-        <DialogContent>
+        <DialogContent sidebarOffset={false}>
           <DialogHeader><DialogTitle>新規店舗を作成</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
