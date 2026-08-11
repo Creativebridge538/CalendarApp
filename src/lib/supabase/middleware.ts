@@ -23,7 +23,7 @@ export async function updateSession(request: NextRequest) {
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const { data: { user }, error } = await supabase.auth.getUser()
 
   const { pathname } = request.nextUrl
 
@@ -32,8 +32,13 @@ export async function updateSession(request: NextRequest) {
     || pathname.startsWith('/auth/')
     || pathname === '/api/auth/resolve-login-id'
 
-  // 未認証ユーザーを /login にリダイレクト
-  if (!user && !isPublicPath) {
+  // Supabase側の一時的な通信エラー（ネットワーク断・タイムアウト等）でセッションが
+  // 無効と誤判定され、実際にはログイン中のユーザーが強制的にログイン画面に飛ばされる
+  // ことがあった。トークン自体が無効/期限切れという明確なエラーの時だけログアウト扱いにする
+  const isDefiniteAuthError = !!error && error.status !== undefined && error.status >= 400 && error.status < 500
+
+  // 未認証ユーザーを /login にリダイレクト（一時的な通信エラーの場合はリダイレクトしない）
+  if (!user && !isPublicPath && (!error || isDefiniteAuthError)) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
