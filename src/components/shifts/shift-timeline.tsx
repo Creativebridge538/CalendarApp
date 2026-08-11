@@ -36,11 +36,17 @@ const DATE_W = 76
 const ROW_H = 44
 const HEADER_H = 32
 
-const CAST_COLORS = [
-  '#60a5fa', '#a78bfa', '#f472b6', '#34d399',
-  '#fbbf24', '#22d3ee', '#fb923c', '#818cf8',
-  '#4ade80', '#f87171', '#c084fc', '#38bdf8',
-]
+// カレンダー表示と同じ配色（ステータスの意味を画面間で揃える）
+const STATUS_COLOR: Record<ShiftStatus, string> = {
+  draft: 'var(--status-draft)',
+  submitted: 'var(--status-submitted)',
+  confirmed: 'var(--status-confirmed)',
+  rejected: 'var(--status-rejected)',
+  modification_requested: 'var(--status-modification-requested)',
+}
+const STATUS_LABEL: Record<ShiftStatus, string> = {
+  draft: '下書き', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し', modification_requested: '修正依頼中',
+}
 
 function timeToHours(t: string): number {
   const [h, m] = t.split(':').map(Number)
@@ -88,8 +94,6 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
     () => eachDayOfInterval({ start: startDate, end: addDays(startDate, 6) }),
     [startDate]
   )
-
-  const castIds = useMemo(() => [...new Set(shifts.map(s => s.cast_id))], [shifts])
 
   const totalWidth = DATE_W + hourCount * HOUR_W
 
@@ -199,21 +203,17 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                     const width = right - left - 2
                     if (width <= 0) return null
 
-                    const colorIdx = castIds.indexOf(shift.cast_id)
-                    const color = CAST_COLORS[colorIdx >= 0 ? colorIdx % CAST_COLORS.length : 0]
-
                     return (
                       <button
                         key={shift.id}
                         type="button"
                         onClick={() => onShiftClick?.(shift.id)}
-                        title={`${shift.cast?.display_name ?? '?'}  ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)}`}
+                        title={`${shift.cast?.display_name ?? '?'}  ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} ${STATUS_LABEL[shift.status]}`}
                         className={cn(
                           'absolute top-1.5 bottom-1.5 rounded text-white text-xs flex items-center px-1.5 overflow-hidden select-none text-left',
                           onShiftClick ? 'cursor-pointer hover:brightness-110' : 'cursor-default',
-                          shift.status !== 'confirmed' && 'opacity-60',
                         )}
-                        style={{ left, width, backgroundColor: color }}
+                        style={{ left, width, backgroundColor: STATUS_COLOR[shift.status] }}
                       >
                         <span className="truncate font-medium">{shift.cast?.display_name ?? '?'}</span>
                       </button>
