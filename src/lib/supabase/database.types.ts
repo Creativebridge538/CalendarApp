@@ -329,6 +329,7 @@ export type Database = {
           store_id: string
           updated_at: string
           usd_amount: number | null
+          worked_hours: number | null
         }
         Insert: {
           amount?: number
@@ -350,6 +351,7 @@ export type Database = {
           store_id: string
           updated_at?: string
           usd_amount?: number | null
+          worked_hours?: number | null
         }
         Update: {
           amount?: number
@@ -371,6 +373,7 @@ export type Database = {
           store_id?: string
           updated_at?: string
           usd_amount?: number | null
+          worked_hours?: number | null
         }
         Relationships: [
           {

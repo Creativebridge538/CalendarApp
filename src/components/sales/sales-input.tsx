@@ -21,14 +21,9 @@ interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
   platform: string; raw_units: number | string | null
   is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
-  shift_id: string | null
+  worked_hours: number | string | null
   bonus: number | string; deduction: number | string
   cast: { display_name: string | null } | null
-}
-
-interface ShiftOption {
-  id: string; cast_id: string; date: string; start_time: string; end_time: string
-  rooms: { name: string } | null
 }
 
 interface Props {
@@ -37,7 +32,6 @@ interface Props {
   storeId: string
   userId: string
   storeSettings: { usd_jpy_rate: number | null; platform_settings: unknown } | null
-  shifts: ShiftOption[]
   year: number
   month: number
 }
@@ -56,13 +50,13 @@ function effectiveRewardRate(sale: Pick<Sale, 'is_daily_payment' | 'reward_rate_
   return sale.is_daily_payment && sale.reward_rate_override != null ? Number(sale.reward_rate_override) : castRewardRate
 }
 
-export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, shifts, year, month }: Props) {
+export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month }: Props) {
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
     amount: '', raw_units: '',
     is_daily_payment: false, rate_override: '', reward_rate_override: '',
-    notes: '', shift_id: '', bonus: '', deduction: '',
+    notes: '', worked_hours: '', bonus: '', deduction: '',
   }), [year, month])
   const [sales, setSales] = useState(initialSales)
   const [form, setForm] = useState(emptyForm)
@@ -77,17 +71,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     for (const c of casts) map[c.id] = Number(c.reward_rate)
     return map
   }, [casts])
-
-  const shiftById = useMemo(() => {
-    const map: Record<string, ShiftOption> = {}
-    for (const s of shifts) map[s.id] = s
-    return map
-  }, [shifts])
-
-  const candidateShifts = useMemo(() => {
-    if (!form.cast_id || !form.date) return []
-    return shifts.filter(s => s.cast_id === form.cast_id && s.date === form.date)
-  }, [shifts, form.cast_id, form.date])
 
   const monthlyTotal = useMemo(() => sales.reduce((sum, s) => sum + Number(s.amount), 0), [sales])
   const monthlyRewardTotal = useMemo(() => sales.reduce((sum, s) => {
@@ -125,7 +108,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       rate_override: form.is_daily_payment && isPlatform && form.rate_override ? parseFloat(form.rate_override) : null,
       reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) / 100 : null,
       notes: form.notes || null,
-      shift_id: form.shift_id || null,
+      worked_hours: form.worked_hours ? parseFloat(form.worked_hours) : null,
       bonus: form.bonus ? parseInt(form.bonus) : 0,
       deduction: form.deduction ? parseInt(form.deduction) : 0,
       store_id: storeId,
@@ -168,14 +151,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
       reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
       notes: sale.notes ?? '',
-      shift_id: sale.shift_id ?? '',
+      worked_hours: sale.worked_hours != null ? String(sale.worked_hours) : '',
       bonus: Number(sale.bonus) ? String(sale.bonus) : '',
       deduction: Number(sale.deduction) ? String(sale.deduction) : '',
     })
-  }
-
-  function shiftLabel(s: ShiftOption): string {
-    return `${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)}${s.rooms?.name ? ` ・ ${s.rooms.name}` : ''}`
   }
 
   return (
@@ -205,7 +184,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div className="space-y-1.5">
               <Label>キャスト *</Label>
-              <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v, shift_id: '' }) }}>
+              <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
                 <SelectTrigger>
                   <SelectValue placeholder="選択">
                     {form.cast_id ? (casts.find(c => c.id === form.cast_id)?.display_name ?? form.cast_id) : undefined}
@@ -218,7 +197,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             </div>
             <div className="space-y-1.5">
               <Label>日付 *</Label>
-              <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value, shift_id: '' })} />
+              <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
             </div>
             <div className="space-y-1.5">
               <Label>プラットフォーム</Label>
@@ -243,22 +222,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 <Input type="number" min="0" value={form.raw_units} onChange={e => setForm({ ...form, raw_units: e.target.value })} placeholder="0" />
               </div>
             )}
-            {candidateShifts.length > 0 && (
-              <div className="space-y-1.5 col-span-2 md:col-span-4">
-                <Label>紐づくシフト</Label>
-                <Select value={form.shift_id || 'none'} onValueChange={v => { if (v) setForm({ ...form, shift_id: v === 'none' ? '' : v }) }}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="紐付けなし">
-                      {form.shift_id ? shiftLabel(shiftById[form.shift_id]) : '紐付けなし'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent alignItemWithTrigger={false}>
-                    <SelectItem value="none">紐付けなし</SelectItem>
-                    {candidateShifts.map(s => <SelectItem key={s.id} value={s.id}>{shiftLabel(s)}</SelectItem>)}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label>稼働時間（時間）</Label>
+              <Input type="number" min="0" step="0.25" value={form.worked_hours} onChange={e => setForm({ ...form, worked_hours: e.target.value })} placeholder="0" />
+            </div>
             <div className="space-y-1.5">
               <Label>ボーナス（円）</Label>
               <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
@@ -319,7 +286,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <TableRow>
                 <TableHead>日付</TableHead>
                 <TableHead>キャスト</TableHead>
-                <TableHead>シフト</TableHead>
+                <TableHead>稼働時間</TableHead>
                 <TableHead>プラットフォーム</TableHead>
                 <TableHead className="text-right">売上</TableHead>
                 <TableHead className="text-right">女子給</TableHead>
@@ -332,7 +299,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">売上データがありません</TableCell></TableRow>
               )}
               {sales.map(sale => {
-                const linkedShift = sale.shift_id ? shiftById[sale.shift_id] : undefined
                 const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
@@ -340,7 +306,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <TableCell>{format(new Date(sale.date), 'M/d(E)', { locale: ja })}</TableCell>
                     <TableCell>{sale.cast?.display_name ?? '—'}</TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
-                      {linkedShift ? shiftLabel(linkedShift) : '—'}
+                      {sale.worked_hours != null ? `${Number(sale.worked_hours)}h` : '—'}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 flex-wrap">

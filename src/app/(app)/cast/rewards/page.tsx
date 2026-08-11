@@ -29,7 +29,7 @@ export default async function CastRewardsPage() {
 
   const [{ data: sales }, { data: shifts }, { data: reward }, { data: settings }, { data: checklistItems }] =
     await Promise.all([
-      supabase.from('sales').select('date, amount, platform, is_daily_payment')
+      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours')
         .eq('cast_id', user.id).gte('date', sixtyDaysAgo).lte('date', today).order('date'),
       supabase.from('shifts').select('date, start_time, end_time, admin_note, checklist_answers, status')
         .eq('cast_id', user.id).gte('date', monthStart).lte('date', monthEnd),
@@ -57,6 +57,15 @@ export default async function CastRewardsPage() {
   const hoursByDate = new Map<string, number>()
   for (const s of shiftsList) {
     hoursByDate.set(s.date, (hoursByDate.get(s.date) ?? 0) + shiftHours(s.start_time, s.end_time))
+  }
+  // 売上入力時に管理者が稼働時間を入力していれば、シフトの時間より優先して反映する
+  const workedHoursByDate = new Map<string, number>()
+  for (const s of salesList) {
+    if (s.worked_hours == null) continue
+    workedHoursByDate.set(s.date, (workedHoursByDate.get(s.date) ?? 0) + Number(s.worked_hours))
+  }
+  for (const [date, hours] of workedHoursByDate.entries()) {
+    hoursByDate.set(date, hours)
   }
 
   // 当月カレンダーグリッド（日曜始まり、前後の月の空白セルも含む）
@@ -91,8 +100,9 @@ export default async function CastRewardsPage() {
 
   // 出勤日数・時間は「実際に出勤し終えたもの」だけを対象にする（未来日・未確定のシフトは予定でしかないため除外）
   const attendedShiftsThisMonth = shiftsList.filter(s => s.date <= today && s.status === 'confirmed')
-  const attendanceDaysThisMonth = new Set(attendedShiftsThisMonth.map(s => s.date)).size
-  const totalHoursThisMonth = attendedShiftsThisMonth.reduce((sum, s) => sum + shiftHours(s.start_time, s.end_time), 0)
+  const attendedDatesThisMonth = new Set(attendedShiftsThisMonth.map(s => s.date))
+  const attendanceDaysThisMonth = attendedDatesThisMonth.size
+  const totalHoursThisMonth = [...attendedDatesThisMonth].reduce((sum, date) => sum + (hoursByDate.get(date) ?? 0), 0)
 
   // 今月のプラットフォーム別内訳
   const platformBreakdownMap = new Map<string, number>()
