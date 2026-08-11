@@ -15,6 +15,8 @@ import {
   type PlatformKey, type PlatformSettings,
 } from '@/lib/platform-earnings'
 
+const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+
 const THEMES = [
   {
     id: 'default',
@@ -347,7 +349,12 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
         <CardContent className="space-y-4">
           <div className="space-y-1.5">
             <Label>締切タイプ</Label>
-            <Select value={deadlineType} onValueChange={v => { if (v) setDeadlineType(v) }}>
+            <Select value={deadlineType} onValueChange={v => {
+              if (!v) return
+              setDeadlineType(v)
+              if (v === 'monthly' && Number(deadlineDay) > 31) setDeadlineDay('25')
+              if (v === 'weekly' && Number(deadlineDay) > 6) setDeadlineDay('5')
+            }}>
               <SelectTrigger>
                 <SelectValue>
                   {{ monthly: '月次（毎月X日）', weekly: '週次（毎週X曜日）', none: '締切なし' }[deadlineType] ?? deadlineType}
@@ -363,9 +370,31 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
           {deadlineType !== 'none' && (
             <>
               <div className="space-y-1.5">
-                <Label>{deadlineType === 'monthly' ? '締切日（1〜31）' : '締切曜日（0=日〜6=土）'}</Label>
-                <Input type="number" min={0} max={deadlineType === 'monthly' ? 31 : 6}
-                  value={deadlineDay} onChange={e => setDeadlineDay(e.target.value)} />
+                <Label>締切{deadlineType === 'monthly' ? '日' : '曜日'}</Label>
+                {deadlineType === 'monthly' ? (
+                  <Select value={deadlineDay} onValueChange={v => { if (v) setDeadlineDay(v) }}>
+                    <SelectTrigger><SelectValue>{`毎月${deadlineDay}日`}</SelectValue></SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                        <SelectItem key={d} value={String(d)}>{d}日</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select value={deadlineDay} onValueChange={v => { if (v) setDeadlineDay(v) }}>
+                    <SelectTrigger><SelectValue>{WEEKDAY_LABELS[Number(deadlineDay)]}曜日</SelectValue></SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {WEEKDAY_LABELS.map((label, i) => (
+                        <SelectItem key={i} value={String(i)}>{label}曜日</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  {deadlineType === 'monthly'
+                    ? `毎月${deadlineDay}日になった時点で、その月が終わるまでシフトの新規提出・編集ができなくなります（翌月1日にリセット）`
+                    : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日になった時点で、その週の土曜まで新規提出・編集ができなくなります（次の日曜にリセット）`}
+                </p>
               </div>
               <div className="flex items-center justify-between">
                 <div>
