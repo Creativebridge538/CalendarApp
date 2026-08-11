@@ -224,7 +224,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
     <>
       {/* デスクトップ サイドバー */}
       <aside
-        className={cn('hidden md:flex w-56 shrink-0 border-r flex-col h-dvh sticky top-0', s.border)}
+        className={cn('hidden md:flex w-56 shrink-0 border-r flex-col h-svh sticky top-0', s.border)}
         style={s.sidebar}
       >
         <div className={cn('px-4 py-4 border-b', s.border)}>
