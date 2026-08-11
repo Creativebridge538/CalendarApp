@@ -89,10 +89,10 @@ export default async function CastRewardsPage() {
   const workedDaysThisMonth = [...salesByDate.keys()].filter(d => d >= monthStart && d <= monthEnd).length
   const avgPerWorkedDay = workedDaysThisMonth > 0 ? Math.round(thisMonthTotal / workedDaysThisMonth) : 0
 
-  // 出勤日数・件数・時間はシフト実績ベース（売上が未入力の日も含む）
-  const attendanceDaysThisMonth = new Set(shiftsList.map(s => s.date)).size
-  const shiftCountThisMonth = shiftsList.length
-  const totalHoursThisMonth = shiftsList.reduce((sum, s) => sum + shiftHours(s.start_time, s.end_time), 0)
+  // 出勤日数・時間は「実際に出勤し終えたもの」だけを対象にする（未来日・未確定のシフトは予定でしかないため除外）
+  const attendedShiftsThisMonth = shiftsList.filter(s => s.date <= today && s.status === 'confirmed')
+  const attendanceDaysThisMonth = new Set(attendedShiftsThisMonth.map(s => s.date)).size
+  const totalHoursThisMonth = attendedShiftsThisMonth.reduce((sum, s) => sum + shiftHours(s.start_time, s.end_time), 0)
 
   // 今月のプラットフォーム別内訳
   const platformBreakdownMap = new Map<string, number>()
@@ -184,7 +184,6 @@ export default async function CastRewardsPage() {
         calendarDays={calendarDays}
         avgPerWorkedDay={avgPerWorkedDay}
         attendanceDaysThisMonth={attendanceDaysThisMonth}
-        shiftCountThisMonth={shiftCountThisMonth}
         totalHoursThisMonth={totalHoursThisMonth}
         platformBreakdown={platformBreakdown}
         trend={trend}

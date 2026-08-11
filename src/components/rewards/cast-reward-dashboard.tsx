@@ -41,7 +41,6 @@ interface Props {
   calendarDays: { date: string | null; day: number | null; amount: number; hours: number; isToday: boolean }[]
   avgPerWorkedDay: number
   attendanceDaysThisMonth: number
-  shiftCountThisMonth: number
   totalHoursThisMonth: number
   platformBreakdown: { platform: string; amount: number }[]
   trend: { date: string; amount: number }[]
@@ -73,7 +72,7 @@ const WEEKDAY_HEADS = ['日', '月', '火', '水', '木', '金', '土']
 export function CastRewardDashboard({
   userId, monthLabel, year, month, thisMonthTotal, prevMonthToDateTotal, monthlyGoal: initialGoal,
   calendarDays, avgPerWorkedDay,
-  attendanceDaysThisMonth, shiftCountThisMonth, totalHoursThisMonth, platformBreakdown,
+  attendanceDaysThisMonth, totalHoursThisMonth, platformBreakdown,
   trend, weekday, dayDetails, usdJpyRate, finalizedReward,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'calendar' | 'report'>('calendar')
@@ -163,7 +162,7 @@ export function CastRewardDashboard({
             >
               <GoalRing percent={goalProgress ?? 0} size={44} stroke={4} textClassName="text-[10px] font-bold" />
               <div className="text-[10px] text-muted-foreground text-left leading-tight">
-                <p className="tabular-nums whitespace-nowrap">出勤{attendanceDaysThisMonth}日・{shiftCountThisMonth}件・{totalHoursThisMonth.toFixed(1)}h</p>
+                <p className="tabular-nums whitespace-nowrap">出勤{attendanceDaysThisMonth}日・{totalHoursThisMonth.toFixed(1)}h</p>
                 <p className="flex items-center gap-0.5 whitespace-nowrap">
                   {monthlyGoal ? `目標 ¥${monthlyGoal.toLocaleString()}` : '目標未設定'}
                   <Pencil className="h-2.5 w-2.5 shrink-0" style={{ color: 'var(--brand-accent)' }} />
