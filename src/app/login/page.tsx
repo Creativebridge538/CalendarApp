@@ -1,7 +1,6 @@
 'use client'
 
 import { useState } from 'react'
-import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,7 +25,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
-  const router = useRouter()
   const supabase = createClient()
 
   async function handleLogin(e: React.FormEvent) {
@@ -49,8 +47,11 @@ export default function LoginPage() {
       return
     }
 
-    router.push('/dashboard')
-    router.refresh()
+    // Next.jsのソフト遷移だと、iOSのPWAでパスワード欄のあるこの画面から抜けた直後、
+    // セーフエリア（ステータスバー分の余白）の再計算が古いまま引き継がれ、
+    // 一時的にコンテンツがステータスバーの裏に潜り込むことがある。
+    // ここだけは完全なページ読み込みにして、iOS側にまっさらな状態から計算させる
+    window.location.href = '/dashboard'
   }
 
   async function handleResetPassword() {
