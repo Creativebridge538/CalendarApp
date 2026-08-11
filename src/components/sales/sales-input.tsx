@@ -22,6 +22,7 @@ interface Sale {
   platform: string; raw_units: number | string | null
   is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
   shift_id: string | null
+  bonus: number | string; deduction: number | string
   cast: { display_name: string | null } | null
 }
 
@@ -61,7 +62,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     platform: 'manual' as 'manual' | PlatformKey,
     amount: '', raw_units: '',
     is_daily_payment: false, rate_override: '', reward_rate_override: '',
-    notes: '', shift_id: '',
+    notes: '', shift_id: '', bonus: '', deduction: '',
   }), [year, month])
   const [sales, setSales] = useState(initialSales)
   const [form, setForm] = useState(emptyForm)
@@ -91,7 +92,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const monthlyTotal = useMemo(() => sales.reduce((sum, s) => sum + Number(s.amount), 0), [sales])
   const monthlyRewardTotal = useMemo(() => sales.reduce((sum, s) => {
     const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0)
-    return sum + Math.floor(Number(s.amount) * rate)
+    return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction)
   }, 0), [sales, castRewardRateById])
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
@@ -125,6 +126,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) / 100 : null,
       notes: form.notes || null,
       shift_id: form.shift_id || null,
+      bonus: form.bonus ? parseInt(form.bonus) : 0,
+      deduction: form.deduction ? parseInt(form.deduction) : 0,
       store_id: storeId,
       created_by: userId,
     }
@@ -166,6 +169,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
       notes: sale.notes ?? '',
       shift_id: sale.shift_id ?? '',
+      bonus: Number(sale.bonus) ? String(sale.bonus) : '',
+      deduction: Number(sale.deduction) ? String(sale.deduction) : '',
     })
   }
 
@@ -254,6 +259,14 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 </Select>
               </div>
             )}
+            <div className="space-y-1.5">
+              <Label>ボーナス（円）</Label>
+              <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>控除（円）</Label>
+              <Input type="number" min="0" value={form.deduction} onChange={e => setForm({ ...form, deduction: e.target.value })} placeholder="0" />
+            </div>
             <div className="space-y-1.5 col-span-2 md:col-span-4">
               <Label>備考</Label>
               <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
@@ -320,7 +333,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               )}
               {sales.map(sale => {
                 const linkedShift = sale.shift_id ? shiftById[sale.shift_id] : undefined
-                const reward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
+                const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
+                const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
                   <TableRow key={sale.id}>
                     <TableCell>{format(new Date(sale.date), 'M/d(E)', { locale: ja })}</TableCell>
@@ -335,7 +349,16 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                       </div>
                     </TableCell>
                     <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
-                    <TableCell className="text-right">¥{reward.toLocaleString()}</TableCell>
+                    <TableCell className="text-right">
+                      ¥{reward.toLocaleString()}
+                      {(Number(sale.bonus) > 0 || Number(sale.deduction) > 0) && (
+                        <span className="block text-[10px] text-muted-foreground">
+                          {Number(sale.bonus) > 0 && `+¥${Number(sale.bonus).toLocaleString()}`}
+                          {Number(sale.bonus) > 0 && Number(sale.deduction) > 0 && ' '}
+                          {Number(sale.deduction) > 0 && `-¥${Number(sale.deduction).toLocaleString()}`}
+                        </span>
+                      )}
+                    </TableCell>
                     <TableCell>{sale.notes ?? '—'}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button size="icon" variant="ghost" onClick={() => startEdit(sale)}><Pencil className="h-3.5 w-3.5" /></Button>

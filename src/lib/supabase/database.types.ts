@@ -311,10 +311,12 @@ export type Database = {
       sales: {
         Row: {
           amount: number
+          bonus: number
           cast_id: string
           created_at: string
           created_by: string | null
           date: string
+          deduction: number
           fx_rate_snapshot: number | null
           id: string
           is_daily_payment: boolean
@@ -330,10 +332,12 @@ export type Database = {
         }
         Insert: {
           amount?: number
+          bonus?: number
           cast_id: string
           created_at?: string
           created_by?: string | null
           date: string
+          deduction?: number
           fx_rate_snapshot?: number | null
           id?: string
           is_daily_payment?: boolean
@@ -349,10 +353,12 @@ export type Database = {
         }
         Update: {
           amount?: number
+          bonus?: number
           cast_id?: string
           created_at?: string
           created_by?: string | null
           date?: string
+          deduction?: number
           fx_rate_snapshot?: number | null
           id?: string
           is_daily_payment?: boolean

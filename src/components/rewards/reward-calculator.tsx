@@ -43,7 +43,7 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
     const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
     const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
     const { data: salesData } = await supabase.from('sales')
-      .select('amount, is_daily_payment, reward_rate_override')
+      .select('amount, is_daily_payment, reward_rate_override, bonus, deduction')
       .eq('cast_id', cast.id)
       .gte('date', monthStart)
       .lte('date', monthEnd)
@@ -57,9 +57,12 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
         return sum + Number(s.amount) * rate
       }, 0)
     )
+    // 売上入力時に日ごとに登録したボーナス・控除を合算し、この画面での手動調整分に上乗せする
+    const salesBonus = (salesData ?? []).reduce((sum, s) => sum + Number(s.bonus), 0)
+    const salesDeduction = (salesData ?? []).reduce((sum, s) => sum + Number(s.deduction), 0)
     const adj = getAdj(cast.id)
-    const bonus = parseInt(adj.bonus) || 0
-    const deduction = parseInt(adj.deduction) || 0
+    const bonus = (parseInt(adj.bonus) || 0) + salesBonus
+    const deduction = (parseInt(adj.deduction) || 0) + salesDeduction
     const totalReward = baseReward + bonus - deduction
 
     const payload = {
