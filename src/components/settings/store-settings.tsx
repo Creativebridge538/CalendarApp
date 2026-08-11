@@ -233,7 +233,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   }
 
   return (
-    <div className="space-y-6 max-w-lg">
+    <div className="space-y-6">
       <Card>
         <CardHeader><CardTitle>店舗情報</CardTitle></CardHeader>
         <CardContent className="space-y-4">
