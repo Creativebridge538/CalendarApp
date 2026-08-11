@@ -215,15 +215,20 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
   }
 
   // iOS PWA: パスワード欄のあるログイン画面からの遷移直後、WebKitがネイティブの
-  // オリジン表示バーを閉じた後にレイアウトの再計算をすぐ行わず、スクロール可能な
-  // main の上部に空白が残ることがある。手動でスクロールすると直ることから、
-  // 遷移直後に強制的に1px分スクロールしてWebKit側の再計算を促す
+  // オリジン表示バーを閉じるアニメーションが終わるまでレイアウトの再計算が走らず、
+  // 一時的に表示がずれることがある（時間が経つ・操作すると自然に直る）。
+  // バーの消去アニメーションのタイミングが正確に分からないため、複数回・時間を空けて
+  // 強制的にスクロール位置をゆらし、WebKit側の再計算を後追いで促す
   useEffect(() => {
-    const main = document.querySelector('main')
-    if (!main) return
-    const top = main.scrollTop
-    main.scrollTop = top + 1
-    requestAnimationFrame(() => { main.scrollTop = top })
+    function nudge() {
+      const main = document.querySelector('main')
+      if (!main) return
+      const top = main.scrollTop
+      main.scrollTop = top + 1
+      requestAnimationFrame(() => { main.scrollTop = top })
+    }
+    const timers = [0, 150, 350, 600, 1000].map(delay => window.setTimeout(nudge, delay))
+    return () => timers.forEach(t => window.clearTimeout(t))
   }, [pathname])
 
   async function handleLogout() {
