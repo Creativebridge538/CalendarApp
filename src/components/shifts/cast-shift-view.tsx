@@ -45,7 +45,7 @@ interface Shift {
 }
 
 interface Settings {
-  deadline_type: string; deadline_day: number; require_approval_after_deadline: boolean
+  deadline_type: string; deadline_day: number; deadline_week_start_day: number; require_approval_after_deadline: boolean
   location_mode: string; area_label: string; room_label: string
 }
 
@@ -246,12 +246,15 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     : null
   // 締切を過ぎたら新規シフトの提出をブロックする。
   // monthly: 毎月deadline_day以降は月末までブロック(翌月1日にリセット)。
-  // weekly: その週のdeadline_day(曜日)〜土曜までブロック(次の日曜にリセット)。
+  // weekly: 週の起点(deadline_week_start_day)からdeadline_day(曜日)以降〜次の起点前日までブロック(次の起点でリセット)。
   const isPastDeadline = (() => {
     if (!settings || settings.deadline_type === 'none') return false
     const now = new Date()
     if (settings.deadline_type === 'monthly') return now.getDate() >= settings.deadline_day
-    if (settings.deadline_type === 'weekly') return now.getDay() >= settings.deadline_day
+    if (settings.deadline_type === 'weekly') {
+      const offsetFromWeekStart = (d: number) => (d - settings.deadline_week_start_day + 7) % 7
+      return offsetFromWeekStart(now.getDay()) >= offsetFromWeekStart(settings.deadline_day)
+    }
     return false
   })()
   const locationMode = settings?.location_mode ?? 'room'

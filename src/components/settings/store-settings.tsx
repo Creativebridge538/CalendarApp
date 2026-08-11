@@ -97,6 +97,7 @@ interface Props {
     id: string
     deadline_type: string
     deadline_day: number
+    deadline_week_start_day: number
     require_approval_after_deadline: boolean
     location_mode: string
     area_label: string
@@ -113,6 +114,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [storeName, setStoreName] = useState(initialStore?.name ?? '')
   const [deadlineType, setDeadlineType] = useState(initialSettings?.deadline_type ?? 'monthly')
   const [deadlineDay, setDeadlineDay] = useState(String(initialSettings?.deadline_day ?? 25))
+  const [deadlineWeekStartDay, setDeadlineWeekStartDay] = useState(String(initialSettings?.deadline_week_start_day ?? 0))
   const [requireApproval, setRequireApproval] = useState(initialSettings?.require_approval_after_deadline ?? true)
   const [locationMode, setLocationMode] = useState(initialSettings?.location_mode ?? 'room')
   const [areaLabel, setAreaLabel] = useState(initialSettings?.area_label ?? 'エリア')
@@ -222,6 +224,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
       store_id: storeId,
       deadline_type: deadlineType as 'monthly' | 'weekly' | 'none',
       deadline_day: parseInt(deadlineDay),
+      deadline_week_start_day: parseInt(deadlineWeekStartDay),
       require_approval_after_deadline: requireApproval,
     }
     if (initialSettings) {
@@ -369,6 +372,19 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
           </div>
           {deadlineType !== 'none' && (
             <>
+              {deadlineType === 'weekly' && (
+                <div className="space-y-1.5">
+                  <Label>週の起点（この曜日にリセット）</Label>
+                  <Select value={deadlineWeekStartDay} onValueChange={v => { if (v) setDeadlineWeekStartDay(v) }}>
+                    <SelectTrigger><SelectValue>{WEEKDAY_LABELS[Number(deadlineWeekStartDay)]}曜日</SelectValue></SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {WEEKDAY_LABELS.map((label, i) => (
+                        <SelectItem key={i} value={String(i)}>{label}曜日</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-1.5">
                 <Label>締切{deadlineType === 'monthly' ? '日' : '曜日'}</Label>
                 {deadlineType === 'monthly' ? (
@@ -393,7 +409,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
                 <p className="text-xs text-muted-foreground">
                   {deadlineType === 'monthly'
                     ? `毎月${deadlineDay}日になった時点で、その月が終わるまでシフトの新規提出・編集ができなくなります（翌月1日にリセット）`
-                    : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日になった時点で、その週の土曜まで新規提出・編集ができなくなります（次の日曜にリセット）`}
+                    : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日になった時点で、${WEEKDAY_LABELS[(Number(deadlineWeekStartDay) + 6) % 7]}曜日まで新規提出・編集ができなくなります（次の${WEEKDAY_LABELS[Number(deadlineWeekStartDay)]}曜日にリセット）`}
                 </p>
               </div>
               <div className="flex items-center justify-between">
