@@ -40,6 +40,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   const [editing, setEditing] = useState<CastUser | null>(null)
   const [form, setForm] = useState({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40', profile_answers: {} as Record<string, string> })
   const [saving, setSaving] = useState(false)
+  const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
   const supabase = createClient()
 
   function toggleSelected(id: string) {
@@ -119,10 +120,22 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   }
 
   async function toggleActive(cast: CastUser) {
-    const { error } = await supabase.from('users').update({ is_active: !cast.is_active }).eq('id', cast.id)
+    // 無効化は影響が大きい（ログイン不可・一覧から外れる）ので確認を挟む。再有効化は即実行してよい
+    if (cast.is_active) { setDeactivateTarget(cast); return }
+    const { error } = await supabase.from('users').update({ is_active: true }).eq('id', cast.id)
     if (error) { toast.error('更新に失敗しました'); return }
-    setCasts(casts.map(c => c.id === cast.id ? { ...c, is_active: !cast.is_active } : c))
-    toast.success(cast.is_active ? '無効にしました' : '有効にしました')
+    setCasts(casts.map(c => c.id === cast.id ? { ...c, is_active: true } : c))
+    toast.success('有効にしました')
+  }
+
+  async function confirmDeactivate() {
+    if (!deactivateTarget) return
+    const cast = deactivateTarget
+    const { error } = await supabase.from('users').update({ is_active: false }).eq('id', cast.id)
+    setDeactivateTarget(null)
+    if (error) { toast.error('更新に失敗しました'); return }
+    setCasts(casts.map(c => c.id === cast.id ? { ...c, is_active: false } : c))
+    toast.success('無効にしました')
   }
 
   return (
@@ -197,11 +210,16 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button size="icon" variant="ghost" onClick={() => openEdit(cast)}>
-                      <Pencil className="h-3.5 w-3.5" />
+                    <Button size="sm" variant="outline" onClick={() => openEdit(cast)}>
+                      <Pencil className="h-3.5 w-3.5 mr-1" />編集
                     </Button>
-                    <Button size="icon" variant="ghost" onClick={() => toggleActive(cast)}>
-                      {cast.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                    <Button
+                      size="sm" variant="outline"
+                      className={cast.is_active ? 'text-destructive' : 'text-positive'}
+                      onClick={() => toggleActive(cast)}
+                    >
+                      {cast.is_active ? <UserX className="h-3.5 w-3.5 mr-1" /> : <UserCheck className="h-3.5 w-3.5 mr-1" />}
+                      {cast.is_active ? '無効化' : '有効化'}
                     </Button>
                   </TableCell>
                 </TableRow>
@@ -324,6 +342,21 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               >
                 {saving ? '保存中...' : '保存'}
               </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!deactivateTarget} onOpenChange={open => { if (!open) setDeactivateTarget(null) }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>キャストを無効化しますか？</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            <p className="text-sm text-muted-foreground">
+              「{deactivateTarget?.display_name ?? '—'}」がログインできなくなり、一覧では「無効」表示になります。後からいつでも再度有効化できます。
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setDeactivateTarget(null)}>キャンセル</Button>
+              <Button variant="destructive" onClick={confirmDeactivate}>無効化する</Button>
             </div>
           </div>
         </DialogContent>
