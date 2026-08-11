@@ -35,7 +35,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const role = profile?.role ?? 'cast'
-  const theme = (settings as { theme?: string } | null)?.theme ?? 'default'
+  // 管理画面は店舗ごとのデザインテーマ選択に関わらず、常に同じ見た目（default）に固定する
+  const theme = role === 'admin' ? 'default' : ((settings as { theme?: string } | null)?.theme ?? 'default')
 
   // キャスト個人の「着せ替え」: ブランドアクセント色とフォントは、それぞれ独立して個人が選択できる（店舗テーマとは別軸）
   const castSkin = role === 'cast' ? getAccentSkin(profile?.accent_skin) : null
