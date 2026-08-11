@@ -251,12 +251,14 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             {casts.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
                 {casts.map(cast => (
-                  <button
+                  <div
                     key={cast.id}
-                    type="button"
+                    role="button"
+                    tabIndex={0}
                     onClick={() => openEdit(cast)}
+                    onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEdit(cast) } }}
                     className={cn(
-                      'relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center hover:bg-accent/40 transition-colors',
+                      'relative flex flex-col items-center gap-1.5 rounded-lg border p-3 text-center hover:bg-accent/40 transition-colors cursor-pointer',
                       !cast.is_active && 'opacity-50'
                     )}
                   >
@@ -291,7 +293,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                       )}
                     </div>
                     <span className="text-sm font-medium truncate w-full">{cast.display_name ?? 'キャスト名'}</span>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
