@@ -37,7 +37,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<CastUser | null>(null)
-  const [form, setForm] = useState({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '0.4', profile_answers: {} as Record<string, string> })
+  const [form, setForm] = useState({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40', profile_answers: {} as Record<string, string> })
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
@@ -62,7 +62,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
 
   function openNew() {
     setEditing(null)
-    setForm({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '0.4', profile_answers: {} })
+    setForm({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40', profile_answers: {} })
     setOpen(true)
   }
 
@@ -75,7 +75,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
       display_name: cast.display_name ?? '',
       real_name: cast.real_name ?? '',
       phone: cast.phone ?? '',
-      reward_rate: String(cast.reward_rate),
+      reward_rate: String(Number(cast.reward_rate) * 100),
       profile_answers: { ...(cast.profile_answers as Record<string, string> | null ?? {}) },
     })
     setOpen(true)
@@ -88,7 +88,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
         const res = await fetch('/api/admin/create-cast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(form),
+          body: JSON.stringify({ ...form, reward_rate: form.reward_rate ? String(parseFloat(form.reward_rate) / 100) : form.reward_rate }),
         })
         const json = await res.json()
         if (!res.ok) { toast.error(json.error ?? '作成に失敗しました'); return }
@@ -99,7 +99,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           display_name: form.display_name,
           real_name: form.real_name || null,
           phone: form.phone || null,
-          reward_rate: parseFloat(form.reward_rate),
+          reward_rate: parseFloat(form.reward_rate) / 100,
           profile_answers: form.profile_answers,
           login_id: form.login_id,
         }
@@ -292,16 +292,19 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="090-xxxx-xxxx" />
             </div>
             <div className="space-y-1.5">
-              <Label>報酬率（0〜1）</Label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                max="1"
-                value={form.reward_rate}
-                onChange={e => setForm({ ...form, reward_rate: e.target.value })}
-              />
-              <p className="text-xs text-muted-foreground">例: 0.40 = 40%</p>
+              <Label>報酬率（%）</Label>
+              <div className="relative">
+                <Input
+                  type="number"
+                  step="1"
+                  min="0"
+                  max="100"
+                  className="pr-8"
+                  value={form.reward_rate}
+                  onChange={e => setForm({ ...form, reward_rate: e.target.value })}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
             </div>
             {editing && profileFields.map(field => (
               <div key={field.id} className="space-y-1.5">

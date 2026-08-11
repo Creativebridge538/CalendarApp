@@ -122,7 +122,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       fx_rate_snapshot: isPlatform ? usdJpyRate : null,
       is_daily_payment: form.is_daily_payment,
       rate_override: form.is_daily_payment && isPlatform && form.rate_override ? parseFloat(form.rate_override) : null,
-      reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) : null,
+      reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) / 100 : null,
       notes: form.notes || null,
       shift_id: form.shift_id || null,
       store_id: storeId,
@@ -163,7 +163,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
       is_daily_payment: sale.is_daily_payment,
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
-      reward_rate_override: sale.reward_rate_override != null ? String(sale.reward_rate_override) : '',
+      reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
       notes: sale.notes ?? '',
       shift_id: sale.shift_id ?? '',
     })
@@ -281,8 +281,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   </div>
                 )}
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground font-normal">報酬率上書き（0〜1）</Label>
-                  <Input type="number" min="0" max="1" step="0.01" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
+                  <Label className="text-xs text-muted-foreground font-normal">報酬率上書き（%）</Label>
+                  <div className="relative">
+                    <Input type="number" min="0" max="100" step="1" className="pr-8" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                  </div>
                 </div>
               </div>
             )}
