@@ -134,22 +134,22 @@ export function CastRewardDashboard({
       </div>
 
       <Card elevated>
-        <CardContent className="pt-4 space-y-2">
-          <div className="flex items-start justify-between gap-3">
+        <CardContent className="pt-3 space-y-1.5">
+          <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
               <p className="text-xs text-muted-foreground">{month}月ここまで</p>
               <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-                <p className="text-3xl font-extrabold tabular-nums">¥{animatedTotal.toLocaleString()}</p>
+                <p className="text-2xl font-extrabold tabular-nums">¥{animatedTotal.toLocaleString()}</p>
                 <button
                   type="button"
                   onClick={() => setBreakdownOpen(true)}
-                  className="text-xs font-medium rounded-full border px-2.5 py-1 shrink-0 hover:bg-muted transition-colors"
+                  className="text-xs font-medium rounded-full border px-2 py-0.5 shrink-0 hover:bg-muted transition-colors"
                 >
                   内訳
                 </button>
               </div>
               {prevMonthDelta != null && (
-                <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1">
+                <p className="text-[11px] text-muted-foreground mt-0.5 flex items-center gap-1">
                   {prevMonthDelta > 0.5 ? <TrendingUp className="h-3 w-3 text-positive" /> : prevMonthDelta < -0.5 ? <TrendingDown className="h-3 w-3 text-destructive" /> : <Minus className="h-3 w-3" />}
                   先月の同じ日まで {prevMonthDelta > 0 ? '+' : ''}{prevMonthDelta.toFixed(1)}%
                 </p>
@@ -159,25 +159,25 @@ export function CastRewardDashboard({
             <button
               type="button"
               onClick={() => { setGoalInput(monthlyGoal != null ? String(monthlyGoal) : ''); setGoalOpen(true) }}
-              className="flex flex-col items-center shrink-0"
+              className="flex items-center gap-2 shrink-0"
             >
-              <GoalRing percent={goalProgress ?? 0} size={56} stroke={5} textClassName="text-xs font-bold" />
-              <div className="text-[10px] text-muted-foreground text-center mt-1 space-y-0">
-                <p className="tabular-nums">出勤{attendanceDaysThisMonth}日・{shiftCountThisMonth}件・{totalHoursThisMonth.toFixed(1)}h</p>
-                <p className="flex items-center justify-center gap-0.5">
+              <GoalRing percent={goalProgress ?? 0} size={44} stroke={4} textClassName="text-[10px] font-bold" />
+              <div className="text-[10px] text-muted-foreground text-left leading-tight">
+                <p className="tabular-nums whitespace-nowrap">出勤{attendanceDaysThisMonth}日・{shiftCountThisMonth}件・{totalHoursThisMonth.toFixed(1)}h</p>
+                <p className="flex items-center gap-0.5 whitespace-nowrap">
                   {monthlyGoal ? `目標 ¥${monthlyGoal.toLocaleString()}` : '目標未設定'}
-                  <Pencil className="h-2.5 w-2.5" style={{ color: 'var(--brand-accent)' }} />
+                  <Pencil className="h-2.5 w-2.5 shrink-0" style={{ color: 'var(--brand-accent)' }} />
                 </p>
               </div>
             </button>
           </div>
 
           {finalizedReward != null && (
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-2 border-t">
+            <div className="flex items-center justify-between flex-wrap gap-2 pt-1.5 border-t">
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
               </p>
-              <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" />
+              <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" size="xs" />
             </div>
           )}
         </CardContent>
