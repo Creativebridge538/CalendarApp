@@ -79,7 +79,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className="h-svh overflow-hidden flex items-center justify-center p-4"
+      className="h-screen overflow-hidden flex items-center justify-center p-4"
       style={{ background: 'var(--cast-mobile-bg, #f7f7f8)' }}
     >
       <div className="relative w-full max-w-md">
