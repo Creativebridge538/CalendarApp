@@ -27,7 +27,7 @@ export default async function CastRewardsPage() {
   const prevMonthStart = format(startOfMonth(prevMonthDate), 'yyyy-MM-dd')
   const prevMonthEnd = format(endOfMonth(prevMonthDate), 'yyyy-MM-dd')
 
-  const [{ data: sales }, { data: shifts }, { data: reward }, { data: settings }, { data: checklistItems }] =
+  const [{ data: sales }, { data: shifts }, { data: reward }, { data: checklistItems }] =
     await Promise.all([
       supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours')
         .eq('cast_id', user.id).gte('date', sixtyDaysAgo).lte('date', today).order('date'),
@@ -35,7 +35,6 @@ export default async function CastRewardsPage() {
         .eq('cast_id', user.id).gte('date', monthStart).lte('date', monthEnd),
       supabase.from('reward_calculations').select('total_reward, is_finalized')
         .eq('cast_id', user.id).eq('period_year', now.getFullYear()).eq('period_month', now.getMonth() + 1).maybeSingle(),
-      supabase.from('store_settings').select('usd_jpy_rate').eq('store_id', profile.store_id).maybeSingle(),
       supabase.from('shift_checklist_items').select('id, label, item_type').eq('store_id', profile.store_id),
     ])
 
@@ -201,7 +200,6 @@ export default async function CastRewardsPage() {
         trend={trend}
         weekday={weekday}
         dayDetails={dayDetails}
-        usdJpyRate={settings?.usd_jpy_rate ?? null}
         finalizedReward={reward?.is_finalized ? Number(reward.total_reward) : null}
       />
     </div>

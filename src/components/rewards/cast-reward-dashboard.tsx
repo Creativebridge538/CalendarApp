@@ -13,7 +13,7 @@ import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
   TrendingUp, TrendingDown, Minus, Pencil, StickyNote, Lock,
-  CircleDollarSign, CalendarDays, CalendarRange, BarChart3,
+  CalendarDays, CalendarRange, BarChart3,
 } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { GoalRing } from '@/components/rewards/goal-ring'
@@ -46,7 +46,6 @@ interface Props {
   trend: { date: string; amount: number }[]
   weekday: { label: string; amount: number }[]
   dayDetails: Record<string, DayDetail>
-  usdJpyRate: number | null
   finalizedReward: number | null
 }
 
@@ -73,7 +72,7 @@ export function CastRewardDashboard({
   userId, monthLabel, year, month, thisMonthTotal, prevMonthToDateTotal, monthlyGoal: initialGoal,
   calendarDays, avgPerWorkedDay,
   attendanceDaysThisMonth, totalHoursThisMonth, platformBreakdown,
-  trend, weekday, dayDetails, usdJpyRate, finalizedReward,
+  trend, weekday, dayDetails, finalizedReward,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'calendar' | 'report'>('calendar')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -279,22 +278,6 @@ export function CastRewardDashboard({
         <>
           <TrendChart data={trend} />
           <WeekdayChart data={weekday} />
-
-          {usdJpyRate != null && (
-            <Card elevated>
-              <CardContent className="pt-4 pb-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-muted-foreground flex items-center gap-1.5">
-                    <CircleDollarSign className="h-3.5 w-3.5" />USD → JPY（本日のレート）
-                  </span>
-                  <span className="font-bold tabular-nums">¥{Number(usdJpyRate).toFixed(2)}</span>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">
-                  STRIPCHAT・DXライブの売上はこのレートで換算表示されます（お支払いは確定時のレートで計算されます）
-                </p>
-              </CardContent>
-            </Card>
-          )}
         </>
       )}
 
