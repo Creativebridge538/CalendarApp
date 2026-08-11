@@ -69,7 +69,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
       <main
-        className={`flex-1 overflow-y-auto md:pt-0 ${role === 'cast' ? 'pt-[env(safe-area-inset-top)] pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-[calc(3.5rem+env(safe-area-inset-top))]'}`}
+        className={`flex-1 overflow-y-auto md:pt-0 ${role === 'cast' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14'}`}
       >
         {children}
       </main>

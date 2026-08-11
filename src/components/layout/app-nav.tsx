@@ -298,10 +298,10 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
         </>
       ) : (
         <>
-          {/* 管理者: モバイル トップバー（PWAのステータスバー分をpadding-topで確保） */}
+          {/* 管理者: モバイル トップバー */}
           <div
-            className="md:hidden fixed top-0 left-0 right-0 z-40 border-b flex items-center px-4 gap-3"
-            style={{ ...s.mobileBar, height: 'calc(3.5rem + env(safe-area-inset-top))', paddingTop: 'env(safe-area-inset-top)' }}
+            className="md:hidden fixed top-0 left-0 right-0 z-40 h-14 border-b flex items-center px-4 gap-3"
+            style={s.mobileBar}
           >
             <button
               onClick={() => setMobileOpen(true)}
@@ -322,7 +322,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
                 className={cn('relative w-64 flex flex-col h-full shadow-xl border-r', s.border)}
                 style={s.sidebar}
               >
-                <div className={cn('px-4 pb-4 border-b flex items-center justify-between', s.border)} style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
+                <div className={cn('px-4 py-4 border-b flex items-center justify-between', s.border)}>
                   <div>
                     <div className="flex items-center gap-2.5" style={s.logo}>
                       <Logo className="h-6 w-6 shrink-0" />

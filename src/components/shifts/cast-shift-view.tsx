@@ -858,7 +858,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
         <div className="fixed inset-0 z-50 flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
           <aside className="relative w-64 flex flex-col h-full bg-card shadow-xl border-r">
-            <div className="px-4 pb-4 border-b flex items-center justify-between" style={{ paddingTop: 'calc(env(safe-area-inset-top) + 1rem)' }}>
+            <div className="px-4 py-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <Logo className="h-6 w-6 shrink-0" style={{ color: 'var(--brand-accent)' }} />
                 <p className="font-bold text-lg tracking-tight truncate">{storeName ?? 'CalendarApp'}</p>
