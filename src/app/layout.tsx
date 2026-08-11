@@ -23,11 +23,20 @@ export const metadata: Metadata = {
   title: 'CalendarApp - 業務管理システム',
   description: '多店舗対応シフト・報酬・キャスト管理',
   manifest: '/manifest.json',
+  // viewport-fit: cover用のApple独自メタタグが無いまま運用していたため、
+  // ホーム画面追加時（スタンドアロン表示）にステータスバー領域の扱いがiOS側で不定になり、
+  // 上部に余計な空白が出たりタップ位置がずれたりしていた。
+  // ここでは「コンテンツをステータスバーの裏に回り込ませない」標準的な構成にして
+  // 独自のsafe-area調整を不要にする。
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'CalendarApp',
+  },
 }
 
 export const viewport = {
   themeColor: '#0a0b0d',
-  viewportFit: 'cover' as const,
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
