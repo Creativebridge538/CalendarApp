@@ -3,5 +3,5 @@
   "env": {
     "ENABLE_COREPACK": "1"
   },
-  "regions": ["icn1"]
+  "regions": ["hnd1"]
 }
