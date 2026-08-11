@@ -14,7 +14,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Switch } from '@/components/ui/switch'
-import { Plus, Check, X } from 'lucide-react'
+import { TimeSelect } from '@/components/ui/time-select'
+import { ShiftCalendar } from '@/components/shifts/shift-calendar'
+import { Plus, Check, X, ChevronDown } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 
 interface Application { id: string; status: string; cast_id: string; cast: { display_name: string | null } | null }
@@ -35,6 +37,7 @@ interface Props {
 export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId }: Props) {
   const [slots, setSlots] = useState(initialSlots)
   const [open, setOpen] = useState(false)
+  const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
   const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '' })
   const supabase = createClient()
 
@@ -140,14 +143,33 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
         </Table>
       </CardContent>
 
-      <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) setDateCalendarOpen(false) }}>
         <DialogContent>
           <DialogHeader><DialogTitle>空き枠追加</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="space-y-1.5"><Label>日付 *</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+            <div className="space-y-1.5">
+              <Label>日付 *</Label>
+              <button
+                type="button"
+                onClick={() => setDateCalendarOpen(o => !o)}
+                className="w-full flex items-center justify-between rounded-md border bg-background px-3 min-h-11 text-sm"
+              >
+                {form.date ? format(new Date(`${form.date}T00:00:00`), 'yyyy年M月d日(E)', { locale: ja }) : '日付を選択'}
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dateCalendarOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {dateCalendarOpen && (
+                <div className="rounded-md border p-2">
+                  <ShiftCalendar
+                    shifts={[]}
+                    selectedDates={form.date ? new Set([form.date]) : undefined}
+                    onDayClick={d => { setForm({ ...form, date: format(d, 'yyyy-MM-dd') }); setDateCalendarOpen(false) }}
+                  />
+                </div>
+              )}
+            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>開始</Label><Input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></div>
-              <div className="space-y-1.5"><Label>終了</Label><Input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></div>
+              <div className="space-y-1.5"><Label>開始</Label><TimeSelect value={form.start_time} onChange={v => setForm({ ...form, start_time: v })} /></div>
+              <div className="space-y-1.5"><Label>終了</Label><TimeSelect value={form.end_time} onChange={v => setForm({ ...form, end_time: v })} /></div>
             </div>
             {rooms.length > 0 && (
               <div className="space-y-1.5">
