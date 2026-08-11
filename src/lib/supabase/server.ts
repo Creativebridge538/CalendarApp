@@ -1,8 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
+import { cache } from 'react'
 import type { Database } from './database.types'
 
-export async function createClient() {
+// cache()でリクエスト単位にメモ化することで、同一リクエスト内でlayout/pageから
+// 複数回呼ばれても実際に作られるクライアントは1つだけになる（getCurrentProfileの重複排除の前提）
+export const createClient = cache(async () => {
   const cookieStore = await cookies()
 
   return createServerClient<Database>(
@@ -25,4 +28,4 @@ export async function createClient() {
       },
     }
   )
-}
+})

@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, endOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -15,11 +16,9 @@ export default async function PaymentNoticePage({
 }) {
   const { cast_id, year: yearParam, month: monthParam } = await searchParams
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('users').select('role, store_id').eq('id', user.id).single()
   const isAdmin = profile?.role === 'admin'
   const isSelf = profile?.role === 'cast' && cast_id === user.id
   if (!isAdmin && !isSelf) redirect('/dashboard')

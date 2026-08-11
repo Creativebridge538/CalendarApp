@@ -1,14 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { CastVacantSlots } from '@/components/vacant-slots/cast-vacant-slots'
 
 export default async function CastVacantSlotsPage() {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
 
-  const { data: profile } = await supabase.from('users').select('store_id').eq('id', user.id).single()
   if (!profile?.store_id) {
     return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
   }

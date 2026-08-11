@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { StoreSettings } from '@/components/settings/store-settings'
 import { ShiftChecklistSettings } from '@/components/settings/shift-checklist-settings'
@@ -8,11 +9,8 @@ import { LoginIdSettings } from '@/components/settings/login-id-settings'
 
 export default async function SettingsPage() {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase.from('users').select('role, store_id, login_id').eq('id', user.id).single()
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const storeId = profile.store_id!

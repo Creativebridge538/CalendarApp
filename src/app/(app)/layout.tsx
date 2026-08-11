@@ -1,21 +1,15 @@
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/current-user'
 import { AppNav } from '@/components/layout/app-nav'
 import { getAccentSkin } from '@/lib/accent-skins'
 import { getAccentFont } from '@/lib/accent-fonts'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user, profile } = await getCurrentUser()
 
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role, store_id, accent_skin, accent_font')
-    .eq('id', user.id)
-    .single()
 
   // owner(SaaS運営者)は店舗に属さないため、この一般ユーザー向けシェルは経由させず内部管理画面に流す
   if (profile?.role === 'owner') redirect('/internal/stores')

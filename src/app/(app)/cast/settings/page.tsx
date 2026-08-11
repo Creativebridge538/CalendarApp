@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { Bell, ChevronRight } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
@@ -10,16 +10,8 @@ import { CastLogoutButton } from '@/components/settings/cast-logout-button'
 import { PasswordChangeSettings } from '@/components/settings/password-change-settings'
 
 export default async function CastSettingsPage() {
-  const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('accent_skin, accent_font, display_name, photo_url, birthdate, show_birthdate, calendar_token')
-    .eq('id', user.id)
-    .single()
 
   return (
     <div className="px-4 py-4 md:p-6 space-y-4 max-w-lg">

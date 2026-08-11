@@ -1,20 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
+import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, subDays, subMonths, startOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 
 export default async function DashboardPage() {
-  const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  const user = session?.user ?? null
+  const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
-
-  const { data: profile } = await supabase
-    .from('users')
-    .select('role, store_id')
-    .eq('id', user.id)
-    .single()
 
   if (profile?.role === 'admin') {
     return <AdminDashboard storeId={profile.store_id!} />
