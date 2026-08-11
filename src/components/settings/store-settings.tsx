@@ -131,7 +131,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   async function fetchLatestRate() {
     setFetchingRate(true)
     try {
-      const res = await fetch('https://api.frankfurter.app/latest?from=USD&to=JPY')
+      const res = await fetch('https://api.frankfurter.dev/v1/latest?from=USD&to=JPY')
       if (!res.ok) throw new Error('fetch failed')
       const data = await res.json()
       const rate = data?.rates?.JPY
