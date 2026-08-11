@@ -29,6 +29,14 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
     return applications.find(a => a.vacant_slot_id === slotId)?.status ?? null
   }
 
+  async function cancelApplication(slotId: string) {
+    const { error } = await supabase.from('vacant_slot_applications').delete()
+      .eq('vacant_slot_id', slotId).eq('cast_id', castId)
+    if (error) { toast.error('取消に失敗しました'); return }
+    setApplications(applications.filter(a => a.vacant_slot_id !== slotId))
+    toast.success('申請を取り消しました')
+  }
+
   async function apply(slotId: string) {
     const { error } = await supabase.from('vacant_slot_applications').insert({ vacant_slot_id: slotId, cast_id: castId })
     if (error) { toast.error('申請に失敗しました'); return }
@@ -50,7 +58,16 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
     const status = getStatus(slotId)
     if (status === 'approved') return <Badge>承認済み</Badge>
     if (status === 'rejected') return <Badge variant="destructive">却下</Badge>
-    if (status === 'pending') return <Badge variant="secondary">申請中</Badge>
+    if (status === 'pending') {
+      return (
+        <div className={`flex items-center gap-2 ${block ? 'w-full' : 'justify-end'}`}>
+          <Badge variant="secondary">申請中</Badge>
+          <Button size="sm" variant="outline" className="text-destructive" onClick={() => cancelApplication(slotId)}>
+            取消
+          </Button>
+        </div>
+      )
+    }
     return (
       <Button size="sm" variant="tonal" className={block ? 'w-full' : undefined} onClick={() => apply(slotId)}>
         申請する
