@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 
@@ -40,11 +40,11 @@ export function PasswordChangeSettings() {
       <CardContent className="space-y-4">
         <div className="space-y-1.5">
           <Label>新しいパスワード</Label>
-          <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="8文字以上" autoComplete="new-password" />
+          <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="8文字以上" autoComplete="new-password" />
         </div>
         <div className="space-y-1.5">
           <Label>確認用</Label>
-          <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" />
+          <PasswordInput value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} autoComplete="new-password" />
         </div>
         <Button onClick={handleSave} disabled={saving || !password}>
           {saving ? '変更中...' : '変更する'}

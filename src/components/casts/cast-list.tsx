@@ -5,6 +5,7 @@ import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { PasswordInput } from '@/components/ui/password-input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -258,18 +259,18 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             <DialogTitle>{editing ? 'キャスト編集' : 'キャスト追加'}</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            <div className="space-y-1.5">
+              <Label>メールアドレス {!editing && '*'}</Label>
+              <Input type="email" value={form.email} disabled={!!editing} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
+              <p className="text-xs text-muted-foreground">
+                {editing ? '確認用の表示のみです（変更はできません）' : 'パスワード再設定メールの送付に使用します（ログインには使いません）'}
+              </p>
+            </div>
             {!editing && (
-              <>
-                <div className="space-y-1.5">
-                  <Label>メールアドレス *</Label>
-                  <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
-                  <p className="text-xs text-muted-foreground">パスワード再設定メールの送付に使用します（ログインには使いません）</p>
-                </div>
-                <div className="space-y-1.5">
-                  <Label>パスワード *</Label>
-                  <Input type="password" value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="8文字以上" />
-                </div>
-              </>
+              <div className="space-y-1.5">
+                <Label>パスワード *</Label>
+                <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="8文字以上" />
+              </div>
             )}
             <div className="space-y-1.5">
               <Label>ユーザーID *</Label>
