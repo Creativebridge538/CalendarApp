@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Calendar, FileEdit, Users, TrendingUp, TrendingDown, Minus, Trophy, Wallet, Briefcase } from 'lucide-react'
@@ -47,17 +48,29 @@ function useCountUp(target: number, durationMs = 900) {
 }
 
 function StatTile({
-  icon: Icon, label, value, prefix, sub, delay,
-}: { icon: typeof Calendar; label: string; value: number; prefix?: string; sub: string; delay: number }) {
+  icon: Icon, label, value, prefix, sub, delay, href,
+}: { icon: typeof Calendar; label: string; value: number; prefix?: string; sub: string; delay: number; href?: string }) {
   const animated = useCountUp(value)
-  return (
-    <div className="stat-tile" style={{ animationDelay: `${delay}ms` }}>
+  const content = (
+    <>
       <div className="stat-tile-head">
         <span className="stat-tile-label">{label}</span>
         <Icon className="stat-tile-icon" />
       </div>
       <div className="stat-tile-value">{prefix}{animated.toLocaleString()}</div>
       <p className="stat-tile-sub">{sub}</p>
+    </>
+  )
+  if (href) {
+    return (
+      <Link href={href} className="stat-tile" style={{ animationDelay: `${delay}ms`, cursor: 'pointer' }}>
+        {content}
+      </Link>
+    )
+  }
+  return (
+    <div className="stat-tile" style={{ animationDelay: `${delay}ms` }}>
+      {content}
     </div>
   )
 }
@@ -110,12 +123,15 @@ export function AdminAnalytics({
         @media (min-width: 768px) { .stat-grid { grid-template-columns: repeat(6, 1fr); gap: 12px; } }
 
         .stat-tile {
+          display: block;
           background: var(--surface-card);
           border: 1px solid var(--line-border);
           border-radius: 12px;
           padding: 14px 16px;
           animation: aa-rise 0.45s cubic-bezier(0.16, 1, 0.3, 1) both;
           transition: background-color .15s, transform .15s;
+          text-decoration: none;
+          color: inherit;
         }
         .stat-tile:hover { background: var(--surface-card-hover); transform: translateY(-1px); }
         .stat-tile-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 9px; }
@@ -205,9 +221,9 @@ export function AdminAnalytics({
       <div className="stat-grid">
         <StatTile icon={Wallet} label="平均1日売上" value={avgDailySales} prefix="¥" sub="今月・日割り" delay={60} />
         <StatTile icon={Users} label="稼働キャスト" value={activeCastCount} sub="今月・実績あり" delay={90} />
-        <StatTile icon={Calendar} label="未確定シフト" value={pendingShifts} sub="要確認" delay={120} />
-        <StatTile icon={FileEdit} label="修正申請" value={pendingRequests} sub="未処理" delay={150} />
-        <StatTile icon={Briefcase} label="空き枠申請" value={pendingVacantApplications} sub="未処理" delay={165} />
+        <StatTile icon={Calendar} label="未確定シフト" value={pendingShifts} sub="要確認" delay={120} href="/admin/shifts" />
+        <StatTile icon={FileEdit} label="修正申請" value={pendingRequests} sub="未処理" delay={150} href="/admin/modification-requests" />
+        <StatTile icon={Briefcase} label="空き枠申請" value={pendingVacantApplications} sub="未処理" delay={165} href="/admin/vacant-slots" />
         <StatTile icon={Trophy} label="トップキャスト" value={castRanking[0]?.amount ?? 0} prefix="¥" sub={castRanking[0]?.name ?? '—'} delay={180} />
       </div>
 
