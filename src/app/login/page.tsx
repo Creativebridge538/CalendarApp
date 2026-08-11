@@ -79,8 +79,8 @@ export default function LoginPage() {
 
   return (
     <div
-      className="h-screen overflow-hidden flex items-center justify-center p-4"
-      style={{ background: 'var(--cast-mobile-bg, #f7f7f8)' }}
+      className="overflow-hidden flex items-center justify-center p-4"
+      style={{ height: 'calc(var(--app-vh) * 100)', background: 'var(--cast-mobile-bg, #f7f7f8)' }}
     >
       <div className="relative w-full max-w-md">
         <Card elevated className="w-full">
