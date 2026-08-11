@@ -68,6 +68,10 @@ export default async function CastRewardsPage() {
     hoursByDate.set(date, hours)
   }
 
+  // 出勤日数・時間は「実際に出勤し終えたもの」だけを対象にする（未来日・未確定のシフトは予定でしかないため除外）
+  const attendedShiftsThisMonth = shiftsList.filter(s => s.date <= today && s.status === 'confirmed')
+  const attendedDatesThisMonth = new Set(attendedShiftsThisMonth.map(s => s.date))
+
   // 当月カレンダーグリッド（日曜始まり、前後の月の空白セルも含む）
   const monthStartDate = startOfMonth(now)
   const monthEndDate = endOfMonth(now)
@@ -80,7 +84,8 @@ export default async function CastRewardsPage() {
     calendarDays.push({
       date, day: d,
       amount: salesByDate.get(date)?.total ?? 0,
-      hours: hoursByDate.get(date) ?? 0,
+      // まだ出勤していない（未来日・未確定）シフトの時間は表示しない
+      hours: attendedDatesThisMonth.has(date) ? (hoursByDate.get(date) ?? 0) : 0,
       isToday: date === today,
     })
   }
@@ -98,9 +103,6 @@ export default async function CastRewardsPage() {
   const workedDaysThisMonth = [...salesByDate.keys()].filter(d => d >= monthStart && d <= monthEnd).length
   const avgPerWorkedDay = workedDaysThisMonth > 0 ? Math.round(thisMonthTotal / workedDaysThisMonth) : 0
 
-  // 出勤日数・時間は「実際に出勤し終えたもの」だけを対象にする（未来日・未確定のシフトは予定でしかないため除外）
-  const attendedShiftsThisMonth = shiftsList.filter(s => s.date <= today && s.status === 'confirmed')
-  const attendedDatesThisMonth = new Set(attendedShiftsThisMonth.map(s => s.date))
   const attendanceDaysThisMonth = attendedDatesThisMonth.size
   const totalHoursThisMonth = [...attendedDatesThisMonth].reduce((sum, date) => sum + (hoursByDate.get(date) ?? 0), 0)
 

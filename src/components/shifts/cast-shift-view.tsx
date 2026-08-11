@@ -87,12 +87,13 @@ function timeToMinutes(hhmm: string): number {
 
 /** 週表示・日表示共通の時間軸グリッド（Googleカレンダー等と同じ、時刻に応じて予定ブロックを配置する形式） */
 function ShiftTimeGrid({
-  days, shiftsOn, onDayClick, locationLabelOf,
+  days, shiftsOn, onDayClick, locationLabelOf, onNavigate,
 }: {
   days: Date[]
   shiftsOn: (day: Date) => Shift[]
   onDayClick: (day: Date) => void
   locationLabelOf: (shift: Shift) => string | null
+  onNavigate?: (direction: 'next' | 'prev') => void
 }) {
   const scrollRef = useRef<HTMLDivElement>(null)
   const daysKey = days.map(d => d.toISOString()).join(',')
@@ -107,8 +108,23 @@ function ShiftTimeGrid({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [daysKey])
 
+  // 横方向のスワイプで前後の週・日へ切り替える（縦スクロールと誤認しないよう横方向の移動が優位な場合のみ反応）
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    const start = touchStart.current
+    touchStart.current = null
+    if (!start || !onNavigate) return
+    const dx = e.changedTouches[0].clientX - start.x
+    const dy = e.changedTouches[0].clientY - start.y
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    onNavigate(dx < 0 ? 'next' : 'prev')
+  }
+
   return (
-    <div>
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
       {/* 日付ヘッダー行 */}
       <div className="flex border-b border-border/60">
         <div className="w-9 shrink-0" />
@@ -725,11 +741,18 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
               shiftsOn={shiftsOn}
               onDayClick={handleDayClick}
               locationLabelOf={locationLabelOf}
+              onNavigate={dir => (dir === 'next' ? goNext() : goPrev())}
             />
           )}
 
           {view === 'day' && (
-            <ShiftTimeGrid days={[calAnchor]} shiftsOn={shiftsOn} onDayClick={handleDayClick} locationLabelOf={locationLabelOf} />
+            <ShiftTimeGrid
+              days={[calAnchor]}
+              shiftsOn={shiftsOn}
+              onDayClick={handleDayClick}
+              locationLabelOf={locationLabelOf}
+              onNavigate={dir => (dir === 'next' ? goNext() : goPrev())}
+            />
           )}
           {view === 'list' && (
             <>
