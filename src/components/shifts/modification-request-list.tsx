@@ -12,7 +12,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { Check, X } from 'lucide-react'
+import { TimeSelect } from '@/components/ui/time-select'
+import { ShiftCalendar } from '@/components/shifts/shift-calendar'
+import { Check, X, ChevronDown, Pencil } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 
 interface Request {
@@ -37,13 +39,24 @@ export function ModificationRequestList({ requests: initialRequests }: { request
   const [requests, setRequests] = useState(initialRequests)
   const [rejectTarget, setRejectTarget] = useState<Request | null>(null)
   const [rejectReason, setRejectReason] = useState('')
+  const [approveTarget, setApproveTarget] = useState<Request | null>(null)
+  const [approveForm, setApproveForm] = useState({ date: '', start_time: '18:00', end_time: '23:00' })
+  const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
   const supabase = createClient()
 
-  async function handleApprove(req: Request) {
-    const updateShift: { status: 'submitted'; date?: string; start_time?: string; end_time?: string } = { status: 'submitted' }
-    if (req.new_date) updateShift.date = req.new_date
-    if (req.new_start_time) updateShift.start_time = req.new_start_time
-    if (req.new_end_time) updateShift.end_time = req.new_end_time
+  function openApprove(req: Request) {
+    setApproveTarget(req)
+    setApproveForm({
+      date: req.new_date ?? req.shifts?.date ?? '',
+      start_time: (req.new_start_time ?? req.shifts?.start_time ?? '18:00:00').slice(0, 5),
+      end_time: (req.new_end_time ?? req.shifts?.end_time ?? '23:00:00').slice(0, 5),
+    })
+  }
+
+  async function handleApprove() {
+    if (!approveTarget) return
+    const req = approveTarget
+    const updateShift = { status: 'submitted' as const, date: approveForm.date, start_time: approveForm.start_time, end_time: approveForm.end_time }
 
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
       supabase.from('shift_modification_requests').update({
@@ -54,8 +67,9 @@ export function ModificationRequestList({ requests: initialRequests }: { request
     if (e1 || e2) { toast.error('承認に失敗しました'); return }
     setRequests(requests.filter(r => r.id !== req.id))
     toast.success('承認しました')
+    setApproveTarget(null)
     const title = 'シフト修正申請が承認されました'
-    const body = req.shifts ? `${format(new Date(req.shifts.date), 'M/d(E)', { locale: ja })} のシフト修正申請` : null
+    const body = `${format(new Date(`${approveForm.date}T00:00:00`), 'M/d(E)', { locale: ja })} ${approveForm.start_time}〜${approveForm.end_time} のシフト修正申請`
     await supabase.from('notifications').insert({ user_id: req.requested_by, title, body, link: '/cast/shifts' })
     sendPushNotification(req.requested_by, title, body, '/cast/shifts')
   }
@@ -126,7 +140,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
                   <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
                   <TableCell>{format(new Date(req.created_at), 'M/d', { locale: ja })}</TableCell>
                   <TableCell className="text-right space-x-1">
-                    <Button size="sm" variant="outline" className="text-positive" onClick={() => handleApprove(req)}>
+                    <Button size="sm" variant="outline" className="text-positive" onClick={() => openApprove(req)}>
                       <Check className="h-3.5 w-3.5 mr-1" />承認
                     </Button>
                     <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(req); setRejectReason('') }}>
@@ -139,6 +153,55 @@ export function ModificationRequestList({ requests: initialRequests }: { request
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={!!approveTarget} onOpenChange={open => { if (!open) { setApproveTarget(null); setDateCalendarOpen(false) } }}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>承認内容を確認・編集</DialogTitle></DialogHeader>
+          <div className="space-y-4 mt-2">
+            {approveTarget && (
+              <p className="text-sm text-muted-foreground">
+                {approveTarget.shifts?.cast?.display_name ?? '—'}／申請理由: {approveTarget.reason}
+              </p>
+            )}
+            <div className="space-y-1.5">
+              <Label>日付</Label>
+              <button
+                type="button"
+                onClick={() => setDateCalendarOpen(o => !o)}
+                className="w-full flex items-center justify-between rounded-md border bg-background px-3 min-h-11 text-sm"
+              >
+                {approveForm.date ? format(new Date(`${approveForm.date}T00:00:00`), 'yyyy年M月d日(E)', { locale: ja }) : '日付を選択'}
+                <ChevronDown className={`h-4 w-4 text-muted-foreground transition-transform ${dateCalendarOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {dateCalendarOpen && (
+                <div className="rounded-md border p-2">
+                  <ShiftCalendar
+                    shifts={[]}
+                    selectedDates={approveForm.date ? new Set([approveForm.date]) : undefined}
+                    onDayClick={d => { setApproveForm({ ...approveForm, date: format(d, 'yyyy-MM-dd') }); setDateCalendarOpen(false) }}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>開始</Label>
+                <TimeSelect value={approveForm.start_time} onChange={v => setApproveForm({ ...approveForm, start_time: v })} />
+              </div>
+              <div className="space-y-1.5">
+                <Label>終了</Label>
+                <TimeSelect value={approveForm.end_time} onChange={v => setApproveForm({ ...approveForm, end_time: v })} />
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setApproveTarget(null)}>キャンセル</Button>
+              <Button onClick={handleApprove} disabled={!approveForm.date}>
+                <Pencil className="h-3.5 w-3.5 mr-1" />この内容で承認
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       <Dialog open={!!rejectTarget} onOpenChange={open => { if (!open) setRejectTarget(null) }}>
         <DialogContent>
