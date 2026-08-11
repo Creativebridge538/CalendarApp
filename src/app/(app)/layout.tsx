@@ -23,7 +23,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (store && !store.is_active) {
     return (
-      <div className="flex items-center justify-center p-6 text-center" style={{ height: 'calc(var(--app-vh) * 100)' }}>
+      <div className="flex h-screen items-center justify-center p-6 text-center">
         <div className="space-y-2 max-w-sm">
           <p className="text-lg font-bold">この店舗は現在ご利用いただけません</p>
           <p className="text-sm text-muted-foreground">
@@ -63,8 +63,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      className={`flex font-sans ${castSkin?.isDark ? 'dark' : ''}`}
-      style={{ height: 'calc(var(--app-vh) * 100)', backgroundColor: 'var(--app-bg)', ...accentStyle }}
+      className={`flex h-screen font-sans ${castSkin?.isDark ? 'dark' : ''}`}
+      style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
       data-theme={theme}
     >
       <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />

@@ -30,26 +30,9 @@ export const viewport = {
   viewportFit: 'cover' as const,
 }
 
-// iOS PWAでは dvh/svh がログイン画面（パスワード欄でWebKitのオリジン表示バーが出る）
-// からの遷移直後に再計算されず、余白が残ることがあった。resize時にだけ更新する
-// 固定値ベースの --app-vh を使うことで、遷移中の不要な再計算を避ける
-const viewportHeightScript = `
-(function () {
-  function setAppVh() {
-    document.documentElement.style.setProperty('--app-vh', (window.innerHeight * 0.01) + 'px')
-  }
-  setAppVh()
-  window.addEventListener('resize', setAppVh)
-  window.addEventListener('orientationchange', setAppVh)
-})()
-`
-
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="ja">
-      <head>
-        <script dangerouslySetInnerHTML={{ __html: viewportHeightScript }} />
-      </head>
       <body className={`${geist.className} ${accentFontVars} h-full antialiased`}>
         {children}
         <Toaster richColors position="top-right" />

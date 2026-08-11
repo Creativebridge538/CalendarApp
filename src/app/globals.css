@@ -52,8 +52,6 @@
 }
 
 :root {
-  /* resize時のみ更新されるJS計算値。JS実行前のフォールバックとして1vhを使う */
-  --app-vh: 1vh;
   --app-bg: oklch(0.976 0 0);
   --background: oklch(1 0 0);
   --foreground: oklch(0.145 0 0);
