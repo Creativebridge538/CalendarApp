@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, type CSSProperties } from 'react'
+import { useRef, useState, type CSSProperties } from 'react'
 import {
   startOfMonth, eachDayOfInterval, getDay,
   isSameDay, isSameMonth, addMonths, subMonths, subDays, addDays, format,
@@ -51,6 +51,8 @@ interface Props {
   /** 指定すると月の状態は呼び出し元が管理し、内蔵のヘッダー（タイトル・前後ボタン）は表示しない */
   current?: Date
   direction?: 'next' | 'prev'
+  /** current を指定している場合、スワイプで前後の月に移動できるようにするためのコールバック */
+  onNavigate?: (direction: 'next' | 'prev') => void
   /** yyyy-MM-dd の集合。指定した日をまとめて追加モードの選択中として強調表示 */
   selectedDates?: Set<string>
   /** 'amount' の場合、各日をシフトチップの代わりに amountByDate の金額で表示する */
@@ -60,7 +62,7 @@ interface Props {
 
 export function ShiftCalendar({
   shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection,
-  selectedDates, mode = 'time', amountByDate,
+  onNavigate, selectedDates, mode = 'time', amountByDate,
 }: Props) {
   const [internalCurrent, setInternalCurrent] = useState(() => new Date())
   const [internalDirection, setInternalDirection] = useState<'next' | 'prev'>('next')
@@ -81,6 +83,24 @@ export function ShiftCalendar({
 
   function goPrev() { setInternalDirection('prev'); setInternalCurrent(subMonths(internalCurrent, 1)) }
   function goNext() { setInternalDirection('next'); setInternalCurrent(addMonths(internalCurrent, 1)) }
+
+  // 指差同士のスワイプで前後の月へ切り替える（縦スクロールと誤認しないよう横方向の移動が優位な場合のみ反応）
+  const touchStart = useRef<{ x: number; y: number } | null>(null)
+  function handleTouchStart(e: React.TouchEvent) {
+    touchStart.current = { x: e.touches[0].clientX, y: e.touches[0].clientY }
+  }
+  function handleTouchEnd(e: React.TouchEvent) {
+    const start = touchStart.current
+    touchStart.current = null
+    if (!start) return
+    const dx = e.changedTouches[0].clientX - start.x
+    const dy = e.changedTouches[0].clientY - start.y
+    if (Math.abs(dx) < 48 || Math.abs(dx) < Math.abs(dy) * 1.5) return
+    const dir = dx < 0 ? 'next' : 'prev'
+    if (isControlled) onNavigate?.(dir)
+    else if (dir === 'next') goNext()
+    else goPrev()
+  }
 
   return (
     <div>
@@ -124,6 +144,8 @@ export function ShiftCalendar({
         {/* カレンダーグリッド */}
         <div
           key={monthStart.toISOString()}
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
           className={cn(
             'grid grid-cols-7 divide-y divide-border border-t border-border',
             direction === 'next' ? 'cal-grid-next' : 'cal-grid-prev'

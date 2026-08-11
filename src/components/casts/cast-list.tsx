@@ -110,7 +110,22 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           toast.error(error.code === '23505' ? 'このユーザーIDは既に使用されています' : '更新に失敗しました')
           return
         }
-        setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload } : c))
+        let email = editing.email
+        if (form.email !== editing.email) {
+          const res = await fetch('/api/account/update-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: editing.id, email: form.email }),
+          })
+          const json = await res.json()
+          if (!res.ok) {
+            toast.error(json.error ?? 'メールアドレスの更新に失敗しました')
+            setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload } : c))
+            return
+          }
+          email = json.email
+        }
+        setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload, email } : c))
         toast.success('キャスト情報を更新しました')
       }
       setOpen(false)
@@ -254,6 +269,19 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                     >
                       <Checkbox checked={selected.has(cast.id)} onCheckedChange={() => toggleSelected(cast.id)} />
                     </span>
+                    <span
+                      role="button"
+                      tabIndex={0}
+                      title={cast.is_active ? '無効化' : '有効化'}
+                      onClick={e => { e.stopPropagation(); toggleActive(cast) }}
+                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleActive(cast) } }}
+                      className={cn(
+                        'absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background hover:bg-accent',
+                        cast.is_active ? 'text-destructive' : 'text-positive'
+                      )}
+                    >
+                      {cast.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                    </span>
                     <div className="h-14 w-14 rounded-full overflow-hidden bg-muted flex items-center justify-center mt-1">
                       {cast.photo_url ? (
                         // eslint-disable-next-line @next/next/no-img-element
@@ -278,11 +306,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>メールアドレス {!editing && '*'}</Label>
-              <Input type="email" value={form.email} disabled={!!editing} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
-              <p className="text-xs text-muted-foreground">
-                {editing ? '確認用の表示のみです（変更はできません）' : 'パスワード再設定メールの送付に使用します（ログインには使いません）'}
-              </p>
+              <Label>メールアドレス *</Label>
+              <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
+              <p className="text-xs text-muted-foreground">パスワード再設定メールの送付に使用します（ログインには使いません）</p>
             </div>
             {!editing && (
               <div className="space-y-1.5">
@@ -338,7 +364,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>キャンセル</Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || !form.display_name || !form.login_id || (!editing && (!form.email || !form.password))}
+                disabled={saving || !form.display_name || !form.login_id || !form.email || (!editing && !form.password)}
               >
                 {saving ? '保存中...' : '保存'}
               </Button>

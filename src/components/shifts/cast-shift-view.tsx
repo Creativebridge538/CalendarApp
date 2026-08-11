@@ -709,6 +709,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 onDayClick={handleDayClick}
                 current={calAnchor}
                 direction={calDirection}
+                onNavigate={dir => (dir === 'next' ? goNext() : goPrev())}
                 mode={calendarMode}
                 amountByDate={amountByDate}
               />

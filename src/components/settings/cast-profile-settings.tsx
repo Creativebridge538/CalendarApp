@@ -26,6 +26,7 @@ export function CastProfileSettings({
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl)
   const [birthdate, setBirthdate] = useState(initialBirthdate ?? '')
   const [showBirthdate, setShowBirthdate] = useState(initialShowBirthdate)
+  const [emailValue, setEmailValue] = useState(email)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [saving, setSaving] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -59,6 +60,15 @@ export function CastProfileSettings({
         show_birthdate: showBirthdate,
       }).eq('id', userId)
       if (error) { toast.error('保存に失敗しました'); return }
+      if (emailValue !== email) {
+        const res = await fetch('/api/account/update-email', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, email: emailValue }),
+        })
+        const json = await res.json()
+        if (!res.ok) { toast.error(json.error ?? 'メールアドレスの更新に失敗しました'); return }
+      }
       toast.success('プロフィールを更新しました')
       router.refresh()
     } finally {
@@ -113,8 +123,8 @@ export function CastProfileSettings({
 
         <div className="space-y-1.5">
           <Label>メールアドレス</Label>
-          <Input value={email} disabled />
-          <p className="text-xs text-muted-foreground">メールアドレスの変更は管理者にご連絡ください</p>
+          <Input type="email" value={emailValue} onChange={e => setEmailValue(e.target.value)} placeholder="cast@example.com" />
+          <p className="text-xs text-muted-foreground">パスワード再設定メールの送付に使用します（ログインには使いません）</p>
         </div>
 
         <div className="space-y-1.5">
