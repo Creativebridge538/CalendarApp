@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Calculator, Lock, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Calculator, Lock, LockOpen, ChevronLeft, ChevronRight } from 'lucide-react'
 import Link from 'next/link'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
@@ -102,6 +102,14 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
     }).catch(() => {})
   }
 
+  async function unfinalize(reward: Reward) {
+    if (!confirm('確定を取り消して編集可能に戻しますか？（キャストには既に確定通知が届いています）')) return
+    const { error } = await supabase.from('reward_calculations').update({ is_finalized: false }).eq('id', reward.id)
+    if (error) { toast.error('取消に失敗しました'); return }
+    setRewards(rewards.map(r => r.id === reward.id ? { ...r, is_finalized: false } : r))
+    toast.success('確定を取り消しました')
+  }
+
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
 
@@ -164,7 +172,12 @@ export function RewardCalculator({ casts, rewards: initialRewards, storeId, user
                   </TableCell>
                   <TableCell className="text-right space-x-1">
                     {isFinalized ? (
-                      <Badge><Lock className="h-3 w-3 mr-1" />確定済み</Badge>
+                      <>
+                        <Badge><Lock className="h-3 w-3 mr-1" />確定済み</Badge>
+                        <Button size="sm" variant="outline" onClick={() => reward && unfinalize(reward)}>
+                          <LockOpen className="h-3.5 w-3.5 mr-1" />取消
+                        </Button>
+                      </>
                     ) : (
                       <>
                         <Button size="sm" variant="outline" onClick={() => calculate(cast)} disabled={calculating}>
