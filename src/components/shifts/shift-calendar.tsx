@@ -135,7 +135,6 @@ export function ShiftCalendar({
             const isToday = inMonth && isSameDay(day, new Date())
             const dow = getDay(day)
             const dayKey = format(day, 'yyyy-MM-dd')
-            const isPeriod = inMonth && dayShifts.some(s => s.is_period_day)
             const isSelected = inMonth && selectedDates?.has(dayKey)
 
             return (
@@ -149,9 +148,6 @@ export function ShiftCalendar({
                   isSelected && 'bg-[color-mix(in_srgb,var(--brand-accent)_12%,transparent)] ring-1 ring-inset ring-[var(--brand-accent)]'
                 )}
               >
-                {isPeriod && (
-                  <span className="absolute top-1 right-1.5 h-1.5 w-1.5 rounded-full bg-pink-400" title="生理日" />
-                )}
                 {isSelected && (
                   <span
                     className="absolute top-1 left-1.5 h-3.5 w-3.5 rounded-full flex items-center justify-center text-white text-[8px] font-bold"

@@ -114,7 +114,6 @@ function ShiftTimeGrid({
         <div className="w-9 shrink-0" />
         {days.map(day => {
           const isToday = isSameDay(day, new Date())
-          const isPeriod = shiftsOn(day).some(s => s.is_period_day)
           return (
             <div key={day.toISOString()} className="flex-1 text-center py-1.5 min-w-0 relative">
               <div className={`text-[10px] ${day.getDay() === 0 ? 'text-red-500' : day.getDay() === 6 ? 'text-blue-500' : 'text-muted-foreground'}`}>
@@ -126,9 +125,6 @@ function ShiftTimeGrid({
               >
                 {format(day, 'd')}
               </span>
-              {isPeriod && (
-                <span className="absolute top-0 right-1/2 translate-x-4 h-1.5 w-1.5 rounded-full bg-pink-400" title="生理日" />
-              )}
             </div>
           )
         })}
@@ -1154,14 +1150,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
               </div>
             )}
             <div className="space-y-1.5"><Label>備考</Label><Textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} rows={2} /></div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={form.is_period_day}
-                onCheckedChange={c => setForm({ ...form, is_period_day: !!c })}
-                className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
-              />
-              生理日
-            </label>
             {checklistItems.length > 0 && (
               <div className="space-y-3">
                 <Label>確認項目</Label>
@@ -1368,14 +1356,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
               <Label className="text-xs text-muted-foreground">備考</Label>
               <Textarea value={bulkForm.notes} onChange={e => setBulkForm({ ...bulkForm, notes: e.target.value })} rows={2} />
             </div>
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox
-                checked={bulkForm.is_period_day}
-                onCheckedChange={c => setBulkForm({ ...bulkForm, is_period_day: !!c })}
-                className="data-checked:border-[var(--brand-accent)] data-checked:bg-[var(--brand-accent)]"
-              />
-              選んだ日をすべて生理日にする
-            </label>
             {checklistItems.length > 0 && (
               <div className="space-y-3">
                 <Label className="text-xs text-muted-foreground">確認項目</Label>
