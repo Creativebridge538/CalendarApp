@@ -214,20 +214,19 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
     color: '#8e8e93',
   }
 
-  // iOS PWA: パスワード欄のあるログイン画面からの遷移直後、WebKitがネイティブの
-  // オリジン表示バーを閉じるアニメーションが終わるまでレイアウトの再計算が走らず、
-  // 一時的に表示がずれることがある（時間が経つ・操作すると自然に直る）。
-  // バーの消去アニメーションのタイミングが正確に分からないため、複数回・時間を空けて
-  // 強制的にスクロール位置をゆらし、WebKit側の再計算を後追いで促す
+  // iOS PWA: パスワード欄のあるログイン画面からの遷移直後、WebKitがセーフエリア
+  // （ステータスバー分の余白）の再計算をすぐ行わず、コンテンツが一時的にステータスバーの
+  // 裏に潜り込むことがある（時間が経つ・操作すると自然に直る）。viewportのmetaタグの
+  // 値を触ってあげることで、iOS側にセーフエリアの再計算を強制的に促す
   useEffect(() => {
-    function nudge() {
-      const main = document.querySelector('main')
-      if (!main) return
-      const top = main.scrollTop
-      main.scrollTop = top + 1
-      requestAnimationFrame(() => { main.scrollTop = top })
+    function touchViewportMeta() {
+      const meta = document.querySelector('meta[name="viewport"]')
+      if (!meta) return
+      const content = meta.getAttribute('content') ?? ''
+      meta.setAttribute('content', `${content}, viewport-fit=cover`)
+      requestAnimationFrame(() => meta.setAttribute('content', content))
     }
-    const timers = [0, 150, 350, 600, 1000].map(delay => window.setTimeout(nudge, delay))
+    const timers = [0, 150, 350, 600, 1000].map(delay => window.setTimeout(touchViewportMeta, delay))
     return () => timers.forEach(t => window.clearTimeout(t))
   }, [pathname])
 
