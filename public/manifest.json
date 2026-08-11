@@ -3,6 +3,7 @@
   "short_name": "CalendarApp",
   "description": "多店舗対応シフト・報酬・キャスト管理",
   "start_url": "/cast/shifts",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#f8fafc",
   "theme_color": "#0a0b0d",
