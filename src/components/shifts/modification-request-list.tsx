@@ -82,7 +82,11 @@ export function ModificationRequestList({ requests: initialRequests }: { request
       }).eq('id', rejectTarget.id),
       supabase.from('shifts').update({ status: 'confirmed' }).eq('id', rejectTarget.shift_id),
     ])
-    if (error || statusError) { toast.error('却下に失敗しました'); return }
+    if (error || statusError) {
+      // 23P01 = exclusion_violation。元の時間帯に別の確定シフトが割り込んでいた場合
+      toast.error(statusError?.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '却下に失敗しました')
+      return
+    }
     setRequests(requests.filter(r => r.id !== rejectTarget.id))
     toast.success('却下しました')
     const title = 'シフト修正申請が却下されました'

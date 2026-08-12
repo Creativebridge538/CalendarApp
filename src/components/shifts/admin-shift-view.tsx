@@ -103,7 +103,11 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     const update: { status: ShiftStatus; confirmed_at?: string; admin_note: string | null } = { status, admin_note: note || null }
     if (status === 'confirmed') update.confirmed_at = new Date().toISOString()
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
-    if (error) { toast.error('更新に失敗しました'); return }
+    if (error) {
+      // 23P01 = exclusion_violation。同じルーム・時間帯に別の確定シフトが既にあり、DB側で二重予約を弾いた場合
+      toast.error(error.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '更新に失敗しました')
+      return
+    }
     setShifts(shifts.map(s => s.id === shift.id ? { ...s, ...update } : s))
     toast.success(status === 'confirmed' ? 'シフトを確定しました' : '差し戻しました')
     setDetailShift(null)

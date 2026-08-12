@@ -83,14 +83,19 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     const slot = slots.find(s => s.id === slotId)
     const app = slot?.vacant_slot_applications.find(a => a.id === appId)
     if (approve) {
-      if (app?.shift_id) {
+      const { error: e2 } = app?.shift_id
         // 申請時に作成済みの仮予定（提出済み）を確定に切り替える
-        await supabase.from('shifts').update({ status: 'confirmed' }).eq('id', app.shift_id)
-      } else if (slot) {
-        await supabase.from('shifts').insert({
-          cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
-          date: slot.date, start_time: slot.start_time, end_time: slot.end_time, status: 'confirmed',
-        })
+        ? await supabase.from('shifts').update({ status: 'confirmed' }).eq('id', app.shift_id)
+        : slot
+        ? await supabase.from('shifts').insert({
+            cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
+            date: slot.date, start_time: slot.start_time, end_time: slot.end_time, status: 'confirmed',
+          })
+        : { error: null }
+      if (e2) {
+        // 23P01 = exclusion_violation。同じルーム・時間帯に既に確定シフトがあり、DB側で二重予約を弾いた場合
+        toast.error(e2.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '承認に失敗しました')
+        return
       }
     } else if (app?.shift_id) {
       await supabase.from('shifts').delete().eq('id', app.shift_id)
