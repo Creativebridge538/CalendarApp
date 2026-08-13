@@ -26,9 +26,10 @@ export async function POST(request: Request) {
   })
 
   if (createError) {
+    console.error('create-cast: createUser failed', createError)
     const message = createError.message.includes('already registered')
       ? 'このメールアドレスは既に登録されています'
-      : createError.message
+      : 'キャストの作成に失敗しました。時間をおいて再度お試しください'
     return NextResponse.json({ error: message }, { status: 400 })
   }
 

@@ -27,26 +27,33 @@ export async function subscribeToPush(userId: string): Promise<void> {
   const permission = await Notification.requestPermission()
   if (permission !== 'granted') throw new Error('通知が許可されませんでした')
 
-  const registration = await navigator.serviceWorker.register('/sw.js')
-  await navigator.serviceWorker.ready
-
   const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY
   if (!publicKey) throw new Error('VAPID公開鍵が設定されていません')
 
-  const subscription = await registration.pushManager.subscribe({
-    userVisibleOnly: true,
-    applicationServerKey: urlBase64ToUint8Array(publicKey),
-  })
+  // ここから先はブラウザ・DB側の生の英語エラーが飛んでくる可能性があるため、
+  // 呼び出し元にはユーザーに見せられる日本語メッセージに正規化して投げ直す
+  try {
+    const registration = await navigator.serviceWorker.register('/sw.js')
+    await navigator.serviceWorker.ready
 
-  const json = subscription.toJSON()
-  const supabase = createClient()
-  const { error } = await supabase.from('push_subscriptions').upsert({
-    user_id: userId,
-    endpoint: json.endpoint!,
-    p256dh: json.keys!.p256dh,
-    auth: json.keys!.auth,
-  }, { onConflict: 'endpoint' })
-  if (error) throw error
+    const subscription = await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: urlBase64ToUint8Array(publicKey),
+    })
+
+    const json = subscription.toJSON()
+    const supabase = createClient()
+    const { error } = await supabase.from('push_subscriptions').upsert({
+      user_id: userId,
+      endpoint: json.endpoint!,
+      p256dh: json.keys!.p256dh,
+      auth: json.keys!.auth,
+    }, { onConflict: 'endpoint' })
+    if (error) throw error
+  } catch (e) {
+    console.error('subscribeToPush failed', e)
+    throw new Error('プッシュ通知の登録に失敗しました')
+  }
 }
 
 export async function unsubscribeFromPush(): Promise<void> {
