@@ -40,13 +40,13 @@ function DialogOverlay({
 }
 
 const centerContentClass =
-  "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+  "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%_-_2rem)] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
 
 // モバイル幅では画面下からのボトムシート、md以上では従来通り中央のダイアログに戻る
 const sheetContentClass = cn(
   "fixed z-50 grid w-full gap-4 overflow-y-auto bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-150 outline-none",
   "inset-x-0 bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 max-h-[85dvh] rounded-t-2xl rounded-b-none pt-2",
-  "pb-[calc(1rem+env(safe-area-inset-bottom))]",
+  "pb-[calc(1rem_+_env(safe-area-inset-bottom))]",
   "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom",
   "md:top-1/2 md:bottom-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4 md:left-1/2 md:right-auto",
   "md:data-open:zoom-in-95 md:data-open:slide-in-from-bottom-0 md:data-closed:zoom-out-95 md:data-closed:slide-out-to-bottom-0"
@@ -56,7 +56,7 @@ const sheetContentClass = cn(
 const topContentClass = cn(
   "fixed z-50 grid w-full gap-4 overflow-y-auto bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-150 outline-none",
   "inset-x-0 top-0 bottom-auto left-0 right-0 translate-x-0 translate-y-0 max-h-[85dvh] rounded-b-2xl rounded-t-none pb-2",
-  "pt-[calc(1rem+env(safe-area-inset-top))]",
+  "pt-[calc(1rem_+_env(safe-area-inset-top))]",
   "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-top data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-top",
   "md:top-1/2 md:bottom-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4 md:left-1/2 md:right-auto",
   "md:data-open:zoom-in-95 md:data-open:slide-in-from-top-0 md:data-closed:zoom-out-95 md:data-closed:slide-out-to-top-0"

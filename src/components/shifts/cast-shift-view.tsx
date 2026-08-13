@@ -614,7 +614,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
         </CardHeader>
         {showPwaBanner && (
           <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none md:px-3 md:pb-3">
-            <div className="pointer-events-auto w-full md:max-w-sm rounded-t-2xl md:rounded-2xl border-t md:border shadow-xl animate-in slide-in-from-bottom fade-in-0 duration-300 bg-popover p-4 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-4">
+            <div className="pointer-events-auto w-full md:max-w-sm rounded-t-2xl md:rounded-2xl border-t md:border shadow-xl animate-in slide-in-from-bottom fade-in-0 duration-300 bg-popover p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:pb-4">
               <div className="mx-auto -mt-1 mb-2 h-1 w-9 rounded-full bg-foreground/15 md:hidden" />
 
               <div className="flex items-start gap-3 mb-4">

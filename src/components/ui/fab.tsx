@@ -8,7 +8,7 @@ function Fab({ className, ...props }: ButtonPrimitive.Props) {
       data-slot="fab"
       className={cn(
         "fixed right-4 z-40 flex h-[60px] w-[60px] items-center justify-center rounded-full border-[3px] border-white",
-        "bottom-[calc(4rem+env(safe-area-inset-bottom)+12px)]",
+        "bottom-[calc(4rem_+_env(safe-area-inset-bottom)_+_12px)]",
         "bg-[var(--brand-accent)] text-white",
         "shadow-[var(--elevation-fab)] outline-none transition-transform duration-150",
         "active:scale-90 active:shadow-[var(--elevation-fab-pressed)]",
