@@ -172,6 +172,13 @@
   .overflow-y-auto, .overflow-x-auto, .overflow-auto {
     overscroll-behavior: none;
   }
+  /* ログイン後の画面((app)配下)専用。iOSでは100vhが実際の表示領域よりわずかに大きく
+     計算されることがあり、overflow-hiddenを子要素に付けるだけだとbody自体が
+     その差分だけ上下にスライドできてしまう。bodyそのものを明示的に画面高さへ固定する */
+  body.app-shell {
+    height: 100vh;
+    overflow: hidden;
+  }
 }
 
 /* ── Theme: Rose ─────────────────────────────── */

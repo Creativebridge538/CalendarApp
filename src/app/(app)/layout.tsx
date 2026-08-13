@@ -2,6 +2,7 @@ import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { AppNav } from '@/components/layout/app-nav'
+import { LockBodyScroll } from '@/components/layout/lock-body-scroll'
 import { getAccentSkin } from '@/lib/accent-skins'
 import { getAccentFont } from '@/lib/accent-fonts'
 
@@ -24,6 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (store && !store.is_active) {
     return (
       <div className="flex h-screen items-center justify-center p-6 text-center">
+        <LockBodyScroll />
         <div className="space-y-2 max-w-sm">
           <p className="text-lg font-bold">この店舗は現在ご利用いただけません</p>
           <p className="text-sm text-muted-foreground">
@@ -67,6 +69,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
       data-theme={theme}
     >
+      <LockBodyScroll />
       <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
       <main
         className={`flex-1 overflow-y-auto md:pt-0 ${role === 'cast' ? 'pb-[calc(4rem+env(safe-area-inset-bottom)+5rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
