@@ -72,7 +72,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       <LockBodyScroll />
       <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
       <main
-        className={`flex-1 overflow-y-auto md:pt-0 ${role === 'cast' ? 'pb-[calc(4rem+env(safe-area-inset-bottom)+5rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
+        className={`flex-1 overflow-y-auto md:pt-0 ${role === 'cast' ? 'pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
       >
         {children}
       </main>
