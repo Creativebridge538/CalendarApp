@@ -167,9 +167,9 @@
     overscroll-behavior: none;
     height: 100%;
   }
-  /* 実際のスクロールはbody/htmlではなく各所のoverflow-y-autoコンテナ側で起きるため、
+  /* 実際のスクロールはbody/htmlではなく各所のoverflow-y-auto/overflow-x-autoコンテナ側で起きるため、
      そちらにもバウンス(ラバーバンド)防止を効かせる */
-  .overflow-y-auto, .overflow-auto {
+  .overflow-y-auto, .overflow-x-auto, .overflow-auto {
     overscroll-behavior: none;
   }
 }

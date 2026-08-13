@@ -63,7 +63,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div
-      className={`flex h-screen font-sans ${castSkin?.isDark ? 'dark' : ''}`}
+      className={`flex h-screen overflow-hidden font-sans ${castSkin?.isDark ? 'dark' : ''}`}
       style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
       data-theme={theme}
     >
