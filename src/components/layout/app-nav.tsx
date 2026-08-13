@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
@@ -208,6 +208,29 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
   const nav = role === 'admin' ? adminNav : castNav
   const [mobileOpen, setMobileOpen] = useState(false)
   const s = THEME_STYLES[theme] ?? THEME_STYLES.default
+  const bottomNavRef = useRef<HTMLElement>(null)
+
+  // 下部タブバーの実際の高さは機種・OSのレンダリング差で微妙に変わるため、決め打ちの余白では
+  // 端末によってコンテンツ最下部がタブバーに隠れたり、逆に余白が大きすぎたりする。
+  // 実測してCSS変数に反映し、コンテンツ側のpadding-bottomはそれを参照する
+  useEffect(() => {
+    if (!bottomNavRef.current) return
+    const el = bottomNavRef.current
+    const update = () => {
+      document.documentElement.style.setProperty('--cast-tabbar-h', `${el.getBoundingClientRect().height}px`)
+    }
+    update()
+    // フォント読み込み等で初回計測直後にラベルの高さがわずかに変わることがあるため、少し遅らせて再計測する
+    const timers = [100, 500].map(delay => window.setTimeout(update, delay))
+    const observer = new ResizeObserver(update)
+    observer.observe(el)
+    window.addEventListener('orientationchange', update)
+    return () => {
+      timers.forEach(t => window.clearTimeout(t))
+      observer.disconnect()
+      window.removeEventListener('orientationchange', update)
+    }
+  }, [])
   // キャストの下部タブバーは店舗テーマに関わらず常に白基調（iOSネイティブ系の見た目）
   const castBottomBar: React.CSSProperties = {
     backgroundColor: '#ffffff',
@@ -262,6 +285,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
           {/* キャスト: 下部タブバー（フラット・全幅。アクティブはアイコン+ラベルの色が変わるだけ）。
               中央はシフト作成の浮き出しボタン（iOSネイティブ系タブバーの「作成」ボタンと同じ配置） */}
           <nav
+            ref={bottomNavRef}
             className="md:hidden fixed bottom-0 left-0 right-0 z-40 grid grid-cols-5 border-t"
             style={{
               ...castBottomBar,
