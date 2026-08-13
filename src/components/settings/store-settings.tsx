@@ -219,42 +219,42 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
       <Card>
         <CardHeader><CardTitle>デザインテーマ</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid grid-cols-3 gap-2 max-w-[200px]">
+          <div className="flex flex-wrap gap-2">
             {THEMES.map(t => (
               <button
                 key={t.id}
                 onClick={() => setTheme(t.id)}
-                className={`rounded-xl overflow-hidden text-left transition-all ring-2 ${
+                className={`w-40 shrink-0 rounded-xl overflow-hidden text-left transition-all ring-2 ${
                   theme === t.id
                     ? 'ring-white shadow-lg shadow-black/30 scale-[1.02]'
                     : 'ring-transparent hover:ring-white/40'
                 }`}
               >
                 {/* プレビュー */}
-                <div className="flex h-16">
+                <div className="flex h-20">
                   {/* サイドバー */}
                   <div
-                    className="w-8 shrink-0 flex flex-col gap-1 p-1.5"
+                    className="w-10 shrink-0 flex flex-col gap-1.5 p-2"
                     style={{ backgroundColor: t.sidebar, borderRight: `1px solid ${t.sidebarBorder}` }}
                   >
                     {[0, 1, 2].map(i => (
                       <div
                         key={i}
-                        className="h-1.5 rounded-full"
+                        className="h-2 rounded-full"
                         style={{ backgroundColor: i === 0 ? t.accent : `${t.accent}44`, width: i === 0 ? '100%' : '70%' }}
                       />
                     ))}
                   </div>
                   {/* コンテンツ */}
-                  <div className="flex-1 p-1.5 flex flex-col gap-1" style={{ backgroundColor: t.mainBg }}>
-                    <div className="h-2 w-3/4 rounded-full" style={{ backgroundColor: t.dark ? 'rgba(255,255,255,0.15)' : '#e5e7eb' }} />
-                    <div className="h-4 w-1/2 rounded" style={{ backgroundColor: t.accent }} />
-                    <div className="h-2 w-2/3 rounded-full" style={{ backgroundColor: t.dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6' }} />
+                  <div className="flex-1 p-2 flex flex-col gap-1.5" style={{ backgroundColor: t.mainBg }}>
+                    <div className="h-2.5 w-3/4 rounded-full" style={{ backgroundColor: t.dark ? 'rgba(255,255,255,0.15)' : '#e5e7eb' }} />
+                    <div className="h-5 w-1/2 rounded" style={{ backgroundColor: t.accent }} />
+                    <div className="h-2.5 w-2/3 rounded-full" style={{ backgroundColor: t.dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6' }} />
                   </div>
                 </div>
-                <div className="px-2 py-1.5 bg-white">
-                  <p className="text-xs font-bold">{t.label}</p>
-                  <p className="text-[10px] text-gray-500">{t.desc}</p>
+                <div className="px-3 py-2 bg-white">
+                  <p className="text-sm font-bold">{t.label}</p>
+                  <p className="text-xs text-gray-500">{t.desc}</p>
                 </div>
               </button>
             ))}
