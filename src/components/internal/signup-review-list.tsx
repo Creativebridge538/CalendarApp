@@ -121,7 +121,7 @@ export function SignupReviewList({ pending: initialPending, recent: initialRecen
       )}
 
       <Dialog open={!!rejectTarget} onOpenChange={open => { if (!open) setRejectTarget(null) }}>
-        <DialogContent sidebarOffset={false}>
+        <DialogContent>
           <DialogHeader><DialogTitle>却下理由（任意）</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">

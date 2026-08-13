@@ -39,10 +39,8 @@ function DialogOverlay({
   )
 }
 
-// md以上ではデスクトップ用サイドバー(w-56=14rem)が左側に固定表示されるため、
-// ダイアログは画面全体ではなくサイドバーを除いたメインコンテンツ領域の中央に来るよう左に7rem(サイドバー幅の半分)分オフセットする
 const centerContentClass =
-  "fixed top-1/2 left-1/2 md:left-[calc(50%+7rem)] z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
+  "fixed top-1/2 left-1/2 z-50 grid w-full max-w-[calc(100%-2rem)] max-h-[85dvh] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground ring-1 ring-foreground/10 duration-100 outline-none sm:max-w-sm data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95"
 
 // モバイル幅では画面下からのボトムシート、md以上では従来通り中央のダイアログに戻る
 const sheetContentClass = cn(
@@ -50,7 +48,7 @@ const sheetContentClass = cn(
   "inset-x-0 bottom-0 top-auto left-0 right-0 translate-x-0 translate-y-0 max-h-[85dvh] rounded-t-2xl rounded-b-none pt-2",
   "pb-[calc(1rem+env(safe-area-inset-bottom))]",
   "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-bottom data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-bottom",
-  "md:top-1/2 md:bottom-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4 md:left-[calc(50%+7rem)] md:right-auto",
+  "md:top-1/2 md:bottom-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4 md:left-1/2 md:right-auto",
   "md:data-open:zoom-in-95 md:data-open:slide-in-from-bottom-0 md:data-closed:zoom-out-95 md:data-closed:slide-out-to-bottom-0"
 )
 
@@ -60,7 +58,7 @@ const topContentClass = cn(
   "inset-x-0 top-0 bottom-auto left-0 right-0 translate-x-0 translate-y-0 max-h-[85dvh] rounded-b-2xl rounded-t-none pb-2",
   "pt-[calc(1rem+env(safe-area-inset-top))]",
   "data-open:animate-in data-open:fade-in-0 data-open:slide-in-from-top data-closed:animate-out data-closed:fade-out-0 data-closed:slide-out-to-top",
-  "md:top-1/2 md:bottom-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4 md:left-[calc(50%+7rem)] md:right-auto",
+  "md:top-1/2 md:bottom-auto md:max-w-sm md:-translate-x-1/2 md:-translate-y-1/2 md:rounded-xl md:pt-4 md:pb-4 md:left-1/2 md:right-auto",
   "md:data-open:zoom-in-95 md:data-open:slide-in-from-top-0 md:data-closed:zoom-out-95 md:data-closed:slide-out-to-top-0"
 )
 
@@ -69,7 +67,6 @@ function DialogContent({
   children,
   showCloseButton = true,
   variant = "center",
-  sidebarOffset = true,
   onDismiss,
   ...props
 }: DialogPrimitive.Popup.Props & {
@@ -77,8 +74,6 @@ function DialogContent({
   variant?: "center" | "sheet" | "top"
   /** variant="sheet" の時、ハンドルを下にドラッグして閉じた際に呼ばれる */
   onDismiss?: () => void
-  /** md以上のデスクトップサイドバー分センタリングをオフセットするか。サイドバーのない画面（/internal 配下など）では false にする */
-  sidebarOffset?: boolean
 }) {
   const popupRef = React.useRef<HTMLDivElement>(null)
   const dragStartY = React.useRef<number | null>(null)
@@ -112,7 +107,6 @@ function DialogContent({
         data-slot="dialog-content"
         className={cn(
           variant === "sheet" ? sheetContentClass : variant === "top" ? topContentClass : centerContentClass,
-          !sidebarOffset && "md:left-1/2",
           className
         )}
         {...props}
