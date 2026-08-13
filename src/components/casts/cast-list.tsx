@@ -125,6 +125,19 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           }
           email = json.email
         }
+        if (form.password) {
+          const res = await fetch('/api/admin/update-cast-password', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId: editing.id, password: form.password }),
+          })
+          const json = await res.json()
+          if (!res.ok) {
+            toast.error(json.error ?? 'パスワードの変更に失敗しました')
+            setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload, email } : c))
+            return
+          }
+        }
         setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload, email } : c))
         toast.success('キャスト情報を更新しました')
       }
@@ -312,10 +325,15 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
               <p className="text-xs text-muted-foreground">パスワード再設定メールの送付に使用します（ログインには使いません）</p>
             </div>
-            {!editing && (
+            {!editing ? (
               <div className="space-y-1.5">
                 <Label>パスワード *</Label>
                 <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="8文字以上" />
+              </div>
+            ) : (
+              <div className="space-y-1.5">
+                <Label>パスワード変更</Label>
+                <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="変更する場合のみ入力（8文字以上）" />
               </div>
             )}
             <div className="space-y-1.5">
