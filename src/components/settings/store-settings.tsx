@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -15,6 +16,21 @@ import {
 } from '@/lib/platform-earnings'
 
 const WEEKDAY_LABELS = ['日', '月', '火', '水', '木', '金', '土']
+
+// 他のテーマ(rose/emerald/midnight/gold/violet)の配色定義自体はglobals.css/app-nav.tsxに残したまま、
+// 選択肢としてはいったんMonoのみに絞っている（今後ここに追加するだけで選べるようになる）
+const THEMES = [
+  {
+    id: 'default',
+    label: 'Mono',
+    desc: 'シンプルなモノクロ',
+    sidebar: '#ffffff',
+    sidebarBorder: '#e5e7eb',
+    accent: '#111827',
+    mainBg: '#f8fafc',
+    dark: false,
+  },
+]
 
 const PLATFORM_LABEL: Record<PlatformKey, string> = {
   stripchat: 'STRIPCHAT（TK）', fc2: 'FC2（ポイント）', dxlive: 'DXライブ（ポイント）',
@@ -55,12 +71,14 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [locationMode, setLocationMode] = useState(initialSettings?.location_mode ?? 'room')
   const [areaLabel, setAreaLabel] = useState(initialSettings?.area_label ?? 'エリア')
   const [roomLabel, setRoomLabel] = useState(initialSettings?.room_label ?? 'ルーム')
+  const [theme, setTheme] = useState(initialSettings?.theme ?? 'default')
   const [logoUrl, setLogoUrl] = useState(initialSettings?.logo_url ?? null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [usdJpyRate, setUsdJpyRate] = useState(String(initialSettings?.usd_jpy_rate ?? ''))
   const [fetchingRate, setFetchingRate] = useState(false)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(parsePlatformSettings(initialSettings?.platform_settings))
   const supabase = createClient()
+  const router = useRouter()
 
   async function fetchLatestRate() {
     setFetchingRate(true)
@@ -100,6 +118,18 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
       if (error) { toast.error('保存に失敗しました'); return }
     }
     toast.success('ロケーション設定を保存しました')
+  }
+
+  async function saveTheme() {
+    if (initialSettings) {
+      const { error } = await supabase.from('store_settings').update({ theme }).eq('id', initialSettings.id)
+      if (error) { toast.error('保存に失敗しました'); return }
+    } else {
+      const { error } = await supabase.from('store_settings').insert({ theme, store_id: storeId })
+      if (error) { toast.error('保存に失敗しました'); return }
+    }
+    toast.success('テーマを変更しました')
+    router.refresh()
   }
 
   async function uploadLogo(file: File) {
@@ -186,6 +216,52 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
         </CardContent>
       </Card>
 
+      <Card>
+        <CardHeader><CardTitle>デザインテーマ</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="grid grid-cols-3 gap-2 max-w-[200px]">
+            {THEMES.map(t => (
+              <button
+                key={t.id}
+                onClick={() => setTheme(t.id)}
+                className={`rounded-xl overflow-hidden text-left transition-all ring-2 ${
+                  theme === t.id
+                    ? 'ring-white shadow-lg shadow-black/30 scale-[1.02]'
+                    : 'ring-transparent hover:ring-white/40'
+                }`}
+              >
+                {/* プレビュー */}
+                <div className="flex h-16">
+                  {/* サイドバー */}
+                  <div
+                    className="w-8 shrink-0 flex flex-col gap-1 p-1.5"
+                    style={{ backgroundColor: t.sidebar, borderRight: `1px solid ${t.sidebarBorder}` }}
+                  >
+                    {[0, 1, 2].map(i => (
+                      <div
+                        key={i}
+                        className="h-1.5 rounded-full"
+                        style={{ backgroundColor: i === 0 ? t.accent : `${t.accent}44`, width: i === 0 ? '100%' : '70%' }}
+                      />
+                    ))}
+                  </div>
+                  {/* コンテンツ */}
+                  <div className="flex-1 p-1.5 flex flex-col gap-1" style={{ backgroundColor: t.mainBg }}>
+                    <div className="h-2 w-3/4 rounded-full" style={{ backgroundColor: t.dark ? 'rgba(255,255,255,0.15)' : '#e5e7eb' }} />
+                    <div className="h-4 w-1/2 rounded" style={{ backgroundColor: t.accent }} />
+                    <div className="h-2 w-2/3 rounded-full" style={{ backgroundColor: t.dark ? 'rgba(255,255,255,0.08)' : '#f3f4f6' }} />
+                  </div>
+                </div>
+                <div className="px-2 py-1.5 bg-white">
+                  <p className="text-xs font-bold">{t.label}</p>
+                  <p className="text-[10px] text-gray-500">{t.desc}</p>
+                </div>
+              </button>
+            ))}
+          </div>
+          <Button onClick={saveTheme}>テーマを保存</Button>
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle>ロケーション設定</CardTitle></CardHeader>
