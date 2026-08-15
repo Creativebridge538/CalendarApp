@@ -3,11 +3,12 @@
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, startOfWeek, endOfWeek } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -61,7 +62,9 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [shifts, setShifts] = useState(initialShifts)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
-  const [view, setView] = useState<'calendar' | 'timeline' | 'list'>('calendar')
+  const [periodMode, setPeriodMode] = useState<'all' | 'day' | 'week'>('all')
+  const [periodDate, setPeriodDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'))
+  const [view, setView] = useState<'calendar' | 'timeline' | 'list'>('list')
   const [listPage, setListPage] = useState(1)
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
   const [detailShift, setDetailShift] = useState<Shift | null>(null)
@@ -75,11 +78,21 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     }).filter((v): v is string => !!v)
   }
 
+  const periodRange = useMemo(() => {
+    if (periodMode === 'all') return null
+    const anchor = new Date(`${periodDate}T00:00:00`)
+    if (periodMode === 'day') return { from: periodDate, to: periodDate }
+    const from = format(startOfWeek(anchor, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    const to = format(endOfWeek(anchor, { weekStartsOn: 1 }), 'yyyy-MM-dd')
+    return { from, to }
+  }, [periodMode, periodDate])
+
   const filtered = useMemo(() => shifts.filter(s => {
     if (filterStatus !== 'all' && s.status !== filterStatus) return false
     if (filterCast !== 'all' && s.cast_id !== filterCast) return false
+    if (periodRange && (s.date < periodRange.from || s.date > periodRange.to)) return false
     return true
-  }), [shifts, filterStatus, filterCast])
+  }), [shifts, filterStatus, filterCast, periodRange])
 
   // リスト表示は件数が多いと際限なく縦に伸びてしまうため、ページ単位で区切る
   const LIST_PAGE_SIZE = 30
@@ -181,6 +194,28 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
             </SelectContent>
           </Select>
+          <Select value={periodMode} onValueChange={v => { if (v) { setPeriodMode(v as 'all' | 'day' | 'week'); setListPage(1) } }}>
+            <SelectTrigger className="w-28">
+              <SelectValue>{{ all: '全期間', day: '日で絞る', week: '週で絞る' }[periodMode]}</SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全期間</SelectItem>
+              <SelectItem value="day">日で絞る</SelectItem>
+              <SelectItem value="week">週で絞る</SelectItem>
+            </SelectContent>
+          </Select>
+          {periodMode !== 'all' && (
+            <Input
+              type="date" className="w-40" value={periodDate}
+              onChange={e => { if (e.target.value) { setPeriodDate(e.target.value); setListPage(1) } }}
+            />
+          )}
+          {periodMode === 'week' && periodRange && (
+            <span className="flex items-center text-xs text-muted-foreground">
+              {format(new Date(`${periodRange.from}T00:00:00`), 'M/d(E)', { locale: ja })}
+              〜{format(new Date(`${periodRange.to}T00:00:00`), 'M/d(E)', { locale: ja })}
+            </span>
+          )}
           {conflicts.size > 0 && (
             <div className="flex items-center gap-1 text-sm text-destructive ml-2">
               <AlertCircle className="h-4 w-4" />
