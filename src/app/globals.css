@@ -161,11 +161,13 @@
   body {
     @apply bg-background text-foreground;
     overscroll-behavior: none;
+    overflow-x: hidden;
   }
   html {
     @apply font-sans;
     overscroll-behavior: none;
     height: 100%;
+    overflow-x: hidden;
   }
   /* 実際のスクロールはbody/htmlではなく各所のoverflow-y-auto/overflow-x-autoコンテナ側で起きるため、
      そちらにもバウンス(ラバーバンド)防止を効かせる */
