@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { CheckCircle2 } from 'lucide-react'
+import { toHalfWidthDigits } from '@/lib/zenkaku'
 
 export function ApplyForm() {
   const [storeName, setStoreName] = useState('')
@@ -90,7 +91,7 @@ export function ApplyForm() {
           </div>
           <div className="space-y-2">
             <Label htmlFor="phone">電話番号</Label>
-            <Input id="phone" type="tel" value={phone} onChange={e => setPhone(e.target.value)} />
+            <Input id="phone" type="tel" value={phone} onChange={e => setPhone(toHalfWidthDigits(e.target.value))} />
           </div>
           <div className="space-y-2">
             <Label htmlFor="message">備考</Label>

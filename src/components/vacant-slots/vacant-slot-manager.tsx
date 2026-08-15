@@ -45,7 +45,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     const { data, error } = await supabase.from('vacant_slots').insert({
       store_id: storeId, created_by: userId,
       date: form.date, start_time: form.start_time, end_time: form.end_time,
-      room_id: form.room_id || null, notes: form.notes || null, is_published: false,
+      room_id: form.room_id || null, notes: form.notes || null, is_published: true,
     }).select('*, rooms(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
     if (error) { toast.error('登録に失敗しました'); return }
     setSlots([data, ...slots])
@@ -54,10 +54,39 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
   }
 
   async function togglePublish(slot: Slot) {
-    const { error } = await supabase.from('vacant_slots').update({ is_published: !slot.is_published }).eq('id', slot.id)
+    const nextPublished = !slot.is_published
+    const { error } = await supabase.from('vacant_slots').update({ is_published: nextPublished }).eq('id', slot.id)
     if (error) { toast.error('更新に失敗しました'); return }
-    setSlots(slots.map(s => s.id === slot.id ? { ...s, is_published: !slot.is_published } : s))
-    toast.success(slot.is_published ? '非公開にしました' : '公開しました')
+
+    let apps = slot.vacant_slot_applications
+    if (!nextPublished) {
+      // 非公開にする: 保留中・承認済みの申請に紐づく仮予定シフトを一時的に消す（申請自体は残す）
+      const activeShiftIds = apps.filter(a => (a.status === 'pending' || a.status === 'approved') && a.shift_id).map(a => a.shift_id!)
+      if (activeShiftIds.length > 0) {
+        await supabase.from('shifts').delete().in('id', activeShiftIds)
+      }
+      apps = apps.map(a => (a.status === 'pending' || a.status === 'approved') ? { ...a, shift_id: null } : a)
+    } else {
+      // 公開に戻す: 非公開時に消えた仮予定シフトを、同じ内容で作り直す
+      const appsNeedingShift = apps.filter(a => (a.status === 'pending' || a.status === 'approved') && !a.shift_id)
+      const restoredShiftIds: Record<string, string> = {}
+      let restoreFailed = false
+      for (const a of appsNeedingShift) {
+        const { data: newShift, error: shiftErr } = await supabase.from('shifts').insert({
+          cast_id: a.cast_id, store_id: storeId, room_id: slot.room_id ?? null,
+          date: slot.date, start_time: slot.start_time, end_time: slot.end_time,
+          status: a.status === 'approved' ? 'confirmed' : 'submitted',
+        }).select('id').single()
+        if (shiftErr || !newShift) { restoreFailed = true; continue }
+        restoredShiftIds[a.id] = newShift.id
+        await supabase.from('vacant_slot_applications').update({ shift_id: newShift.id }).eq('id', a.id)
+      }
+      if (restoreFailed) toast.error('一部の仮予定は時間帯が重複しているため復元できませんでした')
+      apps = apps.map(a => restoredShiftIds[a.id] ? { ...a, shift_id: restoredShiftIds[a.id] } : a)
+    }
+
+    setSlots(slots.map(s => s.id === slot.id ? { ...s, is_published: nextPublished, vacant_slot_applications: apps } : s))
+    toast.success(nextPublished ? '公開しました' : '非公開にしました')
   }
 
   async function deleteSlot(slot: Slot) {

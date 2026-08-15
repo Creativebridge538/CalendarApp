@@ -19,6 +19,7 @@ import {
 import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
+import { toHalfWidthDigits } from '@/lib/zenkaku'
 
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
@@ -354,7 +355,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             </div>
             <div className="space-y-1.5">
               <Label>連絡先</Label>
-              <Input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} placeholder="090-xxxx-xxxx" />
+              <Input value={form.phone} onChange={e => setForm({ ...form, phone: toHalfWidthDigits(e.target.value) })} placeholder="090-xxxx-xxxx" />
             </div>
             <div className="space-y-1.5">
               <Label>報酬率（%）</Label>
