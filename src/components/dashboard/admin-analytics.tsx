@@ -220,7 +220,7 @@ export function AdminAnalytics({
 
       <div className="stat-grid">
         <StatTile icon={Wallet} label="平均1日売上" value={avgDailySales} prefix="¥" sub="今月・日割り" delay={60} />
-        <StatTile icon={Users} label="稼働キャスト" value={activeCastCount} sub="今月・実績あり" delay={90} />
+        <StatTile icon={Users} label="稼働キャスト" value={activeCastCount} sub="今月・実績あり" delay={90} href="/admin/casts" />
         <StatTile icon={Calendar} label="未確定シフト" value={pendingShifts} sub="要確認" delay={120} href="/admin/shifts" />
         <StatTile icon={FileEdit} label="修正申請" value={pendingRequests} sub="未処理" delay={150} href="/admin/modification-requests" />
         <StatTile icon={Briefcase} label="空き枠申請" value={pendingVacantApplications} sub="未処理" delay={165} href="/admin/vacant-slots" />
