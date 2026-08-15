@@ -23,7 +23,7 @@ import { shiftConflictMessage } from '@/lib/shift-conflict'
 interface Application { id: string; status: string; cast_id: string; shift_id: string | null; cast: { display_name: string | null } | null }
 interface Slot {
   id: string; date: string; start_time: string; end_time: string; notes: string | null; is_published: boolean
-  room_id: string | null
+  room_id: string | null; capacity: number
   rooms: { name: string } | null
   vacant_slot_applications: Application[]
 }
@@ -39,19 +39,28 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
   const [slots, setSlots] = useState(initialSlots)
   const [open, setOpen] = useState(false)
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
-  const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '' })
+  const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '', capacity: '1' })
   const supabase = createClient()
 
   async function handleCreate() {
+    const capacity = Math.max(1, parseInt(form.capacity) || 1)
     const { data, error } = await supabase.from('vacant_slots').insert({
       store_id: storeId, created_by: userId,
       date: form.date, start_time: form.start_time, end_time: form.end_time,
-      room_id: form.room_id || null, notes: form.notes || null, is_published: true,
+      room_id: form.room_id || null, notes: form.notes || null, is_published: true, capacity,
     }).select('*, rooms(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
     if (error) { toast.error('登録に失敗しました'); return }
     setSlots([data, ...slots])
     toast.success('空き枠を登録しました')
     setOpen(false)
+    setForm({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '', capacity: '1' })
+  }
+
+  async function updateCapacity(slot: Slot, capacity: number) {
+    if (capacity === slot.capacity || capacity < 1) return
+    const { error } = await supabase.from('vacant_slots').update({ capacity }).eq('id', slot.id)
+    if (error) { toast.error('募集人数の更新に失敗しました'); return }
+    setSlots(slots.map(s => s.id === slot.id ? { ...s, capacity } : s))
   }
 
   async function togglePublish(slot: Slot) {
@@ -109,6 +118,11 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     const slot = slots.find(s => s.id === slotId)
     const app = slot?.vacant_slot_applications.find(a => a.id === appId)
 
+    if (nextStatus === 'approved' && slot) {
+      const approvedCount = slot.vacant_slot_applications.filter(a => a.status === 'approved').length
+      if (approvedCount >= slot.capacity) { toast.error(`募集人数（${slot.capacity}人）に達しています`); return }
+    }
+
     const updates: { status: 'approved' | 'rejected' | 'pending'; reviewed_at: string | null } =
       { status: nextStatus, reviewed_at: nextStatus === 'pending' ? null : new Date().toISOString() }
     const { error: e1 } = await supabase.from('vacant_slot_applications').update(updates).eq('id', appId)
@@ -161,6 +175,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
               <TableHead>日付</TableHead>
               <TableHead>時間</TableHead>
               <TableHead>ルーム</TableHead>
+              <TableHead>定員</TableHead>
               <TableHead>公開</TableHead>
               <TableHead>申請</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -168,19 +183,32 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
           </TableHeader>
           <TableBody>
             {slots.length === 0 && (
-              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">空き枠がありません</TableCell></TableRow>
+              <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">空き枠がありません</TableCell></TableRow>
             )}
-            {slots.map(slot => (
+            {slots.map(slot => {
+              const approvedCount = slot.vacant_slot_applications.filter(a => a.status === 'approved').length
+              const isFull = approvedCount >= slot.capacity
+              return (
               <Fragment key={slot.id}>
                 <TableRow>
                   <TableCell>{format(new Date(slot.date), 'M/d(E)', { locale: ja })}</TableCell>
                   <TableCell>{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</TableCell>
                   <TableCell>{slot.rooms?.name ?? '—'}</TableCell>
                   <TableCell>
-                    <Switch checked={slot.is_published} onCheckedChange={() => togglePublish(slot)} />
+                    <Input
+                      key={slot.capacity} type="number" min="1" defaultValue={slot.capacity}
+                      className="w-16 h-8"
+                      onBlur={e => updateCapacity(slot, Math.max(1, parseInt(e.target.value) || 1))}
+                    />
                   </TableCell>
                   <TableCell>
-                    <Badge variant="outline">{slot.vacant_slot_applications.filter(a => a.status === 'pending').length} 件待ち</Badge>
+                    <Switch checked={slot.is_published} onCheckedChange={() => togglePublish(slot)} />
+                  </TableCell>
+                  <TableCell className="space-x-1">
+                    <Badge variant={isFull ? 'default' : 'outline'}>承認 {approvedCount}/{slot.capacity}</Badge>
+                    {slot.vacant_slot_applications.filter(a => a.status === 'pending').length > 0 && (
+                      <Badge variant="outline">{slot.vacant_slot_applications.filter(a => a.status === 'pending').length} 件待ち</Badge>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="icon" variant="ghost" onClick={() => deleteSlot(slot)} aria-label="削除">
@@ -190,7 +218,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                 </TableRow>
                 {slot.vacant_slot_applications.map(app => (
                   <TableRow key={app.id} className={app.status === 'pending' ? 'bg-primary/10' : ''}>
-                    <TableCell colSpan={2} className="pl-8 text-sm">
+                    <TableCell colSpan={3} className="pl-8 text-sm">
                       申請: {app.cast?.display_name ?? '—'}
                     </TableCell>
                     <TableCell>
@@ -200,7 +228,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                     </TableCell>
                     <TableCell colSpan={2} className="text-right space-x-1">
                       {app.status !== 'approved' && (
-                        <Button size="sm" variant="outline" className="text-positive h-7"
+                        <Button size="sm" variant="outline" className="text-positive h-7" disabled={app.status === 'pending' && isFull}
                           onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'approved')}>
                           <Check className="h-3 w-3 mr-1" />承認
                         </Button>
@@ -221,7 +249,8 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                   </TableRow>
                 ))}
               </Fragment>
-            ))}
+              )
+            })}
           </TableBody>
         </Table>
       </CardContent>
@@ -253,6 +282,10 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5"><Label>開始</Label><TimeSelect value={form.start_time} onChange={v => setForm({ ...form, start_time: v })} /></div>
               <div className="space-y-1.5"><Label>終了</Label><TimeSelect value={form.end_time} onChange={v => setForm({ ...form, end_time: v })} /></div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>募集人数</Label>
+              <Input type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
             </div>
             {rooms.length > 0 && (
               <div className="space-y-1.5">

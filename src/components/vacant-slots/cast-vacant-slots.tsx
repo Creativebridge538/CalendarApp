@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { sendPushNotification } from '@/lib/push'
 
-interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; room_id: string | null; rooms: { name: string } | null }
+interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; room_id: string | null; capacity: number; rooms: { name: string } | null }
 interface Application { vacant_slot_id: string; status: string; shift_id: string | null }
 
 interface Props {
@@ -106,6 +106,12 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
                   <span>{slot.rooms?.name ?? 'ルーム未指定'}</span>
+                  {slot.capacity > 1 && (
+                    <>
+                      <span>・</span>
+                      <span>募集{slot.capacity}人</span>
+                    </>
+                  )}
                   {slot.notes && (
                     <>
                       <span>・</span>
@@ -129,6 +135,7 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
                 <TableHead>日付</TableHead>
                 <TableHead>時間</TableHead>
                 <TableHead>ルーム</TableHead>
+                <TableHead>募集人数</TableHead>
                 <TableHead>備考</TableHead>
                 <TableHead className="text-right">申請</TableHead>
               </TableRow>
@@ -139,6 +146,7 @@ export function CastVacantSlots({ slots, myApplications: initial, castId, storeI
                   <TableCell>{format(new Date(slot.date), 'M/d(E)', { locale: ja })}</TableCell>
                   <TableCell>{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</TableCell>
                   <TableCell>{slot.rooms?.name ?? '—'}</TableCell>
+                  <TableCell>{slot.capacity}人</TableCell>
                   <TableCell>{slot.notes ?? '—'}</TableCell>
                   <TableCell className="text-right"><StatusControl slotId={slot.id} /></TableCell>
                 </TableRow>

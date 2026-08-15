@@ -916,6 +916,7 @@ export type Database = {
       }
       vacant_slots: {
         Row: {
+          capacity: number
           created_at: string
           created_by: string
           date: string
@@ -928,6 +929,7 @@ export type Database = {
           store_id: string
         }
         Insert: {
+          capacity?: number
           created_at?: string
           created_by: string
           date: string
@@ -940,6 +942,7 @@ export type Database = {
           store_id: string
         }
         Update: {
+          capacity?: number
           created_at?: string
           created_by?: string
           date?: string
