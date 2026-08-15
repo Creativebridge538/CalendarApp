@@ -3,7 +3,7 @@
 import { useState, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format, startOfWeek, endOfWeek } from 'date-fns'
+import { format, addDays } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,7 @@ import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote, Chev
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { sendPushNotification } from '@/lib/push'
+import { shiftConflictMessage } from '@/lib/shift-conflict'
 import { ShiftCalendar } from './shift-calendar'
 import { ShiftTimeline } from './shift-timeline'
 
@@ -80,11 +81,11 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
 
   const periodRange = useMemo(() => {
     if (periodMode === 'all') return null
-    const anchor = new Date(`${periodDate}T00:00:00`)
     if (periodMode === 'day') return { from: periodDate, to: periodDate }
-    const from = format(startOfWeek(anchor, { weekStartsOn: 1 }), 'yyyy-MM-dd')
-    const to = format(endOfWeek(anchor, { weekStartsOn: 1 }), 'yyyy-MM-dd')
-    return { from, to }
+    // 週の始まりは月曜固定ではなく、選んだ日をそのまま開始日として+6日
+    const anchor = new Date(`${periodDate}T00:00:00`)
+    const to = format(addDays(anchor, 6), 'yyyy-MM-dd')
+    return { from: periodDate, to }
   }, [periodMode, periodDate])
 
   const filtered = useMemo(() => shifts.filter(s => {
@@ -124,8 +125,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     if (status === 'confirmed') update.confirmed_at = new Date().toISOString()
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
     if (error) {
-      // 23P01 = exclusion_violation。同じルーム・時間帯に別の確定シフトが既にあり、DB側で二重予約を弾いた場合
-      toast.error(error.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '更新に失敗しました')
+      toast.error(shiftConflictMessage(error, '更新に失敗しました'))
       return
     }
     setShifts(shifts.map(s => s.id === shift.id ? { ...s, ...update } : s))

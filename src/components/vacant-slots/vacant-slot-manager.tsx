@@ -18,6 +18,7 @@ import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
 import { Plus, Check, X, ChevronDown, Trash2 } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
+import { shiftConflictMessage } from '@/lib/shift-conflict'
 
 interface Application { id: string; status: string; cast_id: string; shift_id: string | null; cast: { display_name: string | null } | null }
 interface Slot {
@@ -124,8 +125,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
           })
         : { error: null }
       if (e2) {
-        // 23P01 = exclusion_violation。同じルーム・時間帯に既に確定シフトがあり、DB側で二重予約を弾いた場合
-        toast.error(e2.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '承認に失敗しました')
+        toast.error(shiftConflictMessage(e2, '承認に失敗しました'))
         return
       }
     } else if (nextStatus === 'rejected' && app?.shift_id) {
