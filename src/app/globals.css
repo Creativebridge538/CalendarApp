@@ -167,7 +167,10 @@
     @apply font-sans;
     overscroll-behavior: none;
     height: 100%;
-    overflow-x: hidden;
+    /* overflow-xをhiddenにするとhtml自身も(overflow-yがautoへ強制されて)独立したスクロールコンテナになり、
+       キャストのPWAシェル(body.app-shellでoverflow:hidden固定)の外側にごくわずかなスライド余地が
+       生まれてしまう。横はみ出し防止はbody側のoverflow-xだけで十分効くため、htmlには付けない */
+    overflow-x: clip;
   }
   /* キャストのPWAシェル((app)配下、body.app-shell)専用: 実際のスクロールはbody/htmlではなく
      各所のoverflow-y-auto/overflow-x-autoコンテナ側で起きるため、そちらにもバウンス(ラバーバンド)防止を効かせる。
@@ -183,6 +186,9 @@
   body.app-shell {
     height: 100vh;
     overflow: hidden;
+    /* iOSでは画面端からの横スワイプがブラウザの「戻る」ジェスチャーとして拾われ、
+       前の画面が一瞬めくれて見えることがある。縦方向のパンだけ許可することでこれを避ける */
+    touch-action: pan-y;
   }
 }
 
