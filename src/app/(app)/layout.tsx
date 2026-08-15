@@ -25,7 +25,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   if (store && !store.is_active) {
     return (
       <div className="flex h-screen items-center justify-center p-6 text-center">
-        {profile?.role === 'cast' && <LockBodyScroll />}
+        <LockBodyScroll />
         <div className="space-y-2 max-w-sm">
           <p className="text-lg font-bold">この店舗は現在ご利用いただけません</p>
           <p className="text-sm text-muted-foreground">
@@ -63,20 +63,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ...(castFont?.font ? { '--font-sans': castFont.font } : {}),
   } as React.CSSProperties
 
-  // ネイティブアプリ的なスクロール制御（body固定+main内スクロール）はキャストのPWA体験専用。
-  // 管理画面（デスクトップ中心・非PWA）に同じ制約をかけると、ページによっては
-  // main内のスクロール領域の計算が実際のコンテンツ量とズレてスクロール不能に見える事故が起きるため、
-  // 管理者は素直にページ全体がブラウザ標準の方法でスクロールする、これまで通りの挙動に戻す
   return (
     <div
-      className={`flex font-sans ${role === 'cast' ? 'h-screen overflow-hidden' : 'min-h-screen'} ${castSkin?.isDark ? 'dark' : ''}`}
+      className={`flex h-screen overflow-hidden font-sans ${castSkin?.isDark ? 'dark' : ''}`}
       style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
       data-theme={theme}
     >
-      {role === 'cast' && <LockBodyScroll />}
+      <LockBodyScroll />
       <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
       <main
-        className={`flex-1 md:pt-0 ${role === 'cast' ? 'overflow-y-auto pb-[max(calc(var(--cast-tabbar-h,0px)_+_1rem),9rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
+        className={`flex-1 overflow-y-auto md:pt-0 ${role === 'cast' ? 'pb-[max(calc(var(--cast-tabbar-h,0px)_+_1rem),9rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
       >
         {children}
       </main>
