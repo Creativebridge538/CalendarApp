@@ -37,7 +37,7 @@ export default async function PaymentNoticePage({
   const [{ data: store }, { data: settings }, { data: cast }, { data: reward }, { data: sales }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
-    supabase.from('users').select('display_name, real_name').eq('id', cast_id).eq('store_id', storeId).single(),
+    supabase.from('users').select('display_name').eq('id', cast_id).eq('store_id', storeId).single(),
     supabase.from('reward_calculations').select('*')
       .eq('cast_id', cast_id).eq('store_id', storeId).eq('period_year', year).eq('period_month', month).single(),
     supabase.from('sales').select('date, platform, amount, raw_units, is_daily_payment')
@@ -112,7 +112,7 @@ export default async function PaymentNoticePage({
 
         <div className="notice-header-grid">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{cast.display_name ?? cast.real_name} 様</div>
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{cast.display_name} 様</div>
             <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel}のお支払い明細をお送りいたします。</div>
           </div>
           <div className="notice-issuer">
