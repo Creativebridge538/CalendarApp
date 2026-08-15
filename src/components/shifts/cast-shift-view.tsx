@@ -238,6 +238,46 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
+  // 管理者側でシフトが確定/差し戻しされた変更を、リロードなしにリアルタイムで反映する
+  useEffect(() => {
+    const channel = supabase
+      .channel(`cast-shifts-${castId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shifts', filter: `cast_id=eq.${castId}` },
+        payload => {
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { id: string }
+            setShifts(prev => prev.filter(s => s.id !== oldRow.id))
+            return
+          }
+          const row = payload.new as Database['public']['Tables']['shifts']['Row']
+          const room = rooms.find(r => r.id === row.room_id)
+          const area = areas.find(a => a.id === row.area_id)
+          const joined: Shift = {
+            id: row.id, date: row.date, start_time: row.start_time, end_time: row.end_time,
+            status: row.status, notes: row.notes, admin_note: row.admin_note,
+            is_period_day: row.is_period_day, checklist_answers: (row.checklist_answers ?? {}) as ChecklistAnswers,
+            room_id: row.room_id, area_id: row.area_id,
+            rooms: room ? { name: room.name } : null,
+            areas: area ? { name: area.name } : null,
+          }
+          setShifts(prev => {
+            const existing = prev.find(s => s.id === row.id)
+            if (existing && existing.status !== 'confirmed' && row.status === 'confirmed') {
+              const dateLabel = format(new Date(`${row.date}T00:00:00`), 'M/d(E)', { locale: ja })
+              toast.success(`${dateLabel} ${row.start_time.slice(0, 5)}〜${row.end_time.slice(0, 5)} のシフトが確定しました`)
+            }
+            if (!existing) return [joined, ...prev]
+            return prev.map(s => s.id === row.id ? joined : s)
+          })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [castId])
+
   // ホーム画面未追加（ブラウザ表示）の場合、PWA化の案内を出す。「次回以降表示しない」はlocalStorageに記録
   useEffect(() => {
     const isStandalone = window.matchMedia('(display-mode: standalone)').matches
