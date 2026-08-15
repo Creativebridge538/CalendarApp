@@ -116,8 +116,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     }
 
     if (editing) {
-      const { error } = await supabase.from('sales').update(payload).eq('id', editing.id)
-      if (error) { toast.error('更新に失敗しました'); return }
+      const { data, error } = await supabase.from('sales').update(payload).eq('id', editing.id).select('id')
+      if (error || !data || data.length === 0) { toast.error('更新に失敗しました'); return }
       const cast = casts.find(c => c.id === form.cast_id)
       setSales(sales.map(s => s.id === editing.id ? { ...s, ...payload, cast: cast ? { display_name: cast.display_name } : null } : s))
       setEditing(null)
