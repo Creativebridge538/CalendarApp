@@ -100,7 +100,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
   return (
     <div className="flex flex-col">
       {tabs.length > 0 && (
-        <div className="flex border-b overflow-x-auto shrink-0 bg-card">
+        <div className="flex border-b overflow-x-auto overflow-y-clip shrink-0 bg-card">
           {tabs.map(tab => (
             <button
               key={tab.id}
