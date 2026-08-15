@@ -125,11 +125,11 @@ function ShiftTimeGrid({
   }
 
   return (
-    <div>
-      {/* 日付ヘッダー行。スワイプ判定はここだけに付け、下の縦スクロール可能な時間グリッドには付けない
-          （そこに付けると、指の動きに少しでも横方向の成分があるだけで縦スクロールがナビゲーションと誤認され、
-          スクロール位置がリセットされてしまうため） */}
-      <div className="flex border-b border-border/60" onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+    <div onTouchStart={handleTouchStart} onTouchEnd={handleTouchEnd}>
+      {/* 日付ヘッダー行。スワイプ判定は下の時間グリッドも含めて全体で受けるが、横方向の移動が縦方向より
+          明確に優位な場合のみナビゲーションとみなす（handleTouchEndのdx/dy判定）ため、
+          普段の縦スクロール操作を誤ってナビゲーションと認識することはない */}
+      <div className="flex border-b border-border/60">
         <div className="w-9 shrink-0" />
         {days.map(day => {
           const isToday = isSameDay(day, new Date())
