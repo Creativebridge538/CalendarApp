@@ -75,14 +75,16 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     toast.success('空き枠を削除しました')
   }
 
-  async function handleApplication(appId: string, slotId: string, castId: string, approve: boolean) {
-    const updates: { status: 'approved' | 'rejected'; reviewed_at: string } = { status: approve ? 'approved' : 'rejected', reviewed_at: new Date().toISOString() }
+  async function handleApplication(appId: string, slotId: string, castId: string, nextStatus: 'approved' | 'rejected' | 'pending') {
+    const slot = slots.find(s => s.id === slotId)
+    const app = slot?.vacant_slot_applications.find(a => a.id === appId)
+
+    const updates: { status: 'approved' | 'rejected' | 'pending'; reviewed_at: string | null } =
+      { status: nextStatus, reviewed_at: nextStatus === 'pending' ? null : new Date().toISOString() }
     const { error: e1 } = await supabase.from('vacant_slot_applications').update(updates).eq('id', appId)
     if (e1) { toast.error('処理に失敗しました'); return }
 
-    const slot = slots.find(s => s.id === slotId)
-    const app = slot?.vacant_slot_applications.find(a => a.id === appId)
-    if (approve) {
+    if (nextStatus === 'approved') {
       const { error: e2 } = app?.shift_id
         // 申請時に作成済みの仮予定（提出済み）を確定に切り替える
         ? await supabase.from('shifts').update({ status: 'confirmed' }).eq('id', app.shift_id)
@@ -97,17 +99,20 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
         toast.error(e2.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '承認に失敗しました')
         return
       }
-    } else if (app?.shift_id) {
+    } else if (nextStatus === 'rejected' && app?.shift_id) {
       await supabase.from('shifts').delete().eq('id', app.shift_id)
+    } else if (nextStatus === 'pending' && app?.shift_id) {
+      // 承認取消: 確定済みの仮予定を、キャストが再提出したのと同じ「提出済み」の状態に戻す
+      await supabase.from('shifts').update({ status: 'submitted' }).eq('id', app.shift_id)
     }
     setSlots(slots.map(s => s.id === slotId ? {
       ...s,
-      vacant_slot_applications: s.vacant_slot_applications.map(a => a.id === appId ? { ...a, status: approve ? 'approved' : 'rejected' } : a),
+      vacant_slot_applications: s.vacant_slot_applications.map(a => a.id === appId ? { ...a, status: nextStatus } : a),
     } : s))
-    toast.success(approve ? '承認しました' : '却下しました')
+    toast.success(nextStatus === 'approved' ? '承認しました' : nextStatus === 'rejected' ? '却下しました' : '承認を取り消しました')
 
-    if (slot) {
-      const title = approve ? '空き枠申請が承認されました' : '空き枠申請が却下されました'
+    if (slot && nextStatus !== 'pending') {
+      const title = nextStatus === 'approved' ? '空き枠申請が承認されました' : '空き枠申請が却下されました'
       const body = `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} の空き枠`
       await supabase.from('notifications').insert({ user_id: castId, title, body, link: '/cast/vacant-slots' })
       sendPushNotification(castId, title, body, '/cast/vacant-slots')
@@ -154,20 +159,35 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                     </Button>
                   </TableCell>
                 </TableRow>
-                {slot.vacant_slot_applications.filter(a => a.status === 'pending').map(app => (
-                  <TableRow key={app.id} className="bg-primary/10">
-                    <TableCell colSpan={3} className="pl-8 text-sm">
+                {slot.vacant_slot_applications.map(app => (
+                  <TableRow key={app.id} className={app.status === 'pending' ? 'bg-primary/10' : ''}>
+                    <TableCell colSpan={2} className="pl-8 text-sm">
                       申請: {app.cast?.display_name ?? '—'}
                     </TableCell>
-                    <TableCell colSpan={2} className="space-x-1">
-                      <Button size="sm" variant="outline" className="text-positive h-7"
-                        onClick={() => handleApplication(app.id, slot.id, app.cast_id, true)}>
-                        <Check className="h-3 w-3 mr-1" />承認
-                      </Button>
-                      <Button size="sm" variant="destructive" className="h-7"
-                        onClick={() => handleApplication(app.id, slot.id, app.cast_id, false)}>
-                        <X className="h-3 w-3 mr-1" />却下
-                      </Button>
+                    <TableCell>
+                      <Badge variant={app.status === 'approved' ? 'default' : app.status === 'rejected' ? 'destructive' : 'outline'}>
+                        {app.status === 'approved' ? '承認済み' : app.status === 'rejected' ? '却下' : '保留中'}
+                      </Badge>
+                    </TableCell>
+                    <TableCell colSpan={2} className="text-right space-x-1">
+                      {app.status !== 'approved' && (
+                        <Button size="sm" variant="outline" className="text-positive h-7"
+                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'approved')}>
+                          <Check className="h-3 w-3 mr-1" />承認
+                        </Button>
+                      )}
+                      {app.status !== 'rejected' && (
+                        <Button size="sm" variant="destructive" className="h-7"
+                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'rejected')}>
+                          <X className="h-3 w-3 mr-1" />却下
+                        </Button>
+                      )}
+                      {app.status === 'approved' && (
+                        <Button size="sm" variant="outline" className="h-7"
+                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'pending')}>
+                          承認を取消
+                        </Button>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
