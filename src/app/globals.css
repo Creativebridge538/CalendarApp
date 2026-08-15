@@ -169,9 +169,12 @@
     height: 100%;
     overflow-x: hidden;
   }
-  /* 実際のスクロールはbody/htmlではなく各所のoverflow-y-auto/overflow-x-autoコンテナ側で起きるため、
-     そちらにもバウンス(ラバーバンド)防止を効かせる */
-  .overflow-y-auto, .overflow-x-auto, .overflow-auto {
+  /* キャストのPWAシェル((app)配下、body.app-shell)専用: 実際のスクロールはbody/htmlではなく
+     各所のoverflow-y-auto/overflow-x-autoコンテナ側で起きるため、そちらにもバウンス(ラバーバンド)防止を効かせる。
+     body.app-shellの範囲に絞らないと、内容が収まっていて実際にはスクロールしない
+     overflow-y-autoコンテナ（例: 管理画面サイドバーのナビ）までoverscroll-behavior: noneの対象になり、
+     そこにマウスがある間だけページ全体のスクロールが効かなくなってしまう */
+  body.app-shell .overflow-y-auto, body.app-shell .overflow-x-auto, body.app-shell .overflow-auto {
     overscroll-behavior: none;
   }
   /* ログイン後の画面((app)配下)専用。iOSでは100vhが実際の表示領域よりわずかに大きく
