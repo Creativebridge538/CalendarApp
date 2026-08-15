@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
 import { Input } from '@/components/ui/input'
+import { TimeSelect, normalizeTime } from '@/components/ui/time-select'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -70,6 +71,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
   const [detailShift, setDetailShift] = useState<Shift | null>(null)
   const [noteInput, setNoteInput] = useState('')
+  const [scheduleForm, setScheduleForm] = useState({ date: '', start_time: '', end_time: '' })
   const supabase = createClient()
   function checklistBadges(answers: Record<string, boolean | string>) {
     return Object.entries(answers).map(([id, value]) => {
@@ -118,6 +120,31 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   function openDetail(shift: Shift) {
     setDetailShift(shift)
     setNoteInput(shift.admin_note ?? '')
+    setScheduleForm({ date: shift.date, start_time: shift.start_time.slice(0, 5), end_time: shift.end_time.slice(0, 5) })
+  }
+
+  async function saveSchedule() {
+    if (!detailShift) return
+    const start_time = normalizeTime(scheduleForm.start_time)
+    const end_time = normalizeTime(scheduleForm.end_time)
+    const oldStart = detailShift.start_time.slice(0, 5)
+    const oldEnd = detailShift.end_time.slice(0, 5)
+    if (scheduleForm.date === detailShift.date && start_time === oldStart && end_time === oldEnd) return
+
+    const { error } = await supabase.from('shifts').update({ date: scheduleForm.date, start_time, end_time }).eq('id', detailShift.id)
+    if (error) { toast.error(shiftConflictMessage(error, '時間の変更に失敗しました')); return }
+
+    const oldLabel = `${format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} ${oldStart}〜${oldEnd}`
+    const newLabel = `${format(new Date(scheduleForm.date), 'M/d(E)', { locale: ja })} ${start_time}〜${end_time}`
+    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time }
+    setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
+    setDetailShift(updated)
+    toast.success('シフトの日時を変更しました')
+
+    const title = 'シフトの日時が変更されました'
+    const body = `${oldLabel} から ${newLabel} に変更されました`
+    await supabase.from('notifications').insert({ user_id: detailShift.cast_id, title, body, link: '/cast/shifts' })
+    sendPushNotification(detailShift.cast_id, title, body, '/cast/shifts')
   }
 
   async function changeStatus(shift: Shift, status: ShiftStatus, note: string) {
@@ -435,11 +462,22 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
           {detailShift && (
             <div className="space-y-4 mt-2">
               <div className="flex items-center justify-between">
-                <p className="text-sm">
-                  <span className="font-medium">{detailShift.cast?.display_name ?? '—'}</span>
-                  <span className="text-muted-foreground"> ／ {format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} {detailShift.start_time.slice(0, 5)}〜{detailShift.end_time.slice(0, 5)}</span>
-                </p>
+                <p className="text-sm font-medium">{detailShift.cast?.display_name ?? '—'}</p>
                 <Badge variant={STATUS_VARIANT[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">日時（変更するとキャストに通知されます）</label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Input type="date" className="w-40" value={scheduleForm.date} onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })} />
+                  <TimeSelect value={scheduleForm.start_time} onChange={v => setScheduleForm({ ...scheduleForm, start_time: v })} />
+                  <span className="text-muted-foreground text-sm">〜</span>
+                  <TimeSelect value={scheduleForm.end_time} onChange={v => setScheduleForm({ ...scheduleForm, end_time: v })} />
+                  {(scheduleForm.date !== detailShift.date
+                    || normalizeTime(scheduleForm.start_time) !== detailShift.start_time.slice(0, 5)
+                    || normalizeTime(scheduleForm.end_time) !== detailShift.end_time.slice(0, 5)) && (
+                    <Button size="sm" onClick={saveSchedule}>変更を保存</Button>
+                  )}
+                </div>
               </div>
               {detailShift.rooms?.name && (
                 <p className="text-sm text-muted-foreground">ルーム: {detailShift.rooms.name}</p>
