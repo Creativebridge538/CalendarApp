@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote } from 'lucide-react'
+import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { sendPushNotification } from '@/lib/push'
@@ -62,6 +62,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
   const [view, setView] = useState<'calendar' | 'timeline' | 'list'>('calendar')
+  const [listPage, setListPage] = useState(1)
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
   const [detailShift, setDetailShift] = useState<Shift | null>(null)
   const [noteInput, setNoteInput] = useState('')
@@ -79,6 +80,12 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     if (filterCast !== 'all' && s.cast_id !== filterCast) return false
     return true
   }), [shifts, filterStatus, filterCast])
+
+  // リスト表示は件数が多いと際限なく縦に伸びてしまうため、ページ単位で区切る
+  const LIST_PAGE_SIZE = 30
+  const listTotalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE))
+  const listPageClamped = Math.min(listPage, listTotalPages)
+  const paged = filtered.slice((listPageClamped - 1) * LIST_PAGE_SIZE, listPageClamped * LIST_PAGE_SIZE)
 
   const conflicts = useMemo(() => {
     const confirmed = shifts.filter(s => s.status === 'confirmed' && s.room_id)
@@ -148,7 +155,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
           </div>
         </div>
         {view === 'list' && <div className="flex gap-2 mt-2 flex-wrap">
-          <Select value={filterStatus} onValueChange={v => { if (v) setFilterStatus(v) }}>
+          <Select value={filterStatus} onValueChange={v => { if (v) { setFilterStatus(v); setListPage(1) } }}>
             <SelectTrigger className="w-36">
               <SelectValue>
                 {{ all: '全ステータス', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し', draft: '下書き', modification_requested: '修正依頼中' }[filterStatus] ?? filterStatus}
@@ -163,7 +170,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               <SelectItem value="draft">下書き</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={filterCast} onValueChange={v => { if (v) setFilterCast(v) }}>
+          <Select value={filterCast} onValueChange={v => { if (v) { setFilterCast(v); setListPage(1) } }}>
             <SelectTrigger className="w-40">
               <SelectValue>
                 {filterCast === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCast)?.display_name ?? filterCast)}
@@ -205,7 +212,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
 
             {/* モバイル: カードレイアウト */}
             <div className="md:hidden space-y-2">
-              {filtered.map((shift) => (
+              {paged.map((shift) => (
                 <div
                   key={shift.id}
                   onClick={() => openDetail(shift)}
@@ -280,7 +287,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filtered.map((shift) => (
+                {paged.map((shift) => (
                   <TableRow key={shift.id} className={cn('cursor-pointer', conflicts.has(shift.id) ? 'bg-destructive/10' : '')} onClick={() => openDetail(shift)}>
                     <TableCell className="font-medium">
                       {format(new Date(shift.date), 'M/d(E)', { locale: ja })}
@@ -325,6 +332,28 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 ))}
               </TableBody>
             </Table>
+
+            {listTotalPages > 1 && (
+              <div className="flex items-center justify-center gap-3 py-4">
+                <Button
+                  size="sm" variant="outline"
+                  disabled={listPageClamped <= 1}
+                  onClick={() => setListPage(listPageClamped - 1)}
+                >
+                  <ChevronLeft className="h-3.5 w-3.5 mr-1" /> 前へ
+                </Button>
+                <span className="text-sm text-muted-foreground tabular-nums">
+                  {listPageClamped} / {listTotalPages}
+                </span>
+                <Button
+                  size="sm" variant="outline"
+                  disabled={listPageClamped >= listTotalPages}
+                  onClick={() => setListPage(listPageClamped + 1)}
+                >
+                  次へ <ChevronRight className="h-3.5 w-3.5 ml-1" />
+                </Button>
+              </div>
+            )}
           </>
         )}
       </CardContent>
