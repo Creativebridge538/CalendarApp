@@ -303,6 +303,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   const rewardGoalProgress = rewardSummary.monthlyGoal && rewardSummary.monthlyGoal > 0
     ? Math.min(100, (rewardSummary.thisMonthTotal / rewardSummary.monthlyGoal) * 100)
     : null
+  const thisMonthKey = format(new Date(), 'yyyy-MM')
+  const submittedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'submitted').length
+  const confirmedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'confirmed').length
   // 締切を過ぎたら新規シフトの提出をブロックする。
   // monthly: 毎月deadline_day以降は月末までブロック(翌月1日にリセット)。
   // weekly: 週の起点(deadline_week_start_day)からdeadline_day(曜日)以降〜次の起点前日までブロック(次の起点でリセット)。
@@ -738,7 +741,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                     )}
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
-                    出勤 {rewardSummary.attendanceDaysThisMonth}日・{rewardSummary.shiftCountThisMonth}件 ・ {rewardSummary.totalHoursThisMonth.toFixed(1)}時間
+                    提出済み {submittedCountThisMonth}件・確定{confirmedCountThisMonth}件
                   </p>
                 </div>
                 {rewardSummary.monthlyGoal != null && (
