@@ -26,6 +26,7 @@ export async function POST(request: Request) {
   const { data: subscriptions } = await admin.from('push_subscriptions').select('*').eq('user_id', user_id)
 
   if (!subscriptions?.length) {
+    console.error('[push/send] no subscriptions for user', { user_id })
     return NextResponse.json({ sent: 0 })
   }
 
@@ -51,12 +52,15 @@ export async function POST(request: Request) {
     await admin.from('push_subscriptions').delete().in('id', staleIds)
   }
 
-  for (const r of results) {
+  results.forEach((r, i) => {
+    const endpointTail = subscriptions[i].endpoint.slice(-24)
     if (r.status === 'rejected') {
       const reason = r.reason as { statusCode?: number; body?: string; message?: string }
-      console.error('[push/send] delivery failed', { statusCode: reason?.statusCode, body: reason?.body, message: reason?.message })
+      console.error('[push/send] delivery failed', { user_id, endpointTail, statusCode: reason?.statusCode, body: reason?.body, message: reason?.message })
+    } else {
+      console.log('[push/send] delivered', { user_id, endpointTail, statusCode: (r.value as { statusCode?: number })?.statusCode })
     }
-  }
+  })
 
   const sent = results.filter(r => r.status === 'fulfilled').length
   return NextResponse.json({ sent, total: subscriptions.length })
