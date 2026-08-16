@@ -99,6 +99,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const [bulkSaving, setBulkSaving] = useState(false)
   const [bulkCastFill, setBulkCastFill] = useState('')
   const [bulkPlatformFill, setBulkPlatformFill] = useState<'manual' | PlatformKey>('manual')
+  const [filterCast, setFilterCast] = useState('all')
+  const [filterPlatform, setFilterPlatform] = useState('all')
+  const [filterFrom, setFilterFrom] = useState('')
+  const [filterTo, setFilterTo] = useState('')
   const supabase = createClient()
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
@@ -110,11 +114,19 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return map
   }, [casts])
 
-  const monthlyTotal = useMemo(() => sales.reduce((sum, s) => sum + Number(s.amount), 0), [sales])
-  const monthlyRewardTotal = useMemo(() => sales.reduce((sum, s) => {
+  const filteredSales = useMemo(() => sales.filter(s =>
+    (filterCast === 'all' || s.cast_id === filterCast)
+    && (filterPlatform === 'all' || s.platform === filterPlatform)
+    && (!filterFrom || s.date >= filterFrom)
+    && (!filterTo || s.date <= filterTo)
+  ), [sales, filterCast, filterPlatform, filterFrom, filterTo])
+  const filtersActive = filterCast !== 'all' || filterPlatform !== 'all' || !!filterFrom || !!filterTo
+
+  const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
+  const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
     const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0)
     return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction)
-  }, 0), [sales, castRewardRateById])
+  }, 0), [filteredSales, castRewardRateById])
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
@@ -306,7 +318,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             <div>
               <CardTitle>売上一覧 — {year}年{month}月</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
-                月合計: ¥{monthlyTotal.toLocaleString()}
+                {filtersActive ? '絞り込み合計' : '月合計'}: ¥{monthlyTotal.toLocaleString()}
                 <span className="mx-1.5 text-border">・</span>
                 女子給合計: ¥{monthlyRewardTotal.toLocaleString()}
               </p>
@@ -323,6 +335,44 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           </div>
         </CardHeader>
         <CardContent>
+          <div className="flex items-end gap-2 flex-wrap mb-3">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">開始日</Label>
+              <Input type="date" className="w-40" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">終了日</Label>
+              <Input type="date" className="w-40" value={filterTo} onChange={e => setFilterTo(e.target.value)} />
+            </div>
+            <Select value={filterCast} onValueChange={v => { if (v) setFilterCast(v) }}>
+              <SelectTrigger className="w-40">
+                <SelectValue>
+                  {filterCast === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCast)?.display_name ?? filterCast)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                <SelectItem value="all">全キャスト</SelectItem>
+                {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={filterPlatform} onValueChange={v => { if (v) setFilterPlatform(v) }}>
+              <SelectTrigger className="w-36">
+                <SelectValue>{filterPlatform === 'all' ? '全プラットフォーム' : PLATFORM_LABEL[filterPlatform]}</SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全プラットフォーム</SelectItem>
+                <SelectItem value="manual">手入力</SelectItem>
+                <SelectItem value="stripchat">STRIPCHAT</SelectItem>
+                <SelectItem value="fc2">FC2</SelectItem>
+                <SelectItem value="dxlive">DXライブ</SelectItem>
+              </SelectContent>
+            </Select>
+            {filtersActive && (
+              <Button size="sm" variant="ghost" onClick={() => { setFilterCast('all'); setFilterPlatform('all'); setFilterFrom(''); setFilterTo('') }}>
+                <X className="h-3.5 w-3.5 mr-1" />絞り込みを解除
+              </Button>
+            )}
+          </div>
           <Table>
             <TableHeader>
               <TableRow>
@@ -337,10 +387,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               </TableRow>
             </TableHeader>
             <TableBody>
-              {sales.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">売上データがありません</TableCell></TableRow>
+              {filteredSales.length === 0 && (
+                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                  {filtersActive ? '絞り込み条件に一致する売上がありません' : '売上データがありません'}
+                </TableCell></TableRow>
               )}
-              {sales.map(sale => {
+              {filteredSales.map(sale => {
                 const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
