@@ -121,7 +121,7 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle>報酬計算 — 支払通知書の発行</CardTitle>
+          <CardTitle>支払通知書の発行</CardTitle>
           <div className="flex items-center gap-1">
             <Button size="sm" variant="outline" onClick={() => shiftMonth('prev')}>
               <ChevronLeft className="h-3.5 w-3.5 mr-0.5" />前月
