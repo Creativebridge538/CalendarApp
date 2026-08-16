@@ -27,16 +27,30 @@ export default async function CastRewardsPage() {
   const prevMonthStart = format(startOfMonth(prevMonthDate), 'yyyy-MM-dd')
   const prevMonthEnd = format(endOfMonth(prevMonthDate), 'yyyy-MM-dd')
 
-  const [{ data: sales }, { data: shifts }, { data: reward }, { data: checklistItems }] =
+  const [{ data: sales }, { data: shifts }, { data: paymentNoticeRows }, { data: checklistItems }] =
     await Promise.all([
       supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours')
         .eq('cast_id', user.id).gte('date', sixtyDaysAgo).lte('date', today).order('date'),
       supabase.from('shifts').select('date, start_time, end_time, admin_note, checklist_answers, status')
         .eq('cast_id', user.id).gte('date', monthStart).lte('date', monthEnd),
-      supabase.from('reward_calculations').select('total_reward, is_finalized')
-        .eq('cast_id', user.id).eq('period_year', now.getFullYear()).eq('period_month', now.getMonth() + 1).maybeSingle(),
+      supabase.from('notifications').select('id, body, created_at, link')
+        .eq('user_id', user.id).eq('title', '支払通知書が届きました')
+        .order('created_at', { ascending: false }).limit(12),
       supabase.from('shift_checklist_items').select('id, label, item_type').eq('store_id', profile.store_id),
     ])
+
+  // linkの from/to をここで解析しておく（クライアント側では文字列パースをしない）
+  const paymentNotices = (paymentNoticeRows ?? []).flatMap(n => {
+    try {
+      const url = new URL(n.link ?? '', 'http://placeholder')
+      const from = url.searchParams.get('from')
+      const to = url.searchParams.get('to')
+      if (!from || !to) return []
+      return [{ id: n.id, body: n.body, createdAt: n.created_at, from, to }]
+    } catch {
+      return []
+    }
+  })
 
   const salesList = sales ?? []
   const shiftsList = shifts ?? []
@@ -200,7 +214,7 @@ export default async function CastRewardsPage() {
         trend={trend}
         weekday={weekday}
         dayDetails={dayDetails}
-        finalizedReward={reward?.is_finalized ? Number(reward.total_reward) : null}
+        paymentNotices={paymentNotices}
       />
     </div>
   )

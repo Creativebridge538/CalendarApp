@@ -32,6 +32,29 @@ export default async function RewardsPage({
   const salesCastIdSet = new Set((sales ?? []).map(s => s.cast_id))
   const casts = (allCasts ?? []).filter(c => c.is_active || salesCastIdSet.has(c.id))
 
+  // この期間ですでに発行済みのキャストを把握する（通知のlinkに含まれるfrom/toで判定）
+  const castIds = casts.map(c => c.id)
+  const { data: noticeRows } = castIds.length > 0
+    ? await supabase.from('notifications')
+        .select('user_id, link, created_at')
+        .in('user_id', castIds)
+        .eq('title', '支払通知書が届きました')
+        .order('created_at', { ascending: false })
+    : { data: [] }
+
+  const issuedAt: Record<string, string> = {}
+  for (const n of noticeRows ?? []) {
+    if (issuedAt[n.user_id]) continue // 最新（先頭）だけ拾う
+    try {
+      const url = new URL(n.link ?? '', 'http://placeholder')
+      if (url.searchParams.get('from') === from && url.searchParams.get('to') === to) {
+        issuedAt[n.user_id] = n.created_at
+      }
+    } catch {
+      // noop
+    }
+  }
+
   return (
     <div className="p-6">
       <RewardCalculator
@@ -41,6 +64,7 @@ export default async function RewardsPage({
         storeId={storeId}
         from={from}
         to={to}
+        issuedAt={issuedAt}
       />
     </div>
   )

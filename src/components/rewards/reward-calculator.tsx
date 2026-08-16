@@ -30,14 +30,17 @@ interface Props {
   storeId: string
   from: string
   to: string
+  /** cast_id -> この期間ですでに発行済みの通知の作成日時（ISO文字列） */
+  issuedAt: Record<string, string>
 }
 
-export function RewardCalculator({ casts, sales, from, to }: Props) {
+export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssuedAt }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [fromInput, setFromInput] = useState(from)
   const [toInput, setToInput] = useState(to)
+  const [issuedAt, setIssuedAt] = useState(initialIssuedAt)
   const supabase = createClient()
   const router = useRouter()
 
@@ -118,6 +121,12 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
     }
 
     toast.success(`${targets.length}人に支払通知書を発行しました`)
+    const now = new Date().toISOString()
+    setIssuedAt(prev => {
+      const next = { ...prev }
+      for (const t of targets) next[t.cast.id] = now
+      return next
+    })
     setSelected(new Set())
     setConfirmOpen(false)
   }
@@ -169,12 +178,13 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
               <TableHead className="text-right">ボーナス</TableHead>
               <TableHead className="text-right">控除</TableHead>
               <TableHead className="text-right">支払合計</TableHead>
+              <TableHead>ステータス</TableHead>
               <TableHead className="text-right">プレビュー</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.length === 0 && (
-              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
+              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
             )}
             {rows.map(r => (
               <TableRow key={r.cast.id}>
@@ -193,6 +203,15 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
                 <TableCell className="text-right">{r.bonus > 0 ? `+¥${r.bonus.toLocaleString()}` : '—'}</TableCell>
                 <TableCell className="text-right">{r.deduction > 0 ? `-¥${r.deduction.toLocaleString()}` : '—'}</TableCell>
                 <TableCell className="text-right font-bold">¥{r.totalReward.toLocaleString()}</TableCell>
+                <TableCell>
+                  {issuedAt[r.cast.id] ? (
+                    <Badge className="whitespace-nowrap">
+                      発行済み（{format(new Date(issuedAt[r.cast.id]), 'M/d', { locale: ja })}）
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="text-muted-foreground font-normal">未発行</Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-right">
                   <PaymentNoticeButton castId={r.cast.id} from={from} to={to} label="プレビュー" />
                 </TableCell>

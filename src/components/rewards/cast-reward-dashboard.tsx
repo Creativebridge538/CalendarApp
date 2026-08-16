@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format, endOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import {
-  TrendingUp, TrendingDown, Minus, Pencil, StickyNote, Lock,
+  TrendingUp, TrendingDown, Minus, Pencil, StickyNote, Receipt,
   CalendarDays, CalendarRange, BarChart3,
 } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
@@ -46,7 +46,7 @@ interface Props {
   trend: { date: string; amount: number }[]
   weekday: { label: string; amount: number }[]
   dayDetails: Record<string, DayDetail>
-  finalizedReward: number | null
+  paymentNotices: { id: string; body: string | null; createdAt: string; from: string; to: string }[]
 }
 
 function useCountUp(target: number, durationMs = 900) {
@@ -69,10 +69,10 @@ function useCountUp(target: number, durationMs = 900) {
 const WEEKDAY_HEADS = ['日', '月', '火', '水', '木', '金', '土']
 
 export function CastRewardDashboard({
-  userId, monthLabel, year, month, thisMonthTotal, prevMonthToDateTotal, monthlyGoal: initialGoal,
+  userId, monthLabel, month, thisMonthTotal, prevMonthToDateTotal, monthlyGoal: initialGoal,
   calendarDays, avgPerWorkedDay,
   attendanceDaysThisMonth, totalHoursThisMonth, platformBreakdown,
-  trend, weekday, dayDetails, finalizedReward,
+  trend, weekday, dayDetails, paymentNotices,
 }: Props) {
   const [activeTab, setActiveTab] = useState<'calendar' | 'report'>('calendar')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
@@ -170,17 +170,19 @@ export function CastRewardDashboard({
             </button>
           </div>
 
-          {finalizedReward != null && (
-            <div className="flex items-center justify-between flex-wrap gap-2 pt-1.5 border-t">
-              <p className="text-xs text-muted-foreground flex items-center gap-1">
-                <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
+          {paymentNotices.length > 0 && (
+            <div className="pt-1.5 border-t space-y-1.5">
+              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                <Receipt className="h-3 w-3" />支払通知書
               </p>
-              <PaymentNoticeButton
-                castId={userId}
-                from={`${year}-${String(month).padStart(2, '0')}-01`}
-                to={format(endOfMonth(new Date(year, month - 1, 1)), 'yyyy-MM-dd')}
-                label="支払通知書" variant="tonal" size="xs"
-              />
+              <div className="space-y-1">
+                {paymentNotices.map(n => (
+                  <div key={n.id} className="flex items-center justify-between gap-2">
+                    <p className="text-xs text-muted-foreground truncate">{n.body}</p>
+                    <PaymentNoticeButton castId={userId} from={n.from} to={n.to} label="開く" variant="tonal" size="xs" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </CardContent>
