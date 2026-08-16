@@ -83,6 +83,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
   }
 
   function applyRange(nextFrom: string, nextTo: string) {
+    if (nextFrom > nextTo) { toast.error('開始日は終了日より前にしてください'); return }
     router.push(`/admin/rewards?from=${nextFrom}&to=${nextTo}`)
   }
 

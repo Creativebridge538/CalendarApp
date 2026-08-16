@@ -51,6 +51,13 @@ export async function POST(request: Request) {
     await admin.from('push_subscriptions').delete().in('id', staleIds)
   }
 
+  for (const r of results) {
+    if (r.status === 'rejected') {
+      const reason = r.reason as { statusCode?: number; body?: string; message?: string }
+      console.error('[push/send] delivery failed', { statusCode: reason?.statusCode, body: reason?.body, message: reason?.message })
+    }
+  }
+
   const sent = results.filter(r => r.status === 'fulfilled').length
   return NextResponse.json({ sent, total: subscriptions.length })
 }
