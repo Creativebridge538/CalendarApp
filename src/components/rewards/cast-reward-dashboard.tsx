@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, endOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -175,7 +175,12 @@ export function CastRewardDashboard({
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Lock className="h-3 w-3" />確定報酬: <span className="font-medium text-foreground">¥{finalizedReward.toLocaleString()}</span>
               </p>
-              <PaymentNoticeButton castId={userId} year={year} month={month} label="支払通知書" variant="tonal" size="xs" />
+              <PaymentNoticeButton
+                castId={userId}
+                from={`${year}-${String(month).padStart(2, '0')}-01`}
+                to={format(endOfMonth(new Date(year, month - 1, 1)), 'yyyy-MM-dd')}
+                label="支払通知書" variant="tonal" size="xs"
+              />
             </div>
           )}
         </CardContent>

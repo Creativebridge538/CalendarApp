@@ -1,203 +1,198 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format, endOfMonth } from 'date-fns'
-import { Button, buttonVariants } from '@/components/ui/button'
+import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
+import { ja } from 'date-fns/locale'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Calculator, Lock, LockOpen, ChevronLeft, ChevronRight } from 'lucide-react'
-import Link from 'next/link'
-import type { Database } from '@/lib/supabase/database.types'
+import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 
-type Reward = Database['public']['Tables']['reward_calculations']['Row']
-
 interface CastUser { id: string; display_name: string | null; reward_rate: number | string; is_active: boolean }
+interface SaleRow {
+  cast_id: string; amount: number | string
+  is_daily_payment: boolean; reward_rate_override: number | string | null
+  bonus: number | string; deduction: number | string
+}
 
 interface Props {
   casts: CastUser[]
-  rewards: Reward[]
+  sales: SaleRow[]
   storeId: string
-  userId: string
-  year: number
-  month: number
+  from: string
+  to: string
 }
 
-export function RewardCalculator({ casts, rewards: initialRewards, storeId, userId, year, month }: Props) {
-  const [rewards, setRewards] = useState(initialRewards)
-  const [adjustments, setAdjustments] = useState<Record<string, { bonus: string; deduction: string }>>({})
-  const [calculating, setCalculating] = useState(false)
+export function RewardCalculator({ casts, sales, from, to }: Props) {
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [sending, setSending] = useState(false)
+  const [fromInput, setFromInput] = useState(from)
+  const [toInput, setToInput] = useState(to)
   const supabase = createClient()
+  const router = useRouter()
 
-  function getAdj(castId: string) {
-    return adjustments[castId] ?? { bonus: '0', deduction: '0' }
-  }
+  const salesByCast = useMemo(() => {
+    const map = new Map<string, SaleRow[]>()
+    for (const s of sales) {
+      const arr = map.get(s.cast_id) ?? []
+      arr.push(s)
+      map.set(s.cast_id, arr)
+    }
+    return map
+  }, [sales])
 
-  async function calculate(cast: CastUser) {
-    setCalculating(true)
-    const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-    const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
-    const { data: salesData } = await supabase.from('sales')
-      .select('amount, is_daily_payment, reward_rate_override, bonus, deduction')
-      .eq('cast_id', cast.id)
-      .gte('date', monthStart)
-      .lte('date', monthEnd)
-
+  const rows = useMemo(() => casts.map(cast => {
     const rewardRate = Number(cast.reward_rate)
-    const salesTotal = (salesData ?? []).reduce((sum, s) => sum + Number(s.amount), 0)
+    const castSales = salesByCast.get(cast.id) ?? []
+    const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount), 0)
     // 日払いで報酬率が上書きされている行はその行だけ別の率で計算する（それ以外は通常の報酬率）
-    const baseReward = Math.floor(
-      (salesData ?? []).reduce((sum, s) => {
-        const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
-        return sum + Number(s.amount) * rate
-      }, 0)
-    )
-    // 売上入力時に日ごとに登録したボーナス・控除を合算し、この画面での手動調整分に上乗せする
-    const salesBonus = (salesData ?? []).reduce((sum, s) => sum + Number(s.bonus), 0)
-    const salesDeduction = (salesData ?? []).reduce((sum, s) => sum + Number(s.deduction), 0)
-    const adj = getAdj(cast.id)
-    const bonus = (parseInt(adj.bonus) || 0) + salesBonus
-    const deduction = (parseInt(adj.deduction) || 0) + salesDeduction
+    const baseReward = Math.floor(castSales.reduce((sum, s) => {
+      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+      return sum + Number(s.amount) * rate
+    }, 0))
+    const bonus = castSales.reduce((sum, s) => sum + Number(s.bonus), 0)
+    const deduction = castSales.reduce((sum, s) => sum + Number(s.deduction), 0)
     const totalReward = baseReward + bonus - deduction
+    return { cast, rewardRate, salesTotal, baseReward, bonus, deduction, totalReward }
+  }), [casts, salesByCast])
 
-    const payload = {
-      cast_id: cast.id, store_id: storeId,
-      period_year: year, period_month: month,
-      sales_total: salesTotal, reward_rate: rewardRate,
-      base_reward: baseReward, bonus, deduction, total_reward: totalReward,
-      calculated_by: userId, calculated_at: new Date().toISOString(),
+  const allSelected = rows.length > 0 && rows.every(r => selected.has(r.cast.id))
+
+  function toggleAll() {
+    setSelected(allSelected ? new Set() : new Set(rows.map(r => r.cast.id)))
+  }
+  function toggleOne(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  function applyRange(nextFrom: string, nextTo: string) {
+    router.push(`/admin/rewards?from=${nextFrom}&to=${nextTo}`)
+  }
+
+  function shiftMonth(dir: 'prev' | 'next') {
+    const anchor = new Date(`${from}T00:00:00`)
+    const shifted = dir === 'next' ? addMonths(anchor, 1) : subMonths(anchor, 1)
+    applyRange(format(startOfMonth(shifted), 'yyyy-MM-dd'), format(endOfMonth(shifted), 'yyyy-MM-dd'))
+  }
+
+  async function handleIssue() {
+    const targets = rows.filter(r => selected.has(r.cast.id))
+    if (targets.length === 0) { toast.error('キャストを選択してください'); return }
+    setSending(true)
+
+    const title = '支払通知書が届きました'
+    const periodLabel = `${format(new Date(`${from}T00:00:00`), 'M/d', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M/d', { locale: ja })}`
+    const notifications = targets.map(t => ({
+      user_id: t.cast.id, title,
+      body: `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`,
+      link: `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}`,
+    }))
+    const { error } = await supabase.from('notifications').insert(notifications)
+    setSending(false)
+    if (error) { toast.error('通知の送信に失敗しました'); return }
+
+    for (const t of targets) {
+      sendPushNotification(t.cast.id, title, `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`, `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}`)
+      // メール通知は任意送信。失敗しても発行処理自体はすでに成功しているので握りつぶす
+      fetch('/api/rewards/notify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ cast_id: t.cast.id, from, to, total_reward: t.totalReward }),
+      }).catch(() => {})
     }
 
-    const existing = rewards.find(r => r.cast_id === cast.id)
-    if (existing) {
-      const { error } = await supabase.from('reward_calculations').update(payload).eq('id', existing.id)
-      if (error) { toast.error('計算に失敗しました'); setCalculating(false); return }
-      setRewards(rewards.map(r => r.id === existing.id ? { ...r, ...payload } : r))
-    } else {
-      const { data, error } = await supabase.from('reward_calculations').insert(payload).select().single()
-      if (error) { toast.error('計算に失敗しました'); setCalculating(false); return }
-      setRewards([...rewards, data])
-    }
-    toast.success(`${cast.display_name} の報酬を計算しました`)
-    setCalculating(false)
+    toast.success(`${targets.length}人に支払通知書を発行しました`)
+    setSelected(new Set())
   }
-
-  async function finalize(reward: Reward) {
-    if (!confirm('確定すると変更できません。よろしいですか？')) return
-    const { error } = await supabase.from('reward_calculations').update({ is_finalized: true }).eq('id', reward.id)
-    if (error) { toast.error('確定に失敗しました'); return }
-    setRewards(rewards.map(r => r.id === reward.id ? { ...r, is_finalized: true } : r))
-    toast.success('明細を確定しました')
-    const title = '報酬明細が確定されました'
-    const body = `${year}年${month}月の報酬: ¥${Number(reward.total_reward).toLocaleString()}`
-    await supabase.from('notifications').insert({ user_id: reward.cast_id, title, body, link: '/cast/rewards' })
-    sendPushNotification(reward.cast_id, title, body, '/cast/rewards')
-    // メール通知は任意送信。失敗しても確定処理自体はすでに成功しているので握りつぶす
-    fetch('/api/rewards/notify', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ cast_id: reward.cast_id, year, month, total_reward: Number(reward.total_reward) }),
-    }).catch(() => {})
-  }
-
-  async function unfinalize(reward: Reward) {
-    if (!confirm('確定を取り消して編集可能に戻しますか？（キャストには既に確定通知が届いています）')) return
-    const { error } = await supabase.from('reward_calculations').update({ is_finalized: false }).eq('id', reward.id)
-    if (error) { toast.error('取消に失敗しました'); return }
-    setRewards(rewards.map(r => r.id === reward.id ? { ...r, is_finalized: false } : r))
-    toast.success('確定を取り消しました')
-  }
-
-  const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
-  const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
 
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
-          <CardTitle>報酬計算 — {year}年{month}月</CardTitle>
+          <CardTitle>報酬計算 — 支払通知書の発行</CardTitle>
           <div className="flex items-center gap-1">
-            <Link href={`/admin/rewards?year=${prev.year}&month=${prev.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+            <Button size="sm" variant="outline" onClick={() => shiftMonth('prev')}>
               <ChevronLeft className="h-3.5 w-3.5 mr-0.5" />前月
-            </Link>
-            <Link href={`/admin/rewards?year=${next.year}&month=${next.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => shiftMonth('next')}>
               翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
-            </Link>
+            </Button>
           </div>
+        </div>
+        <div className="flex items-end gap-2 flex-wrap mt-2">
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">開始日</label>
+            <Input type="date" className="w-40" value={fromInput} onChange={e => setFromInput(e.target.value)} />
+          </div>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">終了日</label>
+            <Input type="date" className="w-40" value={toInput} onChange={e => setToInput(e.target.value)} />
+          </div>
+          <Button size="sm" variant="outline" onClick={() => applyRange(fromInput, toInput)}>この期間で表示</Button>
         </div>
       </CardHeader>
       <CardContent>
+        <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+            全員選択
+          </label>
+          <Button size="sm" onClick={handleIssue} disabled={sending || selected.size === 0}>
+            <Send className="h-3.5 w-3.5 mr-1" />選択した{selected.size}人に発行
+          </Button>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead>キャスト</TableHead>
               <TableHead className="text-right">売上合計</TableHead>
               <TableHead className="text-right">報酬率</TableHead>
               <TableHead className="text-right">基本報酬</TableHead>
-              <TableHead className="w-28">ボーナス</TableHead>
-              <TableHead className="w-28">控除</TableHead>
+              <TableHead className="text-right">ボーナス</TableHead>
+              <TableHead className="text-right">控除</TableHead>
               <TableHead className="text-right">支払合計</TableHead>
-              <TableHead className="text-right">操作</TableHead>
+              <TableHead className="text-right">プレビュー</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {casts.map(cast => {
-              const reward = rewards.find(r => r.cast_id === cast.id)
-              const adj = getAdj(cast.id)
-              const isFinalized = reward?.is_finalized
-
-              return (
-                <TableRow key={cast.id}>
-                  <TableCell className="font-medium">
-                    <div className="flex items-center gap-1.5">
-                      {cast.display_name ?? '—'}
-                      {!cast.is_active && <Badge variant="outline" className="text-[10px] font-normal">退店済み</Badge>}
-                    </div>
-                  </TableCell>
-                  <TableCell className="text-right">{reward ? `¥${Number(reward.sales_total).toLocaleString()}` : '—'}</TableCell>
-                  <TableCell className="text-right">{(Number(cast.reward_rate) * 100).toFixed(1)}%</TableCell>
-                  <TableCell className="text-right">{reward ? `¥${Number(reward.base_reward).toLocaleString()}` : '—'}</TableCell>
-                  <TableCell>
-                    <Input type="number" className="h-8 text-sm" value={adj.bonus} disabled={!!isFinalized}
-                      onChange={e => setAdjustments({ ...adjustments, [cast.id]: { ...adj, bonus: e.target.value } })} />
-                  </TableCell>
-                  <TableCell>
-                    <Input type="number" className="h-8 text-sm" value={adj.deduction} disabled={!!isFinalized}
-                      onChange={e => setAdjustments({ ...adjustments, [cast.id]: { ...adj, deduction: e.target.value } })} />
-                  </TableCell>
-                  <TableCell className="text-right font-bold">
-                    {reward ? `¥${Number(reward.total_reward).toLocaleString()}` : '—'}
-                  </TableCell>
-                  <TableCell className="text-right space-x-1">
-                    {isFinalized ? (
-                      <>
-                        <Badge><Lock className="h-3 w-3 mr-1" />確定済み</Badge>
-                        <Button size="sm" variant="outline" onClick={() => reward && unfinalize(reward)}>
-                          <LockOpen className="h-3.5 w-3.5 mr-1" />取消
-                        </Button>
-                      </>
-                    ) : (
-                      <>
-                        <Button size="sm" variant="outline" onClick={() => calculate(cast)} disabled={calculating}>
-                          <Calculator className="h-3.5 w-3.5 mr-1" />計算
-                        </Button>
-                        {reward && (
-                          <Button size="sm" onClick={() => finalize(reward)}>確定</Button>
-                        )}
-                      </>
-                    )}
-                    {reward && (
-                      <PaymentNoticeButton castId={cast.id} year={year} month={month} label="通知書" />
-                    )}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+            {rows.length === 0 && (
+              <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
+            )}
+            {rows.map(r => (
+              <TableRow key={r.cast.id}>
+                <TableCell>
+                  <Checkbox checked={selected.has(r.cast.id)} onCheckedChange={() => toggleOne(r.cast.id)} />
+                </TableCell>
+                <TableCell className="font-medium">
+                  <div className="flex items-center gap-1.5">
+                    {r.cast.display_name ?? '—'}
+                    {!r.cast.is_active && <Badge variant="outline" className="text-[10px] font-normal">退店済み</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">¥{r.salesTotal.toLocaleString()}</TableCell>
+                <TableCell className="text-right">{(r.rewardRate * 100).toFixed(1)}%</TableCell>
+                <TableCell className="text-right">¥{r.baseReward.toLocaleString()}</TableCell>
+                <TableCell className="text-right">{r.bonus > 0 ? `+¥${r.bonus.toLocaleString()}` : '—'}</TableCell>
+                <TableCell className="text-right">{r.deduction > 0 ? `-¥${r.deduction.toLocaleString()}` : '—'}</TableCell>
+                <TableCell className="text-right font-bold">¥{r.totalReward.toLocaleString()}</TableCell>
+                <TableCell className="text-right">
+                  <PaymentNoticeButton castId={r.cast.id} from={from} to={to} label="プレビュー" />
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </CardContent>

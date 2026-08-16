@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
-import { format, endOfMonth } from 'date-fns'
+import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { PrintButton } from './print-button'
 
@@ -12,9 +12,9 @@ const PLATFORM_LABEL: Record<string, string> = {
 export default async function PaymentNoticePage({
   searchParams,
 }: {
-  searchParams: Promise<{ cast_id?: string; year?: string; month?: string }>
+  searchParams: Promise<{ cast_id?: string; from?: string; to?: string }>
 }) {
-  const { cast_id, year: yearParam, month: monthParam } = await searchParams
+  const { cast_id, from, to } = await searchParams
   const supabase = await createClient()
   const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
@@ -24,38 +24,41 @@ export default async function PaymentNoticePage({
   if (!isAdmin && !isSelf) redirect('/dashboard')
 
   const storeId = profile!.store_id!
-  const year = parseInt(yearParam ?? '')
-  const month = parseInt(monthParam ?? '')
 
-  if (!cast_id || !year || !month) {
-    return <div className="p-6 text-sm text-muted-foreground">対象キャスト・対象月が指定されていません。</div>
+  if (!cast_id || !from || !to) {
+    return <div className="p-6 text-sm text-muted-foreground">対象キャスト・対象期間が指定されていません。</div>
   }
 
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
-
-  const [{ data: store }, { data: settings }, { data: cast }, { data: reward }, { data: sales }] = await Promise.all([
+  const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
-    supabase.from('users').select('display_name').eq('id', cast_id).eq('store_id', storeId).single(),
-    supabase.from('reward_calculations').select('*')
-      .eq('cast_id', cast_id).eq('store_id', storeId).eq('period_year', year).eq('period_month', month).single(),
-    supabase.from('sales').select('date, platform, amount, raw_units, is_daily_payment')
+    supabase.from('users').select('display_name, reward_rate').eq('id', cast_id).eq('store_id', storeId).single(),
+    supabase.from('sales').select('date, platform, amount, raw_units, is_daily_payment, reward_rate_override, bonus, deduction')
       .eq('cast_id', cast_id).eq('store_id', storeId)
-      .gte('date', monthStart)
-      .lte('date', monthEnd)
+      .gte('date', from)
+      .lte('date', to)
       .order('date'),
   ])
 
-  if (!cast || !reward) {
-    return <div className="p-6 text-sm text-muted-foreground">対象の報酬明細が見つかりません（まだ計算・確定されていない可能性があります）。</div>
-  }
-  // キャスト本人は確定済みの月のみ閲覧可能（管理者は確認のため未確定でも閲覧可）
-  if (isSelf && !reward.is_finalized) {
-    return <div className="p-6 text-sm text-muted-foreground">この月の報酬明細はまだ確定されていません。確定後にご確認いただけます。</div>
+  if (!cast) {
+    return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>
   }
 
-  const periodLabel = `${year}年${month}月分`
+  const rewardRate = Number(cast.reward_rate)
+  const salesRows = sales ?? []
+  const salesTotal = salesRows.reduce((sum, s) => sum + Number(s.amount), 0)
+  // 日払いで報酬率が上書きされている行はその行だけ別の率で計算する（それ以外は通常の報酬率）
+  const baseReward = Math.floor(
+    salesRows.reduce((sum, s) => {
+      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+      return sum + Number(s.amount) * rate
+    }, 0)
+  )
+  const bonus = salesRows.reduce((sum, s) => sum + Number(s.bonus), 0)
+  const deduction = salesRows.reduce((sum, s) => sum + Number(s.deduction), 0)
+  const totalReward = baseReward + bonus - deduction
+
+  const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
 
   return (
     <div style={{ background: '#eef0f2', minHeight: '100vh' }}>
@@ -113,7 +116,7 @@ export default async function PaymentNoticePage({
         <div className="notice-header-grid">
           <div>
             <div style={{ fontSize: 18, fontWeight: 'bold' }}>{cast.display_name} 様</div>
-            <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel}のお支払い明細をお送りいたします。</div>
+            <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel} のお支払い明細をお送りいたします。</div>
           </div>
           <div className="notice-issuer">
             {settings?.logo_url && (
@@ -126,17 +129,17 @@ export default async function PaymentNoticePage({
 
         <div className="notice-total">
           <div style={{ fontSize: 14, fontWeight: 'bold', width: 90 }}>お支払額</div>
-          <div className="notice-total-amount">¥{Number(reward.total_reward).toLocaleString()}</div>
+          <div className="notice-total-amount">¥{totalReward.toLocaleString()}</div>
         </div>
 
         <table className="summary-table">
           <tbody>
-            <tr><td>売上合計</td><td className="right">¥{Number(reward.sales_total).toLocaleString()}</td></tr>
-            <tr><td>報酬率</td><td className="right">{(Number(reward.reward_rate) * 100).toFixed(1)}%</td></tr>
-            <tr><td>基本報酬</td><td className="right">¥{Number(reward.base_reward).toLocaleString()}</td></tr>
-            <tr><td>ボーナス</td><td className="right">+¥{Number(reward.bonus).toLocaleString()}</td></tr>
-            <tr><td>控除</td><td className="right">-¥{Number(reward.deduction).toLocaleString()}</td></tr>
-            <tr className="final-row"><td>合計お支払額</td><td className="right">¥{Number(reward.total_reward).toLocaleString()}</td></tr>
+            <tr><td>売上合計</td><td className="right">¥{salesTotal.toLocaleString()}</td></tr>
+            <tr><td>報酬率</td><td className="right">{(rewardRate * 100).toFixed(1)}%</td></tr>
+            <tr><td>基本報酬</td><td className="right">¥{baseReward.toLocaleString()}</td></tr>
+            <tr><td>ボーナス</td><td className="right">+¥{bonus.toLocaleString()}</td></tr>
+            <tr><td>控除</td><td className="right">-¥{deduction.toLocaleString()}</td></tr>
+            <tr className="final-row"><td>合計お支払額</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
           </tbody>
         </table>
 
@@ -152,10 +155,10 @@ export default async function PaymentNoticePage({
             </tr>
           </thead>
           <tbody>
-            {(!sales || sales.length === 0) && (
+            {salesRows.length === 0 && (
               <tr><td colSpan={3} style={{ textAlign: 'center', color: '#888', padding: '16px 0' }}>売上データがありません</td></tr>
             )}
-            {sales?.map((s, i) => (
+            {salesRows.map((s, i) => (
               <tr key={i}>
                 <td>{format(new Date(s.date), 'M/d(E)', { locale: ja })}</td>
                 <td>{PLATFORM_LABEL[s.platform] ?? s.platform}{s.is_daily_payment && '（日払い）'}</td>

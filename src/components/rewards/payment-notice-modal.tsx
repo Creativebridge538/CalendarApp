@@ -8,15 +8,17 @@ import type { VariantProps } from 'class-variance-authority'
 
 interface Props {
   castId: string
-  year: number
-  month: number
+  /** yyyy-MM-dd */
+  from: string
+  /** yyyy-MM-dd */
+  to: string
   label: string
   variant?: VariantProps<typeof buttonVariants>['variant']
   size?: VariantProps<typeof buttonVariants>['size']
   className?: string
 }
 
-export function PaymentNoticeButton({ castId, year, month, label, variant = 'ghost', size = 'sm', className }: Props) {
+export function PaymentNoticeButton({ castId, from, to, label, variant = 'ghost', size = 'sm', className }: Props) {
   const [open, setOpen] = useState(false)
 
   return (
@@ -29,7 +31,7 @@ export function PaymentNoticeButton({ castId, year, month, label, variant = 'gho
           <DialogTitle className="sr-only">支払通知書</DialogTitle>
           {open && (
             <iframe
-              src={`/admin/rewards/notice?cast_id=${castId}&year=${year}&month=${month}`}
+              src={`/admin/rewards/notice?cast_id=${castId}&from=${from}&to=${to}`}
               title="支払通知書"
               className="w-full h-full border-0 rounded-xl"
             />

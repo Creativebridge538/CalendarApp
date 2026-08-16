@@ -1,13 +1,13 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
-import { format, endOfMonth } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { RewardCalculator } from '@/components/rewards/reward-calculator'
 
 export default async function RewardsPage({
   searchParams,
 }: {
-  searchParams: Promise<{ year?: string; month?: string }>
+  searchParams: Promise<{ from?: string; to?: string }>
 }) {
   const supabase = await createClient()
   const { user, profile } = await getCurrentUser()
@@ -16,38 +16,31 @@ export default async function RewardsPage({
 
   const storeId = profile.store_id!
   const now = new Date()
-  const { year: yearParam, month: monthParam } = await searchParams
-  const year = parseInt(yearParam ?? '') || now.getFullYear()
-  const month = parseInt(monthParam ?? '') || now.getMonth() + 1
+  const { from: fromParam, to: toParam } = await searchParams
+  const from = fromParam || format(startOfMonth(now), 'yyyy-MM-dd')
+  const to = toParam || format(endOfMonth(now), 'yyyy-MM-dd')
 
-  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
-  const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
-
-  const [{ data: allCasts }, { data: rewards }, { data: salesCastIds }] = await Promise.all([
+  const [{ data: allCasts }, { data: sales }] = await Promise.all([
     supabase.from('users').select('id, display_name, reward_rate, is_active')
       .eq('store_id', storeId).eq('role', 'cast').order('display_name'),
-    supabase.from('reward_calculations').select('*').eq('store_id', storeId)
-      .eq('period_year', year).eq('period_month', month),
-    supabase.from('sales').select('cast_id').eq('store_id', storeId)
-      .gte('date', monthStart).lte('date', monthEnd),
+    supabase.from('sales').select('cast_id, amount, is_daily_payment, reward_rate_override, bonus, deduction')
+      .eq('store_id', storeId).gte('date', from).lte('date', to),
   ])
 
-  // 在籍中のキャストに加え、退店済みでもこの期間に売上・報酬実績があるキャストは一覧に残す
-  // （月の途中で辞めたキャストの最終給与処理ができなくなるのを防ぐ）
-  const rewardCastIds = new Set((rewards ?? []).map(r => r.cast_id))
-  const salesCastIdSet = new Set((salesCastIds ?? []).map(s => s.cast_id))
-  const casts = (allCasts ?? []).filter(c => c.is_active || rewardCastIds.has(c.id) || salesCastIdSet.has(c.id))
+  // 在籍中のキャストに加え、退店済みでもこの期間に売上実績があるキャストは一覧に残す
+  // （辞めたキャストの最終給与処理ができなくなるのを防ぐ）
+  const salesCastIdSet = new Set((sales ?? []).map(s => s.cast_id))
+  const casts = (allCasts ?? []).filter(c => c.is_active || salesCastIdSet.has(c.id))
 
   return (
     <div className="p-6">
       <RewardCalculator
-        key={`${year}-${month}`}
+        key={`${from}-${to}`}
         casts={casts}
-        rewards={rewards ?? []}
+        sales={sales ?? []}
         storeId={storeId}
-        userId={user.id}
-        year={year}
-        month={month}
+        from={from}
+        to={to}
       />
     </div>
   )

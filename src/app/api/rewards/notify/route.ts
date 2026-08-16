@@ -11,9 +11,9 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: '権限がありません' }, { status: 403 })
 
-  const { cast_id, year, month, total_reward } = await request.json()
-  if (!cast_id || !year || !month) {
-    return NextResponse.json({ error: 'cast_id, year, month は必須です' }, { status: 400 })
+  const { cast_id, from, to, total_reward } = await request.json()
+  if (!cast_id || !from || !to) {
+    return NextResponse.json({ error: 'cast_id, from, to は必須です' }, { status: 400 })
   }
 
   // 任意送信の通知なので、APIキー未設定でもエラーにせずスキップする
@@ -28,19 +28,19 @@ export async function POST(request: Request) {
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY)
-  const periodLabel = `${year}年${month}月`
+  const periodLabel = `${from}〜${to}`
   const amountLabel = typeof total_reward === 'number' ? `¥${total_reward.toLocaleString()}` : null
   const origin = new URL(request.url).origin
-  const noticeUrl = `${origin}/admin/rewards/notice?cast_id=${cast_id}&year=${year}&month=${month}`
+  const noticeUrl = `${origin}/admin/rewards/notice?cast_id=${cast_id}&from=${from}&to=${to}`
 
   try {
     await resend.emails.send({
       from: 'CalendarApp <onboarding@resend.dev>',
       to: cast.email,
-      subject: `${periodLabel}分の報酬明細が確定しました`,
+      subject: `${periodLabel}分の支払通知書が届いています`,
       html: `
         <p>${cast.display_name ?? ''} 様</p>
-        <p>${periodLabel}分の報酬明細が確定しました。${amountLabel ? `<br>お支払額: ${amountLabel}` : ''}</p>
+        <p>${periodLabel}分の支払通知書が届いています。${amountLabel ? `<br>お支払額: ${amountLabel}` : ''}</p>
         <p><a href="${noticeUrl}">支払通知書を見る</a></p>
         <p style="color:#888;font-size:12px;">アプリにログインした状態でこのリンクを開くと、支払通知書をそのままプレビューできます。</p>
       `,
