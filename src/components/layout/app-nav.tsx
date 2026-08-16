@@ -23,7 +23,7 @@ const adminNav = [
   { href: '/admin/rooms',                 label: 'ルーム管理',      icon: DoorOpen },
   { href: '/admin/modification-requests', label: '修正申請',        icon: FileEdit },
   { href: '/admin/vacant-slots',          label: '空き枠管理',      icon: Briefcase },
-  { href: '/admin/sales',                 label: '売上入力',        icon: BarChart2 },
+  { href: '/admin/sales',                 label: '売上一覧',        icon: BarChart2 },
   { href: '/admin/rewards',               label: '報酬計算',        icon: Award },
   { href: '/notifications',               label: '通知',            icon: Bell },
   { href: '/admin/settings',              label: '店舗設定',        icon: Settings },

@@ -12,10 +12,15 @@ import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit } from 'lucide-react'
 import Link from 'next/link'
+import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
+import type { Database } from '@/lib/supabase/database.types'
+
+type SaleInsert = Database['public']['Tables']['sales']['Insert']
 
 interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
@@ -50,6 +55,20 @@ function effectiveRewardRate(sale: Pick<Sale, 'is_daily_payment' | 'reward_rate_
   return sale.is_daily_payment && sale.reward_rate_override != null ? Number(sale.reward_rate_override) : castRewardRate
 }
 
+// スプレッドシートからのコピペを想定した一括登録行。列の並びはBULK_COLUMNSと対応させる
+interface BulkRow {
+  id: string
+  date: string
+  castName: string
+  amount: string
+  worked_hours: string
+  bonus: string
+  deduction: string
+  notes: string
+}
+const BULK_COLUMNS = ['date', 'castName', 'amount', 'worked_hours', 'bonus', 'deduction', 'notes'] as const
+type BulkColumn = typeof BULK_COLUMNS[number]
+
 export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month }: Props) {
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
@@ -58,9 +77,18 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     is_daily_payment: false, rate_override: '', reward_rate_override: '',
     notes: '', worked_hours: '', bonus: '', deduction: '',
   }), [year, month])
+  const emptyBulkRow = (date?: string): BulkRow => ({
+    id: crypto.randomUUID(), date: date ?? defaultDateFor(year, month),
+    castName: '', amount: '', worked_hours: '', bonus: '', deduction: '', notes: '',
+  })
   const [sales, setSales] = useState(initialSales)
   const [form, setForm] = useState(emptyForm)
   const [editing, setEditing] = useState<Sale | null>(null)
+  const [dialogOpen, setDialogOpen] = useState(false)
+  const [mode, setMode] = useState<'single' | 'bulk'>('single')
+  const [bulkPlatform, setBulkPlatform] = useState<'manual' | PlatformKey>('manual')
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>(() => Array.from({ length: 5 }, () => emptyBulkRow()))
+  const [bulkSaving, setBulkSaving] = useState(false)
   const supabase = createClient()
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
@@ -87,6 +115,34 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     const override = form.is_daily_payment && form.rate_override ? parseFloat(form.rate_override) : null
     return calcPlatformAmount(form.platform, rawUnits, platformSettings[form.platform], usdJpyRate, override)
   }, [form.platform, form.raw_units, form.is_daily_payment, form.rate_override, platformSettings, usdJpyRate])
+
+  function openCreate() {
+    setForm(emptyForm)
+    setEditing(null)
+    setMode('single')
+    setBulkRows(Array.from({ length: 5 }, () => emptyBulkRow()))
+    setDialogOpen(true)
+  }
+
+  function startEdit(sale: Sale) {
+    setEditing(sale)
+    setForm({
+      cast_id: sale.cast_id,
+      date: sale.date,
+      platform: (sale.platform as 'manual' | PlatformKey) ?? 'manual',
+      amount: String(sale.amount),
+      raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
+      is_daily_payment: sale.is_daily_payment,
+      rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
+      reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
+      notes: sale.notes ?? '',
+      worked_hours: sale.worked_hours != null ? String(sale.worked_hours) : '',
+      bonus: Number(sale.bonus) ? String(sale.bonus) : '',
+      deduction: Number(sale.deduction) ? String(sale.deduction) : '',
+    })
+    setMode('single')
+    setDialogOpen(true)
+  }
 
   async function handleSave() {
     if (!form.cast_id) { toast.error('キャストは必須です'); return }
@@ -129,6 +185,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       toast.success('売上を登録しました')
     }
     setForm(emptyForm)
+    setDialogOpen(false)
   }
 
   async function handleDelete(id: string) {
@@ -139,22 +196,85 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     toast.success('削除しました')
   }
 
-  function startEdit(sale: Sale) {
-    setEditing(sale)
-    setForm({
-      cast_id: sale.cast_id,
-      date: sale.date,
-      platform: (sale.platform as 'manual' | PlatformKey) ?? 'manual',
-      amount: String(sale.amount),
-      raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
-      is_daily_payment: sale.is_daily_payment,
-      rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
-      reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
-      notes: sale.notes ?? '',
-      worked_hours: sale.worked_hours != null ? String(sale.worked_hours) : '',
-      bonus: Number(sale.bonus) ? String(sale.bonus) : '',
-      deduction: Number(sale.deduction) ? String(sale.deduction) : '',
+  function updateBulkCell(rowId: string, col: BulkColumn, value: string) {
+    setBulkRows(rows => rows.map(r => r.id === rowId ? { ...r, [col]: value } : r))
+  }
+
+  function addBulkRow() {
+    setBulkRows(rows => [...rows, emptyBulkRow(rows.at(-1)?.date)])
+  }
+
+  function removeBulkRow(rowId: string) {
+    setBulkRows(rows => rows.filter(r => r.id !== rowId))
+  }
+
+  // スプレッドシートからタブ区切り・改行区切りで貼り付けた内容を、貼り付け開始セルを起点にグリッドへ展開する
+  function handleBulkPaste(e: React.ClipboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) {
+    const text = e.clipboardData.getData('text')
+    if (!text.includes('\t') && !text.includes('\n')) return
+    e.preventDefault()
+    const lines = text.replace(/\r/g, '').split('\n')
+    while (lines.length > 0 && lines.at(-1) === '') lines.pop()
+    const grid = lines.map(line => line.split('\t'))
+
+    setBulkRows(rows => {
+      const next = [...rows]
+      grid.forEach((cols, i) => {
+        const targetIndex = rowIndex + i
+        while (next.length <= targetIndex) next.push(emptyBulkRow())
+        const row = { ...next[targetIndex] }
+        cols.forEach((val, j) => {
+          const col = BULK_COLUMNS[colIndex + j]
+          if (col) row[col] = val.trim()
+        })
+        next[targetIndex] = row
+      })
+      return next
     })
+  }
+
+  async function handleBulkSubmit() {
+    // dateは常にデフォルト値が入っているため空判定には使わない。キャスト名か金額のどちらかが入っている行だけを対象にする
+    const nonEmptyRows = bulkRows.filter(r => r.castName.trim() || r.amount.trim())
+    if (nonEmptyRows.length === 0) { toast.error('入力された行がありません'); return }
+
+    const isPlatform = bulkPlatform !== 'manual'
+    const payloads: SaleInsert[] = []
+    const errorRows: number[] = []
+
+    nonEmptyRows.forEach((row, idx) => {
+      const cast = casts.find(c => c.display_name?.trim() === row.castName.trim())
+      const amountVal = parseFloat(row.amount)
+      if (!cast || !row.date || row.amount === '' || Number.isNaN(amountVal)) { errorRows.push(idx + 1); return }
+      const converted = isPlatform ? calcPlatformAmount(bulkPlatform, amountVal, platformSettings[bulkPlatform], usdJpyRate, null) : null
+      payloads.push({
+        cast_id: cast.id, date: row.date, platform: bulkPlatform,
+        amount: isPlatform ? (converted?.jpy ?? 0) : Math.round(amountVal),
+        raw_units: isPlatform ? amountVal : null,
+        usd_amount: isPlatform ? converted?.usd ?? null : null,
+        fx_rate_snapshot: isPlatform ? usdJpyRate : null,
+        is_daily_payment: false, rate_override: null, reward_rate_override: null,
+        notes: row.notes || null,
+        worked_hours: row.worked_hours ? parseFloat(row.worked_hours) : null,
+        bonus: row.bonus ? parseInt(row.bonus) : 0,
+        deduction: row.deduction ? parseInt(row.deduction) : 0,
+        store_id: storeId, created_by: userId,
+      })
+    })
+
+    if (errorRows.length > 0) {
+      toast.error(`${errorRows.length}行に不備があります（${errorRows.join('、')}行目）。キャスト名・日付・金額を確認してください`)
+      return
+    }
+
+    setBulkSaving(true)
+    const { data, error } = await supabase.from('sales').insert(payloads).select('*, cast:users!sales_cast_id_fkey(display_name)')
+    setBulkSaving(false)
+    if (error) { toast.error('一括登録に失敗しました'); return }
+    setSales([...(data ?? []), ...sales])
+    toast.success(`${data?.length ?? 0}件の売上を登録しました`)
+    setBulkRows(Array.from({ length: 5 }, () => emptyBulkRow()))
+    setDialogOpen(false)
   }
 
   return (
@@ -163,7 +283,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
         <CardHeader>
           <div className="flex items-center justify-between flex-wrap gap-2">
             <div>
-              <CardTitle>売上入力 — {year}年{month}月</CardTitle>
+              <CardTitle>売上一覧 — {year}年{month}月</CardTitle>
               <p className="text-sm text-muted-foreground mt-1">
                 月合計: ¥{monthlyTotal.toLocaleString()}
                 <span className="mx-1.5 text-border">・</span>
@@ -177,109 +297,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <Link href={`/admin/sales?year=${next.year}&month=${next.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
                 翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
               </Link>
+              <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1" />追加</Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-            <div className="space-y-1.5">
-              <Label>キャスト *</Label>
-              <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
-                <SelectTrigger>
-                  <SelectValue placeholder="選択">
-                    {form.cast_id ? (casts.find(c => c.id === form.cast_id)?.display_name ?? form.cast_id) : undefined}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent alignItemWithTrigger={false}>
-                  {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="space-y-1.5">
-              <Label>日付 *</Label>
-              <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
-            </div>
-            <div className="space-y-1.5">
-              <Label>プラットフォーム</Label>
-              <Select value={form.platform} onValueChange={v => { if (v) setForm({ ...form, platform: v as 'manual' | PlatformKey }) }}>
-                <SelectTrigger><SelectValue>{PLATFORM_LABEL[form.platform]}</SelectValue></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="manual">手入力</SelectItem>
-                  <SelectItem value="stripchat">STRIPCHAT</SelectItem>
-                  <SelectItem value="fc2">FC2</SelectItem>
-                  <SelectItem value="dxlive">DXライブ</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            {form.platform === 'manual' ? (
-              <div className="space-y-1.5">
-                <Label>売上金額（円）*</Label>
-                <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
-              </div>
-            ) : (
-              <div className="space-y-1.5">
-                <Label>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'} *</Label>
-                <Input type="number" min="0" value={form.raw_units} onChange={e => setForm({ ...form, raw_units: e.target.value })} placeholder="0" />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label>稼働時間（時間）</Label>
-              <Input type="number" min="0" step="0.25" value={form.worked_hours} onChange={e => setForm({ ...form, worked_hours: e.target.value })} placeholder="0" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>ボーナス（円）</Label>
-              <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
-            </div>
-            <div className="space-y-1.5">
-              <Label>控除（円）</Label>
-              <Input type="number" min="0" value={form.deduction} onChange={e => setForm({ ...form, deduction: e.target.value })} placeholder="0" />
-            </div>
-            <div className="space-y-1.5 col-span-2 md:col-span-4">
-              <Label>備考</Label>
-              <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
-            </div>
-          </div>
-
-          {form.platform !== 'manual' && preview && (
-            <p className="text-sm text-muted-foreground mt-2">
-              換算金額: <span className="font-medium text-foreground">¥{preview.jpy.toLocaleString()}</span>
-              {preview.usd != null && ` （$${preview.usd.toFixed(2)}）`}
-            </p>
-          )}
-
-          <div className="mt-4 pt-3 border-t space-y-3">
-            <label className="flex items-center gap-2 text-sm cursor-pointer">
-              <Checkbox checked={form.is_daily_payment} onCheckedChange={c => setForm({ ...form, is_daily_payment: !!c })} />
-              日払い（この回だけ単価・報酬率を上書きする）
-            </label>
-            {form.is_daily_payment && (
-              <div className="grid grid-cols-2 gap-3 pl-1">
-                {form.platform !== 'manual' && (
-                  <div className="space-y-1.5">
-                    <Label className="text-xs text-muted-foreground font-normal">単価上書き（1{form.platform === 'stripchat' ? 'TK' : 'pt'}＝◯円）</Label>
-                    <Input type="number" min="0" step="0.01" value={form.rate_override} onChange={e => setForm({ ...form, rate_override: e.target.value })} placeholder="通常の計算式/固定単価を使う場合は空欄" />
-                  </div>
-                )}
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground font-normal">報酬率上書き（%）</Label>
-                  <div className="relative">
-                    <Input type="number" min="0" max="100" step="1" className="pr-8" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
-                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-2 mt-3">
-            <Button onClick={handleSave}><Plus className="h-4 w-4 mr-1" />{editing ? '更新' : '登録'}</Button>
-            {editing && <Button variant="outline" onClick={() => { setEditing(null); setForm(emptyForm) }}>キャンセル</Button>}
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader><CardTitle>売上一覧</CardTitle></CardHeader>
         <CardContent>
           <Table>
             <TableHeader>
@@ -337,6 +358,249 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           </Table>
         </CardContent>
       </Card>
+
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent className={mode === 'bulk' ? 'sm:max-w-4xl' : 'sm:max-w-lg'}>
+          <DialogHeader>
+            <DialogTitle>{editing ? '売上を編集' : '売上を登録'}</DialogTitle>
+          </DialogHeader>
+
+          {!editing && (
+            <div className="inline-flex rounded-md border p-0.5 w-fit">
+              <button
+                type="button" onClick={() => setMode('single')}
+                className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors', mode === 'single' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent')}
+              >
+                <FileEdit className="h-3.5 w-3.5" />1件ずつ
+              </button>
+              <button
+                type="button" onClick={() => setMode('bulk')}
+                className={cn('flex items-center gap-1.5 px-3 py-1.5 rounded text-sm transition-colors', mode === 'bulk' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:bg-accent')}
+              >
+                <Table2 className="h-3.5 w-3.5" />まとめて登録
+              </button>
+            </div>
+          )}
+
+          {mode === 'single' && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>キャスト *</Label>
+                  <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="選択">
+                        {form.cast_id ? (casts.find(c => c.id === form.cast_id)?.display_name ?? form.cast_id) : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>日付 *</Label>
+                  <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>プラットフォーム</Label>
+                  <Select value={form.platform} onValueChange={v => { if (v) setForm({ ...form, platform: v as 'manual' | PlatformKey }) }}>
+                    <SelectTrigger><SelectValue>{PLATFORM_LABEL[form.platform]}</SelectValue></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">手入力</SelectItem>
+                      <SelectItem value="stripchat">STRIPCHAT</SelectItem>
+                      <SelectItem value="fc2">FC2</SelectItem>
+                      <SelectItem value="dxlive">DXライブ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                {form.platform === 'manual' ? (
+                  <div className="space-y-1.5">
+                    <Label>売上金額（円）*</Label>
+                    <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <Label>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'} *</Label>
+                    <Input type="number" min="0" value={form.raw_units} onChange={e => setForm({ ...form, raw_units: e.target.value })} placeholder="0" />
+                  </div>
+                )}
+                <div className="space-y-1.5">
+                  <Label>稼働時間（時間）</Label>
+                  <Input type="number" min="0" step="0.25" value={form.worked_hours} onChange={e => setForm({ ...form, worked_hours: e.target.value })} placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>ボーナス（円）</Label>
+                  <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>控除（円）</Label>
+                  <Input type="number" min="0" value={form.deduction} onChange={e => setForm({ ...form, deduction: e.target.value })} placeholder="0" />
+                </div>
+                <div className="space-y-1.5 col-span-2">
+                  <Label>備考</Label>
+                  <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
+                </div>
+              </div>
+
+              {form.platform !== 'manual' && preview && (
+                <p className="text-sm text-muted-foreground">
+                  換算金額: <span className="font-medium text-foreground">¥{preview.jpy.toLocaleString()}</span>
+                  {preview.usd != null && ` （$${preview.usd.toFixed(2)}）`}
+                </p>
+              )}
+
+              <div className="pt-3 border-t space-y-3">
+                <label className="flex items-center gap-2 text-sm cursor-pointer">
+                  <Checkbox checked={form.is_daily_payment} onCheckedChange={c => setForm({ ...form, is_daily_payment: !!c })} />
+                  日払い（この回だけ単価・報酬率を上書きする）
+                </label>
+                {form.is_daily_payment && (
+                  <div className="grid grid-cols-2 gap-3 pl-1">
+                    {form.platform !== 'manual' && (
+                      <div className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground font-normal">単価上書き（1{form.platform === 'stripchat' ? 'TK' : 'pt'}＝◯円）</Label>
+                        <Input type="number" min="0" step="0.01" value={form.rate_override} onChange={e => setForm({ ...form, rate_override: e.target.value })} placeholder="通常の計算式/固定単価を使う場合は空欄" />
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <Label className="text-xs text-muted-foreground font-normal">報酬率上書き（%）</Label>
+                      <div className="relative">
+                        <Input type="number" min="0" max="100" step="1" className="pr-8" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
+                        <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>キャンセル</Button>
+                <Button onClick={handleSave}><Plus className="h-4 w-4 mr-1" />{editing ? '更新' : '登録'}</Button>
+              </div>
+            </div>
+          )}
+
+          {mode === 'bulk' && (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                外部サイトの表をコピーして、セルをクリックしてから貼り付けられます（複数行・複数列まとめてOK）。プラットフォームはこのまとめて登録全体で共通です。
+              </p>
+              <div className="space-y-1.5 w-48">
+                <Label>プラットフォーム</Label>
+                <Select value={bulkPlatform} onValueChange={v => { if (v) setBulkPlatform(v as 'manual' | PlatformKey) }}>
+                  <SelectTrigger><SelectValue>{PLATFORM_LABEL[bulkPlatform]}</SelectValue></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="manual">手入力</SelectItem>
+                    <SelectItem value="stripchat">STRIPCHAT</SelectItem>
+                    <SelectItem value="fc2">FC2</SelectItem>
+                    <SelectItem value="dxlive">DXライブ</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <datalist id="cast-name-options">
+                {casts.map(c => <option key={c.id} value={c.display_name ?? ''} />)}
+              </datalist>
+
+              <div className="overflow-x-auto border rounded-lg">
+                <table className="w-full text-sm border-collapse">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-32">日付</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">
+                        {bulkPlatform === 'manual' ? '金額(円)' : bulkPlatform === 'stripchat' ? 'TK数' : 'ポイント数'}
+                      </th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">ボーナス</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">控除</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b">備考</th>
+                      <th className="w-8 border-b" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {bulkRows.map((row, rowIndex) => (
+                      <tr key={row.id}>
+                        <td className="p-0.5 border-b">
+                          <input
+                            type="date" value={row.date}
+                            onChange={e => updateBulkCell(row.id, 'date', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 0)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <input
+                            list="cast-name-options" value={row.castName} placeholder="キャスト名"
+                            onChange={e => updateBulkCell(row.id, 'castName', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 1)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <input
+                            type="number" value={row.amount} placeholder="0"
+                            onChange={e => updateBulkCell(row.id, 'amount', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 2)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <input
+                            type="number" step="0.25" value={row.worked_hours} placeholder="0"
+                            onChange={e => updateBulkCell(row.id, 'worked_hours', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 3)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <input
+                            type="number" value={row.bonus} placeholder="0"
+                            onChange={e => updateBulkCell(row.id, 'bonus', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 4)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <input
+                            type="number" value={row.deduction} placeholder="0"
+                            onChange={e => updateBulkCell(row.id, 'deduction', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 5)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <input
+                            value={row.notes} placeholder="備考"
+                            onChange={e => updateBulkCell(row.id, 'notes', e.target.value)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, 6)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          />
+                        </td>
+                        <td className="p-0.5 border-b text-center">
+                          <button type="button" onClick={() => removeBulkRow(row.id)} className="text-muted-foreground hover:text-destructive" aria-label="この行を削除">
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <Button size="sm" variant="outline" onClick={addBulkRow}><Plus className="h-3.5 w-3.5 mr-1" />行を追加</Button>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setDialogOpen(false)}>キャンセル</Button>
+                <Button onClick={handleBulkSubmit} disabled={bulkSaving}>
+                  <Plus className="h-4 w-4 mr-1" />{bulkSaving ? '登録中...' : 'まとめて登録'}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }
