@@ -56,10 +56,12 @@ function effectiveRewardRate(sale: Pick<Sale, 'is_daily_payment' | 'reward_rate_
 }
 
 // スプレッドシートからのコピペを想定した一括登録行。列の並びはBULK_COLUMNSと対応させる
+// （プラットフォームは行ごとに個別設定するため、貼り付け列の対応には含めない）
 interface BulkRow {
   id: string
   date: string
   castName: string
+  platform: 'manual' | PlatformKey
   amount: string
   worked_hours: string
   bonus: string
@@ -79,16 +81,24 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   }), [year, month])
   const emptyBulkRow = (date?: string): BulkRow => ({
     id: crypto.randomUUID(), date: date ?? defaultDateFor(year, month),
-    castName: '', amount: '', worked_hours: '', bonus: '', deduction: '', notes: '',
+    castName: '', platform: 'manual', amount: '', worked_hours: '', bonus: '', deduction: '', notes: '',
   })
+  // その月の全日分の行を用意する（まとめて登録は「1ヶ月分を一気に埋める」用途が中心のため）
+  const daysInMonthRows = (): BulkRow[] => {
+    const count = new Date(year, month, 0).getDate()
+    return Array.from({ length: count }, (_, i) =>
+      emptyBulkRow(`${year}-${String(month).padStart(2, '0')}-${String(i + 1).padStart(2, '0')}`)
+    )
+  }
   const [sales, setSales] = useState(initialSales)
   const [form, setForm] = useState(emptyForm)
   const [editing, setEditing] = useState<Sale | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [mode, setMode] = useState<'single' | 'bulk'>('single')
-  const [bulkPlatform, setBulkPlatform] = useState<'manual' | PlatformKey>('manual')
-  const [bulkRows, setBulkRows] = useState<BulkRow[]>(() => Array.from({ length: 5 }, () => emptyBulkRow()))
+  const [bulkRows, setBulkRows] = useState<BulkRow[]>(() => daysInMonthRows())
   const [bulkSaving, setBulkSaving] = useState(false)
+  const [bulkCastFill, setBulkCastFill] = useState('')
+  const [bulkPlatformFill, setBulkPlatformFill] = useState<'manual' | PlatformKey>('manual')
   const supabase = createClient()
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
@@ -120,8 +130,18 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     setForm(emptyForm)
     setEditing(null)
     setMode('single')
-    setBulkRows(Array.from({ length: 5 }, () => emptyBulkRow()))
+    setBulkRows(daysInMonthRows())
     setDialogOpen(true)
+  }
+
+  function applyCastToAllRows() {
+    const cast = casts.find(c => c.id === bulkCastFill)
+    if (!cast) return
+    setBulkRows(rows => rows.map(r => ({ ...r, castName: cast.display_name ?? '' })))
+  }
+
+  function applyPlatformToAllRows() {
+    setBulkRows(rows => rows.map(r => ({ ...r, platform: bulkPlatformFill })))
   }
 
   function startEdit(sale: Sale) {
@@ -196,7 +216,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     toast.success('削除しました')
   }
 
-  function updateBulkCell(rowId: string, col: BulkColumn, value: string) {
+  function updateBulkCell(rowId: string, col: BulkColumn | 'platform', value: string) {
     setBulkRows(rows => rows.map(r => r.id === rowId ? { ...r, [col]: value } : r))
   }
 
@@ -238,7 +258,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     const nonEmptyRows = bulkRows.filter(r => r.castName.trim() || r.amount.trim())
     if (nonEmptyRows.length === 0) { toast.error('入力された行がありません'); return }
 
-    const isPlatform = bulkPlatform !== 'manual'
     const payloads: SaleInsert[] = []
     const errorRows: number[] = []
 
@@ -246,9 +265,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       const cast = casts.find(c => c.display_name?.trim() === row.castName.trim())
       const amountVal = parseFloat(row.amount)
       if (!cast || !row.date || row.amount === '' || Number.isNaN(amountVal)) { errorRows.push(idx + 1); return }
-      const converted = isPlatform ? calcPlatformAmount(bulkPlatform, amountVal, platformSettings[bulkPlatform], usdJpyRate, null) : null
+      const rowPlatform = row.platform
+      const isPlatform = rowPlatform !== 'manual'
+      const converted = rowPlatform !== 'manual' ? calcPlatformAmount(rowPlatform, amountVal, platformSettings[rowPlatform], usdJpyRate, null) : null
       payloads.push({
-        cast_id: cast.id, date: row.date, platform: bulkPlatform,
+        cast_id: cast.id, date: row.date, platform: row.platform,
         amount: isPlatform ? (converted?.jpy ?? 0) : Math.round(amountVal),
         raw_units: isPlatform ? amountVal : null,
         usd_amount: isPlatform ? converted?.usd ?? null : null,
@@ -273,7 +294,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     if (error) { toast.error('一括登録に失敗しました'); return }
     setSales([...(data ?? []), ...sales])
     toast.success(`${data?.length ?? 0}件の売上を登録しました`)
-    setBulkRows(Array.from({ length: 5 }, () => emptyBulkRow()))
+    setBulkRows(daysInMonthRows())
     setDialogOpen(false)
   }
 
@@ -484,19 +505,38 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           {mode === 'bulk' && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                外部サイトの表をコピーして、セルをクリックしてから貼り付けられます（複数行・複数列まとめてOK）。プラットフォームはこのまとめて登録全体で共通です。
+                外部サイトの表をコピーして、セルをクリックしてから貼り付けられます（複数行・複数列まとめてOK）。日付はその月の全日を用意しています。プラットフォームは行ごとに設定できます。
               </p>
-              <div className="space-y-1.5 w-48">
-                <Label>プラットフォーム</Label>
-                <Select value={bulkPlatform} onValueChange={v => { if (v) setBulkPlatform(v as 'manual' | PlatformKey) }}>
-                  <SelectTrigger><SelectValue>{PLATFORM_LABEL[bulkPlatform]}</SelectValue></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="manual">手入力</SelectItem>
-                    <SelectItem value="stripchat">STRIPCHAT</SelectItem>
-                    <SelectItem value="fc2">FC2</SelectItem>
-                    <SelectItem value="dxlive">DXライブ</SelectItem>
-                  </SelectContent>
-                </Select>
+
+              <div className="flex items-end gap-2 flex-wrap p-2.5 rounded-lg border bg-muted/30">
+                <div className="space-y-1.5 w-44">
+                  <Label className="text-xs">キャストを一括設定</Label>
+                  <Select value={bulkCastFill} onValueChange={v => { if (v) setBulkCastFill(v) }}>
+                    <SelectTrigger className="h-8">
+                      <SelectValue placeholder="選択">
+                        {bulkCastFill ? (casts.find(c => c.id === bulkCastFill)?.display_name ?? bulkCastFill) : undefined}
+                      </SelectValue>
+                    </SelectTrigger>
+                    <SelectContent alignItemWithTrigger={false}>
+                      {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button size="sm" variant="outline" onClick={applyCastToAllRows} disabled={!bulkCastFill}>全行に適用</Button>
+
+                <div className="space-y-1.5 w-44">
+                  <Label className="text-xs">プラットフォームを一括設定</Label>
+                  <Select value={bulkPlatformFill} onValueChange={v => { if (v) setBulkPlatformFill(v as 'manual' | PlatformKey) }}>
+                    <SelectTrigger className="h-8"><SelectValue>{PLATFORM_LABEL[bulkPlatformFill]}</SelectValue></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="manual">手入力</SelectItem>
+                      <SelectItem value="stripchat">STRIPCHAT</SelectItem>
+                      <SelectItem value="fc2">FC2</SelectItem>
+                      <SelectItem value="dxlive">DXライブ</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button size="sm" variant="outline" onClick={applyPlatformToAllRows}>全行に適用</Button>
               </div>
 
               <datalist id="cast-name-options">
@@ -509,9 +549,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <tr className="bg-muted/50">
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">日付</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">
-                        {bulkPlatform === 'manual' ? '金額(円)' : bulkPlatform === 'stripchat' ? 'TK数' : 'ポイント数'}
-                      </th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">ボーナス</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">控除</th>
@@ -539,8 +578,21 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                           />
                         </td>
                         <td className="p-0.5 border-b">
+                          <select
+                            value={row.platform}
+                            onChange={e => updateBulkCell(row.id, 'platform', e.target.value)}
+                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                          >
+                            <option value="manual">手入力</option>
+                            <option value="stripchat">STRIPCHAT</option>
+                            <option value="fc2">FC2</option>
+                            <option value="dxlive">DXライブ</option>
+                          </select>
+                        </td>
+                        <td className="p-0.5 border-b">
                           <input
-                            type="number" value={row.amount} placeholder="0"
+                            type="number" value={row.amount}
+                            placeholder={row.platform === 'manual' ? '円' : row.platform === 'stripchat' ? 'TK数' : 'pt数'}
                             onChange={e => updateBulkCell(row.id, 'amount', e.target.value)}
                             onPaste={e => handleBulkPaste(e, rowIndex, 2)}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
