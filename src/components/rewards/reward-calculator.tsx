@@ -69,14 +69,17 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     return { cast, rewardRate, salesTotal, baseReward, bonus, deduction, totalReward }
   }), [casts, salesByCast])
 
-  const selectableRows = useMemo(() => rows.filter(r => !issuedAt[r.cast.id]), [rows, issuedAt])
-  const allSelected = selectableRows.length > 0 && selectableRows.every(r => selected.has(r.cast.id))
+  const allSelected = rows.length > 0 && rows.every(r => selected.has(r.cast.id))
+  const unissuedRows = useMemo(() => rows.filter(r => !issuedAt[r.cast.id]), [rows, issuedAt])
+  const unissuedAllSelected = unissuedRows.length > 0 && unissuedRows.every(r => selected.has(r.cast.id))
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(selectableRows.map(r => r.cast.id)))
+    setSelected(allSelected ? new Set() : new Set(rows.map(r => r.cast.id)))
+  }
+  function toggleUnissuedAll() {
+    setSelected(unissuedAllSelected ? new Set() : new Set(unissuedRows.map(r => r.cast.id)))
   }
   function toggleOne(id: string) {
-    if (issuedAt[id]) return
     setSelected(prev => {
       const next = new Set(prev)
       if (next.has(id)) next.delete(id); else next.add(id)
@@ -162,10 +165,16 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
       </CardHeader>
       <CardContent>
         <div className="flex items-center justify-between mb-2 flex-wrap gap-2">
-          <label className={`flex items-center gap-2 text-sm ${selectableRows.length === 0 ? 'text-muted-foreground' : 'cursor-pointer'}`}>
-            <Checkbox checked={allSelected} onCheckedChange={toggleAll} disabled={selectableRows.length === 0} />
-            未発行を全員選択
-          </label>
+          <div className="flex items-center gap-4 flex-wrap">
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
+              全員選択
+            </label>
+            <label className={`flex items-center gap-2 text-sm ${unissuedRows.length === 0 ? 'text-muted-foreground' : 'cursor-pointer'}`}>
+              <Checkbox checked={unissuedAllSelected} onCheckedChange={toggleUnissuedAll} disabled={unissuedRows.length === 0} />
+              未発行のみ選択
+            </label>
+          </div>
           <Button size="sm" onClick={() => setConfirmOpen(true)} disabled={sending || selected.size === 0}>
             <Send className="h-3.5 w-3.5 mr-1" />選択した{selected.size}人に発行
           </Button>
@@ -192,11 +201,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             {rows.map(r => (
               <TableRow key={r.cast.id}>
                 <TableCell>
-                  <Checkbox
-                    checked={selected.has(r.cast.id)}
-                    onCheckedChange={() => toggleOne(r.cast.id)}
-                    disabled={!!issuedAt[r.cast.id]}
-                  />
+                  <Checkbox checked={selected.has(r.cast.id)} onCheckedChange={() => toggleOne(r.cast.id)} />
                 </TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-1.5">
