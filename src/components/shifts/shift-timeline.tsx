@@ -29,12 +29,20 @@ interface Props {
   areaLabel: string
   roomLabel: string
   onShiftClick?: (shiftId: string) => void
+  /** 1日あたりの重なり表示の上限を超えた分がある日に呼ばれる（「+N」クリック時、その日の一覧を別途表示するため） */
+  onDayClick?: (dateStr: string) => void
 }
 
 const HOUR_W = 72
 const DATE_W = 76
-const ROW_H = 44
 const HEADER_H = 32
+// 同じ時間帯に重なるシフトは、この段数までを横並びのレーンで表示し、それ以上は「+N」にまとめる
+// （量が増えても行の高さを一定に保つため。月表示の「3件まで表示+あとは…」と同じ考え方）
+const MAX_LANES = 3
+const LANE_H = 22
+const LANE_GAP = 2
+const ROW_PAD = 4
+const ROW_H = ROW_PAD * 2 + MAX_LANES * LANE_H + (MAX_LANES - 1) * LANE_GAP
 
 // カレンダー表示と同じ配色（ステータスの意味を画面間で揃える）
 const STATUS_COLOR: Record<ShiftStatus, string> = {
@@ -53,7 +61,30 @@ function timeToHours(t: string): number {
   return h + m / 60
 }
 
-export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, roomLabel, onShiftClick }: Props) {
+/** 開始時刻順に並べ、空いている最も早いレーンへ詰めていく（レーンが埋まっていればoverflowへ） */
+function layoutLanes(dayShifts: TimelineShift[]) {
+  const sorted = [...dayShifts].sort((a, b) => timeToHours(a.start_time) - timeToHours(b.start_time))
+  const laneEndHours: number[] = []
+  const placed: { shift: TimelineShift; lane: number }[] = []
+  let overflowCount = 0
+  for (const shift of sorted) {
+    const sh = timeToHours(shift.start_time)
+    let eh = timeToHours(shift.end_time)
+    if (eh <= sh) eh += 24
+    let lane = laneEndHours.findIndex(end => end <= sh)
+    if (lane === -1) {
+      if (laneEndHours.length >= MAX_LANES) { overflowCount++; continue }
+      lane = laneEndHours.length
+      laneEndHours.push(eh)
+    } else {
+      laneEndHours[lane] = eh
+    }
+    placed.push({ shift, lane })
+  }
+  return { placed, overflowCount }
+}
+
+export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, roomLabel, onShiftClick, onDayClick }: Props) {
   const tabs = useMemo(() => {
     if (locationMode === 'area_only' || locationMode === 'area_and_room') {
       return [{ id: 'all', name: 'すべて' }, ...areas.map(a => ({ id: a.id, name: a.name }))]
@@ -160,6 +191,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
             const dayShifts = filteredShifts.filter(s => s.date === dateStr)
             const dow = day.getDay()
             const isWeekend = dow === 0 || dow === 6
+            const { placed, overflowCount } = layoutLanes(dayShifts)
 
             return (
               <div
@@ -169,7 +201,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
               >
                 <div
                   className={cn(
-                    'shrink-0 sticky left-0 z-10 border-r flex items-center justify-center',
+                    'shrink-0 sticky left-0 z-10 border-r flex flex-col items-center justify-center gap-0.5',
                     isWeekend ? 'bg-muted/40' : 'bg-card'
                   )}
                   style={{ width: DATE_W }}
@@ -182,6 +214,15 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                     {format(day, 'M/d', { locale: ja })}<br />
                     <span className="text-[10px]">{format(day, '(E)', { locale: ja })}</span>
                   </span>
+                  {overflowCount > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => onDayClick?.(dateStr)}
+                      className="text-[10px] font-semibold rounded-full px-1.5 py-0.5 bg-muted-foreground/15 text-muted-foreground hover:bg-muted-foreground/25 transition-colors"
+                    >
+                      +{overflowCount}
+                    </button>
+                  )}
                 </div>
 
                 <div className="relative flex-1">
@@ -193,7 +234,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                     />
                   ))}
 
-                  {dayShifts.map(shift => {
+                  {placed.map(({ shift, lane }) => {
                     const sh = timeToHours(shift.start_time)
                     let eh = timeToHours(shift.end_time)
                     if (eh <= sh) eh += 24
@@ -202,6 +243,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                     const right = Math.min(hourCount * HOUR_W, (eh - startHour) * HOUR_W)
                     const width = right - left - 2
                     if (width <= 0) return null
+                    const top = ROW_PAD + lane * (LANE_H + LANE_GAP)
 
                     return (
                       <button
@@ -210,10 +252,10 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
                         onClick={() => onShiftClick?.(shift.id)}
                         title={`${shift.cast?.display_name ?? '?'}  ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} ${STATUS_LABEL[shift.status]}`}
                         className={cn(
-                          'absolute top-1.5 bottom-1.5 rounded text-white text-xs flex items-center px-1.5 overflow-hidden select-none text-left',
+                          'absolute rounded text-white text-xs flex items-center px-1.5 overflow-hidden select-none text-left',
                           onShiftClick ? 'cursor-pointer hover:brightness-110' : 'cursor-default',
                         )}
-                        style={{ left, width, backgroundColor: STATUS_COLOR[shift.status] }}
+                        style={{ left, width, top, height: LANE_H, backgroundColor: STATUS_COLOR[shift.status] }}
                       >
                         <span className="truncate font-medium">{shift.cast?.display_name ?? '?'}</span>
                       </button>

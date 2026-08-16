@@ -264,6 +264,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
             areaLabel={areaLabel}
             roomLabel={roomLabel}
             onShiftClick={id => { const s = shifts.find(x => x.id === id); if (s) openDetail(s) }}
+            onDayClick={setDayDetailDate}
           />
         )}
         {view === 'list' && (
