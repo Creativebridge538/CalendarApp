@@ -19,7 +19,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TimeSelect, normalizeTime } from '@/components/ui/time-select'
-import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, Bell, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { sendPushNotification } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
@@ -642,6 +642,13 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
             )}
 
             <div className="flex items-center gap-1 shrink-0">
+              <Link
+                href="/notifications"
+                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground"
+                aria-label="通知"
+              >
+                <Bell className="h-5 w-5" />
+              </Link>
               <button
                 type="button"
                 onClick={() => setSearchOpen(true)}

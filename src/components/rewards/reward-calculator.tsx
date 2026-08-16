@@ -12,6 +12,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
@@ -34,6 +35,7 @@ interface Props {
 export function RewardCalculator({ casts, sales, from, to }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
+  const [confirmOpen, setConfirmOpen] = useState(false)
   const [fromInput, setFromInput] = useState(from)
   const [toInput, setToInput] = useState(to)
   const supabase = createClient()
@@ -87,8 +89,10 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
     applyRange(format(startOfMonth(shifted), 'yyyy-MM-dd'), format(endOfMonth(shifted), 'yyyy-MM-dd'))
   }
 
+  const targets = useMemo(() => rows.filter(r => selected.has(r.cast.id)), [rows, selected])
+  const targetsTotal = useMemo(() => targets.reduce((sum, t) => sum + t.totalReward, 0), [targets])
+
   async function handleIssue() {
-    const targets = rows.filter(r => selected.has(r.cast.id))
     if (targets.length === 0) { toast.error('キャストを選択してください'); return }
     setSending(true)
 
@@ -115,6 +119,7 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
 
     toast.success(`${targets.length}人に支払通知書を発行しました`)
     setSelected(new Set())
+    setConfirmOpen(false)
   }
 
   return (
@@ -149,7 +154,7 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
             <Checkbox checked={allSelected} onCheckedChange={toggleAll} />
             全員選択
           </label>
-          <Button size="sm" onClick={handleIssue} disabled={sending || selected.size === 0}>
+          <Button size="sm" onClick={() => setConfirmOpen(true)} disabled={sending || selected.size === 0}>
             <Send className="h-3.5 w-3.5 mr-1" />選択した{selected.size}人に発行
           </Button>
         </div>
@@ -196,6 +201,35 @@ export function RewardCalculator({ casts, sales, from, to }: Props) {
           </TableBody>
         </Table>
       </CardContent>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent>
+          <DialogHeader><DialogTitle>支払通知書を発行しますか？</DialogTitle></DialogHeader>
+          <div className="space-y-3 mt-2">
+            <p className="text-sm text-muted-foreground">
+              {format(new Date(`${from}T00:00:00`), 'M/d', { locale: ja })}〜{format(new Date(`${to}T00:00:00`), 'M/d', { locale: ja })} の内容で、以下{targets.length}人に通知を送ります。
+            </p>
+            <div className="rounded-lg border divide-y max-h-64 overflow-y-auto">
+              {targets.map(t => (
+                <div key={t.cast.id} className="flex items-center justify-between px-3 py-2 text-sm">
+                  <span>{t.cast.display_name ?? '—'}</span>
+                  <span className="font-medium tabular-nums">¥{t.totalReward.toLocaleString()}</span>
+                </div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between px-1 text-sm font-bold">
+              <span>合計</span>
+              <span className="tabular-nums">¥{targetsTotal.toLocaleString()}</span>
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>キャンセル</Button>
+              <Button onClick={handleIssue} disabled={sending}>
+                <Send className="h-3.5 w-3.5 mr-1" />{sending ? '送信中...' : '発行する'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }
