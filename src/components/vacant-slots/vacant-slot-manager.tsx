@@ -233,16 +233,16 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                           <Check className="h-3 w-3 mr-1" />承認
                         </Button>
                       )}
-                      {app.status !== 'rejected' && (
-                        <Button size="sm" variant="destructive" className="h-7"
-                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'rejected')}>
-                          <X className="h-3 w-3 mr-1" />却下
-                        </Button>
-                      )}
                       {app.status === 'approved' && (
                         <Button size="sm" variant="outline" className="h-7"
                           onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'pending')}>
                           承認を取消
+                        </Button>
+                      )}
+                      {app.status !== 'rejected' && (
+                        <Button size="sm" variant="destructive" className="h-7"
+                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'rejected')}>
+                          <X className="h-3 w-3 mr-1" />却下
                         </Button>
                       )}
                     </TableCell>
