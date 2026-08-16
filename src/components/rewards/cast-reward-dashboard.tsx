@@ -170,21 +170,6 @@ export function CastRewardDashboard({
             </button>
           </div>
 
-          {paymentNotices.length > 0 && (
-            <div className="pt-1.5 border-t space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                <Receipt className="h-3 w-3" />支払通知書
-              </p>
-              <div className="space-y-1">
-                {paymentNotices.map(n => (
-                  <div key={n.id} className="flex items-center justify-between gap-2">
-                    <p className="text-xs text-muted-foreground truncate">{n.body}</p>
-                    <PaymentNoticeButton castId={userId} from={n.from} to={n.to} label="開く" variant="tonal" size="xs" />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -283,6 +268,25 @@ export function CastRewardDashboard({
 
       {activeTab === 'report' && (
         <>
+          <Card elevated>
+            <CardContent className="pt-4 pb-4 space-y-2">
+              <p className="text-sm font-semibold flex items-center gap-1.5">
+                <Receipt className="h-4 w-4 text-muted-foreground" />支払通知書
+              </p>
+              {paymentNotices.length === 0 ? (
+                <p className="text-xs text-muted-foreground text-center py-4">まだ支払通知書はありません</p>
+              ) : (
+                <div className="space-y-1 max-h-72 overflow-y-auto">
+                  {paymentNotices.map(n => (
+                    <div key={n.id} className="flex items-center justify-between gap-2 py-1">
+                      <p className="text-xs text-muted-foreground truncate">{n.body}</p>
+                      <PaymentNoticeButton castId={userId} from={n.from} to={n.to} label="開く" variant="tonal" size="xs" />
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
           <TrendChart data={trend} />
           <WeekdayChart data={weekday} />
         </>
