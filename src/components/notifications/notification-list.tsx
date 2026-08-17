@@ -67,7 +67,10 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
       if (!res.ok) {
         toast.error(`${targetLabel}へのプッシュ送信エラー: ${result.error ?? res.status}`)
       } else if (result.sent === 0 && result.total > 0) {
-        toast.error(`${targetLabel}へのプッシュ送信失敗（${result.total}件の購読すべてで失敗しました）`)
+        const detail = (result.failures ?? [])
+          .map((f: { statusCode?: number; message?: string; body?: string }) => `${f.statusCode ?? '?'} ${f.message ?? f.body ?? ''}`.trim())
+          .join(' / ')
+        toast.error(`${targetLabel}へのプッシュ送信失敗（${result.total}件中0件成功）${detail ? `: ${detail}` : ''}`, { duration: 15000 })
       } else if (result.total === 0) {
         toast.error(`${targetLabel}はプッシュ通知の購読が見つかりません（端末で通知をオンにできているか確認してください）`)
       } else {
