@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -32,8 +32,8 @@ interface Props {
 export function IssuedNoticesList({ notices, casts }: Props) {
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filterCast, setFilterCast] = useState('all')
-  const [filterFrom, setFilterFrom] = useState('')
-  const [filterTo, setFilterTo] = useState('')
+  const [filterFrom, setFilterFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'))
+  const [filterTo, setFilterTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [downloading, setDownloading] = useState(false)
 
   const filtered = useMemo(() => notices.filter(n =>
