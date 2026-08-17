@@ -266,8 +266,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   }
 
   async function handleBulkSubmit() {
-    // dateは常にデフォルト値が入っているため空判定には使わない。キャスト名か金額のどちらかが入っている行だけを対象にする
-    const nonEmptyRows = bulkRows.filter(r => r.castName.trim() || r.amount.trim())
+    // dateは常にデフォルト値が入っており、キャスト名も一括設定で全行に入りうるため、
+    // 金額が実際に入力されている行だけを登録対象にする（キャストだけ入っていて金額が空の行はスルー）
+    const nonEmptyRows = bulkRows.filter(r => r.amount.trim())
     if (nonEmptyRows.length === 0) { toast.error('入力された行がありません'); return }
 
     const payloads: SaleInsert[] = []
