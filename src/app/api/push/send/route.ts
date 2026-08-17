@@ -13,6 +13,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'user_id, title は必須です' }, { status: 400 })
   }
 
+  const admin = createAdminClient()
+
+  // 自分以外に送る場合は、同じ店舗のユーザー同士（管理者⇄キャスト等）のみ許可する
+  if (user_id !== user.id) {
+    const { data: caller } = await supabase.from('users').select('store_id').eq('id', user.id).single()
+    const { data: target } = await admin.from('users').select('store_id').eq('id', user_id).single()
+    if (!caller?.store_id || !target?.store_id || caller.store_id !== target.store_id) {
+      return NextResponse.json({ error: '権限がありません' }, { status: 403 })
+    }
+  }
+
   if (!process.env.VAPID_SUBJECT || !process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY || !process.env.VAPID_PRIVATE_KEY) {
     return NextResponse.json({ error: 'VAPID環境変数が未設定です' }, { status: 500 })
   }
@@ -22,12 +33,11 @@ export async function POST(request: Request) {
     process.env.VAPID_PRIVATE_KEY
   )
 
-  const admin = createAdminClient()
   const { data: subscriptions } = await admin.from('push_subscriptions').select('*').eq('user_id', user_id)
 
   if (!subscriptions?.length) {
     console.error('[push/send] no subscriptions for user', { user_id })
-    return NextResponse.json({ sent: 0 })
+    return NextResponse.json({ sent: 0, total: 0 })
   }
 
   const payload = JSON.stringify({ title, body: body ?? undefined, link: link ?? undefined })

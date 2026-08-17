@@ -9,17 +9,27 @@ import { ja } from 'date-fns/locale'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Bell, BellRing, BellOff, CheckCheck, Send, ChevronLeft } from 'lucide-react'
-import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush, sendPushNotification } from '@/lib/push'
+import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from '@/lib/push'
 
 interface Notification {
   id: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string
 }
 
-export function NotificationList({ notifications: initial, userId }: { notifications: Notification[]; userId: string }) {
+interface Props {
+  notifications: Notification[]
+  userId: string
+  /** 管理者の場合のみ渡される。指定するとキャストへのテスト通知送信UIを表示する */
+  casts?: { id: string; display_name: string | null }[]
+}
+
+export function NotificationList({ notifications: initial, userId, casts }: Props) {
   const [notifications, setNotifications] = useState(initial)
   const [pushState, setPushState] = useState<'unsupported' | 'denied' | 'subscribed' | 'unsubscribed' | 'loading'>('loading')
+  const [testCastId, setTestCastId] = useState('')
+  const [sendingCastTest, setSendingCastTest] = useState(false)
   const supabase = createClient()
   const router = useRouter()
   const unreadCount = notifications.filter(n => !n.read_at).length
@@ -44,6 +54,30 @@ export function NotificationList({ notifications: initial, userId }: { notificat
     }
   }
 
+  // プッシュ送信の結果をその場で確認できるよう、テスト時だけ結果を待って表示する
+  // （通常のsendPushNotificationは呼び出し元をブロックしないよう握りつぶす設計のため、ここでは使わない）
+  async function sendAndReportPush(targetUserId: string, title: string, body: string | null, link: string | null, targetLabel: string) {
+    try {
+      const res = await fetch('/api/push/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: targetUserId, title, body, link }),
+      })
+      const result = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        toast.error(`${targetLabel}へのプッシュ送信エラー: ${result.error ?? res.status}`)
+      } else if (result.sent === 0 && result.total > 0) {
+        toast.error(`${targetLabel}へのプッシュ送信失敗（${result.total}件の購読すべてで失敗しました）`)
+      } else if (result.total === 0) {
+        toast.error(`${targetLabel}はプッシュ通知の購読が見つかりません（端末で通知をオンにできているか確認してください）`)
+      } else {
+        toast.success(`${targetLabel}へテスト通知を送信しました（プッシュ ${result.sent}/${result.total}件成功）`)
+      }
+    } catch {
+      toast.error('プッシュ送信リクエストに失敗しました（ネットワークエラー）')
+    }
+  }
+
   async function sendTestNotification() {
     const { data, error } = await supabase
       .from('notifications')
@@ -51,9 +85,22 @@ export function NotificationList({ notifications: initial, userId }: { notificat
       .select()
       .single()
     if (error || !data) { toast.error('送信に失敗しました'); return }
-    sendPushNotification(userId, data.title, data.body, data.link)
     setNotifications([data, ...notifications])
-    toast.success('テスト通知を送信しました')
+    await sendAndReportPush(userId, data.title, data.body, data.link, '自分')
+  }
+
+  async function sendTestToCast() {
+    if (!testCastId) { toast.error('キャストを選択してください'); return }
+    const castName = casts?.find(c => c.id === testCastId)?.display_name ?? 'キャスト'
+    setSendingCastTest(true)
+    const { data, error } = await supabase
+      .from('notifications')
+      .insert({ user_id: testCastId, title: 'テスト通知', body: '管理者からの通知テストです' })
+      .select()
+      .single()
+    if (error || !data) { toast.error('送信に失敗しました'); setSendingCastTest(false); return }
+    await sendAndReportPush(testCastId, data.title, data.body, data.link, castName)
+    setSendingCastTest(false)
   }
 
   async function markRead(id: string) {
@@ -157,6 +204,30 @@ export function NotificationList({ notifications: initial, userId }: { notificat
               iPhoneでは、Safariでホーム画面に追加してそのアイコンから開いた場合のみ通知を受け取れます。
             </p>
           )}
+        </div>
+      )}
+      {casts && (
+        <div className="px-6 pb-4">
+          <div className="rounded-lg border p-3 space-y-2">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Send className="h-3.5 w-3.5 shrink-0" />キャストへテスト通知を送信
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={testCastId} onValueChange={v => { if (v) setTestCastId(v) }}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="キャストを選択">
+                    {testCastId ? (casts.find(c => c.id === testCastId)?.display_name ?? testCastId) : undefined}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" onClick={sendTestToCast} disabled={sendingCastTest || !testCastId}>
+                <Send className="h-3.5 w-3.5 mr-1" />{sendingCastTest ? '送信中...' : 'テスト送信'}
+              </Button>
+            </div>
+          </div>
         </div>
       )}
       <CardContent>
