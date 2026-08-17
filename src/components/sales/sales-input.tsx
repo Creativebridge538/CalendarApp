@@ -650,6 +650,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                             onPaste={e => handleBulkPaste(e, rowIndex, 2)}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
+                          {row.platform !== 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount)) && (
+                            <p className="text-[10px] text-muted-foreground px-1.5 leading-tight">
+                              ¥{calcPlatformAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate, null).jpy.toLocaleString()}
+                            </p>
+                          )}
                         </td>
                         <td className="p-0.5 border-b">
                           <input
