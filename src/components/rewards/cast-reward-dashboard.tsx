@@ -74,7 +74,7 @@ export function CastRewardDashboard({
   attendanceDaysThisMonth, totalHoursThisMonth, platformBreakdown,
   trend, weekday, dayDetails, paymentNotices,
 }: Props) {
-  const [activeTab, setActiveTab] = useState<'calendar' | 'report'>('calendar')
+  const [activeTab, setActiveTab] = useState<'calendar' | 'report' | 'notices'>('calendar')
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [monthlyGoal, setMonthlyGoal] = useState(initialGoal)
   const [goalOpen, setGoalOpen] = useState(false)
@@ -127,6 +127,16 @@ export function CastRewardDashboard({
             }`}
           >
             <BarChart3 className="h-3.5 w-3.5" />レポート
+          </button>
+          <button
+            onClick={() => setActiveTab('notices')}
+            className={`flex items-center gap-1 px-3.5 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-all duration-150 ${
+              activeTab === 'notices'
+                ? 'bg-[var(--brand-accent)] text-white shadow-[0_2px_6px_oklch(0_0_0_/_15%)]'
+                : 'text-muted-foreground'
+            }`}
+          >
+            <Receipt className="h-3.5 w-3.5" />支払通知書
           </button>
         </div>
       </div>
@@ -268,28 +278,28 @@ export function CastRewardDashboard({
 
       {activeTab === 'report' && (
         <>
-          <Card elevated>
-            <CardContent className="pt-4 pb-4 space-y-2">
-              <p className="text-sm font-semibold flex items-center gap-1.5">
-                <Receipt className="h-4 w-4 text-muted-foreground" />支払通知書
-              </p>
-              {paymentNotices.length === 0 ? (
-                <p className="text-xs text-muted-foreground text-center py-4">まだ支払通知書はありません</p>
-              ) : (
-                <div className="space-y-1 max-h-72 overflow-y-auto">
-                  {paymentNotices.map(n => (
-                    <div key={n.id} className="flex items-center justify-between gap-2 py-1">
-                      <p className="text-xs text-muted-foreground truncate">{n.body}</p>
-                      <PaymentNoticeButton castId={userId} from={n.from} to={n.to} label="開く" variant="tonal" size="xs" />
-                    </div>
-                  ))}
-                </div>
-              )}
-            </CardContent>
-          </Card>
           <TrendChart data={trend} />
           <WeekdayChart data={weekday} />
         </>
+      )}
+
+      {activeTab === 'notices' && (
+        <Card elevated>
+          <CardContent className="pt-4 pb-4 space-y-2">
+            {paymentNotices.length === 0 ? (
+              <p className="text-xs text-muted-foreground text-center py-4">まだ支払通知書はありません</p>
+            ) : (
+              <div className="space-y-1">
+                {paymentNotices.map(n => (
+                  <div key={n.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-b-0">
+                    <p className="text-xs text-muted-foreground truncate">{n.body}</p>
+                    <PaymentNoticeButton castId={userId} from={n.from} to={n.to} label="開く" variant="tonal" size="xs" />
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       <Dialog open={breakdownOpen} onOpenChange={setBreakdownOpen}>
