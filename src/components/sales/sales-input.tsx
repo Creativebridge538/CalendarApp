@@ -604,6 +604,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">換算金額</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">ボーナス</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">控除</th>
@@ -650,11 +651,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                             onPaste={e => handleBulkPaste(e, rowIndex, 2)}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
-                          {row.platform !== 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount)) && (
-                            <p className="text-[10px] text-muted-foreground px-1.5 leading-tight">
-                              ¥{calcPlatformAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate, null).jpy.toLocaleString()}
-                            </p>
-                          )}
+                        </td>
+                        <td className="p-0.5 border-b">
+                          <div className="w-full h-8 px-1.5 flex items-center text-xs text-muted-foreground whitespace-nowrap">
+                            {row.platform !== 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount))
+                              ? `¥${calcPlatformAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate, null).jpy.toLocaleString()}`
+                              : '—'}
+                          </div>
                         </td>
                         <td className="p-0.5 border-b">
                           <input
