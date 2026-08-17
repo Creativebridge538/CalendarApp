@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { sendPushNotification } from '@/lib/push'
+import type { Database } from '@/lib/supabase/database.types'
 
 interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; room_id: string | null; capacity: number; rooms: { name: string } | null }
 interface Application { vacant_slot_id: string; status: string; shift_id: string | null }
@@ -21,9 +22,49 @@ interface Props {
   storeId: string
 }
 
-export function CastVacantSlots({ slots, myApplications: initial, castId, storeId }: Props) {
+export function CastVacantSlots({ slots: initialSlots, myApplications: initial, castId, storeId }: Props) {
+  const [slots, setSlots] = useState(initialSlots)
   const [applications, setApplications] = useState(initial)
   const supabase = createClient()
+
+  // 管理者側で定員変更・非公開化された空き枠を、リロードなしにリアルタイムで反映する
+  useEffect(() => {
+    const channel = supabase
+      .channel(`cast-vacant-slots-${storeId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'vacant_slots', filter: `store_id=eq.${storeId}` },
+        payload => {
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { id: string }
+            setSlots(prev => prev.filter(s => s.id !== oldRow.id))
+            return
+          }
+          const row = payload.new as Database['public']['Tables']['vacant_slots']['Row']
+          const today = format(new Date(), 'yyyy-MM-dd')
+          if (!row.is_published || row.date < today) {
+            setSlots(prev => prev.filter(s => s.id !== row.id))
+            return
+          }
+          setSlots(prev => {
+            const existing = prev.find(s => s.id === row.id)
+            if (!existing) {
+              return [...prev, {
+                id: row.id, date: row.date, start_time: row.start_time, end_time: row.end_time,
+                notes: row.notes, room_id: row.room_id, capacity: row.capacity, rooms: null,
+              }]
+            }
+            return prev.map(s => s.id === row.id ? {
+              ...s, date: row.date, start_time: row.start_time, end_time: row.end_time,
+              notes: row.notes, room_id: row.room_id, capacity: row.capacity,
+            } : s)
+          })
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId])
 
   function getStatus(slotId: string) {
     return applications.find(a => a.vacant_slot_id === slotId)?.status ?? null
