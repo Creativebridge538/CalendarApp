@@ -24,8 +24,9 @@ export async function POST(request: Request) {
   const zip = new JSZip()
   for (const n of notices) {
     const content = await fetchNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
-    if (!content) continue
+    if (!content) { console.error('[bulk-pdf] cast not found in store', { cast_id: n.cast_id }); continue }
     const buffer = await renderToBuffer(NoticeDocument({ content, issuedAt: n.issued_at }))
+    // 同じキャスト・同じ期間で複数回発行されている場合はファイル名が衝突し、zip内で上書きされる（意図的な挙動）
     const filename = `${content.castName || 'unknown'}_${n.from}_${n.to}.pdf`.replace(/[/\\]/g, '-')
     zip.file(filename, buffer)
   }
