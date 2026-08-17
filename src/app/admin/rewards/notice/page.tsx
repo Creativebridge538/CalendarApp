@@ -4,10 +4,7 @@ import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { PrintButton } from './print-button'
-
-const PLATFORM_LABEL: Record<string, string> = {
-  manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
-}
+import { fetchNoticeContent } from '@/lib/payment-notice-data'
 
 export default async function PaymentNoticePage({
   searchParams,
@@ -29,34 +26,15 @@ export default async function PaymentNoticePage({
     return <div className="p-6 text-sm text-muted-foreground">対象キャスト・対象期間が指定されていません。</div>
   }
 
-  const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
-    supabase.from('stores').select('name').eq('id', storeId).single(),
-    supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
-    supabase.from('users').select('display_name, reward_rate').eq('id', cast_id).eq('store_id', storeId).single(),
-    supabase.from('sales').select('date, platform, amount, raw_units, is_daily_payment, reward_rate_override, bonus, deduction')
-      .eq('cast_id', cast_id).eq('store_id', storeId)
-      .gte('date', from)
-      .lte('date', to)
-      .order('date'),
-  ])
+  const content = await fetchNoticeContent(supabase, storeId, cast_id, from, to)
 
-  if (!cast) {
+  if (!content) {
     return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>
   }
 
-  const rewardRate = Number(cast.reward_rate)
-  const salesRows = sales ?? []
-  const salesTotal = salesRows.reduce((sum, s) => sum + Number(s.amount), 0)
-  // 日払いで報酬率が上書きされている行はその行だけ別の率で計算する（それ以外は通常の報酬率）
-  const baseReward = Math.floor(
-    salesRows.reduce((sum, s) => {
-      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
-      return sum + Number(s.amount) * rate
-    }, 0)
-  )
-  const bonus = salesRows.reduce((sum, s) => sum + Number(s.bonus), 0)
-  const deduction = salesRows.reduce((sum, s) => sum + Number(s.deduction), 0)
-  const totalReward = baseReward + bonus - deduction
+  const { castName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
+  const store = { name: content.storeName }
+  const settings = { logo_url: logoUrl }
 
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
 
@@ -115,7 +93,7 @@ export default async function PaymentNoticePage({
 
         <div className="notice-header-grid">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{cast.display_name} 様</div>
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{castName} 様</div>
             <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel} のお支払い明細をお送りいたします。</div>
           </div>
           <div className="notice-issuer">
@@ -161,8 +139,8 @@ export default async function PaymentNoticePage({
             {salesRows.map((s, i) => (
               <tr key={i}>
                 <td>{format(new Date(s.date), 'M/d(E)', { locale: ja })}</td>
-                <td>{PLATFORM_LABEL[s.platform] ?? s.platform}{s.is_daily_payment && '（日払い）'}</td>
-                <td className="right">¥{Number(s.amount).toLocaleString()}</td>
+                <td>{s.platformLabel}{s.isDailyPayment && '（日払い）'}</td>
+                <td className="right">¥{s.amount.toLocaleString()}</td>
               </tr>
             ))}
           </tbody>

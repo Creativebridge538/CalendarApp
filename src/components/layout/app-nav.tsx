@@ -8,7 +8,7 @@ import { createClient } from '@/lib/supabase/client'
 import {
   LayoutDashboard, Users, DoorOpen, Calendar, FileEdit,
   Briefcase, BarChart2, Award, Settings, Bell, LogOut,
-  ChevronDown, Menu, X, MapPin, Palette, Plus,
+  ChevronDown, Menu, X, MapPin, Palette, Plus, FileText,
 } from 'lucide-react'
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
@@ -24,7 +24,8 @@ const adminNav = [
   { href: '/admin/modification-requests', label: '修正申請',        icon: FileEdit },
   { href: '/admin/vacant-slots',          label: '空き枠管理',      icon: Briefcase },
   { href: '/admin/sales',                 label: '売上一覧',        icon: BarChart2 },
-  { href: '/admin/rewards',               label: '支払通知書',      icon: Award },
+  { href: '/admin/rewards',               label: '支払通知書作成',  icon: Award },
+  { href: '/admin/issued-notices',        label: '発行済み支払通知書', icon: FileText },
   { href: '/notifications',               label: '通知',            icon: Bell },
   { href: '/admin/settings',              label: '店舗設定',        icon: Settings },
 ]
