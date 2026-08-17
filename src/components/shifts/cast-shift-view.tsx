@@ -178,7 +178,7 @@ function ShiftTimeGrid({
                     key={s.id}
                     type="button"
                     onClick={e => { e.stopPropagation(); onDayClick(day) }}
-                    className="absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-left text-white text-[10px] font-medium overflow-hidden whitespace-nowrap leading-tight"
+                    className="absolute left-0.5 right-0.5 rounded-md px-1.5 py-0.5 text-left text-white text-[10px] font-medium overflow-hidden leading-tight break-words"
                     style={{ top, height, backgroundColor: STATUS_DOT[s.status] }}
                     title={`${locationLabelOf(s) ? locationLabelOf(s) + ' ' : ''}${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                   >
@@ -752,8 +752,22 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 )}
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </Link>
-              <div className="flex justify-end mx-4 md:mx-0 mb-2">
-                <div className="inline-flex rounded-full bg-muted p-0.5">
+              <div className="flex items-center justify-between mx-4 md:mx-0 mb-2 gap-2 flex-wrap">
+                <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-wrap">
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.submitted }} />提出済み
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.confirmed }} />確定
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.rejected }} />差し戻し
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.modification_requested }} />修正依頼中
+                  </span>
+                </div>
+                <div className="inline-flex rounded-full bg-muted p-0.5 shrink-0">
                   <button
                     type="button"
                     onClick={() => setCalendarMode('time')}
@@ -784,6 +798,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 onNavigate={dir => (dir === 'next' ? goNext() : goPrev())}
                 mode={calendarMode}
                 amountByDate={amountByDate}
+                showChipLabel={false}
               />
             </>
           )}

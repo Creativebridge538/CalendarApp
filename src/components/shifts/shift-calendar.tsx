@@ -58,11 +58,13 @@ interface Props {
   /** 'amount' の場合、各日をシフトチップの代わりに amountByDate の金額で表示する */
   mode?: 'time' | 'amount'
   amountByDate?: Record<string, number>
+  /** false の場合、チップには開始時間のみを表示する（ルーム名・ステータス名は表示しない） */
+  showChipLabel?: boolean
 }
 
 export function ShiftCalendar({
   shifts, showCastName = false, onDayClick, current: controlledCurrent, direction: controlledDirection,
-  onNavigate, selectedDates, mode = 'time', amountByDate,
+  onNavigate, selectedDates, mode = 'time', amountByDate, showChipLabel = true,
 }: Props) {
   const [internalCurrent, setInternalCurrent] = useState(() => new Date())
   const [internalDirection, setInternalDirection] = useState<'next' | 'prev'>('next')
@@ -210,8 +212,8 @@ export function ShiftCalendar({
                       style={chipStyle(s.status)}
                       title={`${s.start_time.slice(0, 5)}〜${s.end_time.slice(0, 5)} ${STATUS_LABEL[s.status]}`}
                     >
-                      {`${s.start_time.slice(0, 5)} `}
-                      {s.rooms?.name ?? STATUS_LABEL[s.status]}
+                      {s.start_time.slice(0, 5)}
+                      {showChipLabel && ` ${s.rooms?.name ?? STATUS_LABEL[s.status]}`}
                     </div>
                   ))}
                   {dayShifts.length > 2 && (
@@ -229,8 +231,8 @@ export function ShiftCalendar({
                       {showCastName && s.cast && (
                         <span className="font-bold">{s.cast.display_name} </span>
                       )}
-                      {`${s.start_time.slice(0, 5)} `}
-                      {s.rooms?.name ?? STATUS_LABEL[s.status]}
+                      {s.start_time.slice(0, 5)}
+                      {showChipLabel && ` ${s.rooms?.name ?? STATUS_LABEL[s.status]}`}
                     </div>
                   ))}
                   {dayShifts.length > 3 && (
