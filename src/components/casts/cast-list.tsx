@@ -347,7 +347,6 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             <div className="space-y-1.5">
               <Label>メールアドレス *</Label>
               <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
-              <p className="text-xs text-muted-foreground">パスワード再設定メールの送付に使用します（ログインには使いません）</p>
             </div>
             {!editing ? (
               <div className="space-y-1.5">
