@@ -19,6 +19,9 @@ export async function POST(request: Request) {
   if (!email || !password || !display_name || !real_name || !login_id || !bank_name || !bank_branch || !bank_account_number || !bank_account_holder) {
     return NextResponse.json({ error: 'email, password, display_name, real_name, login_id, bank_name, bank_branch, bank_account_number, bank_account_holder は必須です' }, { status: 400 })
   }
+  if (!/^\d{7}$/.test(bank_account_number)) {
+    return NextResponse.json({ error: '口座番号は7桁の数字で入力してください' }, { status: 400 })
+  }
 
   const admin = createAdminClient()
 

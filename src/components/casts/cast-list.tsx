@@ -408,7 +408,16 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                 </div>
                 <div className="space-y-1.5">
                   <Label>口座番号 *</Label>
-                  <Input value={form.bank_account_number} onChange={e => setForm({ ...form, bank_account_number: toHalfWidthDigits(e.target.value) })} />
+                  <Input
+                    value={form.bank_account_number}
+                    maxLength={7}
+                    inputMode="numeric"
+                    onChange={e => setForm({ ...form, bank_account_number: toHalfWidthDigits(e.target.value).replace(/\D/g, '').slice(0, 7) })}
+                    placeholder="7桁の数字"
+                  />
+                  {form.bank_account_number.length > 0 && form.bank_account_number.length < 7 && (
+                    <p className="text-xs text-destructive">口座番号は7桁で入力してください</p>
+                  )}
                 </div>
                 <div className="space-y-1.5">
                   <Label>名義人（カナ）*</Label>
@@ -431,7 +440,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                 onClick={handleSave}
                 disabled={
                   saving || !form.display_name || !form.real_name || !form.login_id || !form.email
-                  || !form.bank_name || !form.bank_branch || !form.bank_account_number || !form.bank_account_holder
+                  || !form.bank_name || !form.bank_branch || form.bank_account_number.length !== 7 || !form.bank_account_holder
                   || (!editing && !form.password)
                 }
               >
