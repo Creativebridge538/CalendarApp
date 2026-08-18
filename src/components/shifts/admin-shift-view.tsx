@@ -52,7 +52,6 @@ interface Props {
   locationMode: string
   areaLabel: string
   roomLabel: string
-  allowRoomDoubleBooking: boolean
   checklistItems: { id: string; label: string; item_type: string }[]
 }
 
@@ -63,7 +62,7 @@ const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive
   draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive', modification_requested: 'secondary',
 }
 
-export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, allowRoomDoubleBooking, checklistItems }: Props) {
+export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
@@ -121,12 +120,12 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     for (const s of confirmed) {
       const count = overlapCount.get(s.id) ?? 0
       if (count === 0) continue
-      if (!allowRoomDoubleBooking) { ids.add(s.id); continue }
       const capacity = roomCapacity.get(s.room_id!)
-      if (capacity != null && count + 1 > capacity) ids.add(s.id)
+      if (capacity == null) continue
+      if (count + 1 > capacity) ids.add(s.id)
     }
     return ids
-  }, [shifts, rooms, allowRoomDoubleBooking])
+  }, [shifts, rooms])
 
   function openDetail(shift: Shift) {
     setDetailShift(shift)

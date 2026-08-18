@@ -628,7 +628,6 @@ export type Database = {
       }
       store_settings: {
         Row: {
-          allow_room_double_booking: boolean
           area_label: string
           created_at: string
           deadline_day: number
@@ -646,7 +645,6 @@ export type Database = {
           usd_jpy_rate: number | null
         }
         Insert: {
-          allow_room_double_booking?: boolean
           area_label?: string
           created_at?: string
           deadline_day?: number
@@ -664,7 +662,6 @@ export type Database = {
           usd_jpy_rate?: number | null
         }
         Update: {
-          allow_room_double_booking?: boolean
           area_label?: string
           created_at?: string
           deadline_day?: number
