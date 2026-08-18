@@ -479,14 +479,22 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     </p>
                   )}
                   <div className="flex gap-2 pt-1">
-                    <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30" disabled={shift.status === 'confirmed'}
-                      onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
-                      <Check className="h-3.5 w-3.5 mr-1" /> 確定
-                    </Button>
-                    <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
-                      onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
-                      <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
-                    </Button>
+                    {shift.status === 'modification_requested' ? (
+                      <Link href={`/admin/modification-requests?shift=${shift.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
+                        <Button size="sm" variant="outline" className="w-full">修正申請で対応する</Button>
+                      </Link>
+                    ) : (
+                      <>
+                        <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30" disabled={shift.status === 'confirmed'}
+                          onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
+                          <Check className="h-3.5 w-3.5 mr-1" /> 確定
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
+                          onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
+                          <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
               ))}
@@ -539,14 +547,22 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                       </div>
                     </TableCell>
                     <TableCell className="text-right space-x-1">
-                      <Button size="sm" variant="outline" className="text-positive border-positive/30" disabled={shift.status === 'confirmed'}
-                        onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
-                        <Check className="h-3.5 w-3.5 mr-1" /> 確定
-                      </Button>
-                      <Button size="sm" variant="outline" className="text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
-                        onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
-                        <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
-                      </Button>
+                      {shift.status === 'modification_requested' ? (
+                        <Link href={`/admin/modification-requests?shift=${shift.id}`} onClick={e => e.stopPropagation()}>
+                          <Button size="sm" variant="outline">修正申請で対応する</Button>
+                        </Link>
+                      ) : (
+                        <>
+                          <Button size="sm" variant="outline" className="text-positive border-positive/30" disabled={shift.status === 'confirmed'}
+                            onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
+                            <Check className="h-3.5 w-3.5 mr-1" /> 確定
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
+                            onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
+                            <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
+                          </Button>
+                        </>
+                      )}
                     </TableCell>
                   </TableRow>
                 ))}
