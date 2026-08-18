@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User } from 'lucide-react'
+import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User, Copy } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { toHalfWidthDigits } from '@/lib/zenkaku'
@@ -48,7 +48,6 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
-  const [createdAccount, setCreatedAccount] = useState<{ login_id: string; password: string } | null>(null)
   const supabase = createClient()
   const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedCasts, totalItems } = usePagination(casts)
 
@@ -113,7 +112,6 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
         if (!res.ok) { toast.error(json.error ?? '作成に失敗しました'); return }
         setCasts([...casts, json.cast])
         toast.success('キャストを作成しました')
-        setCreatedAccount({ login_id: form.login_id, password: form.password })
       } else {
         const payload = {
           display_name: form.display_name,
@@ -170,13 +168,15 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   }
 
   function accountInfoText(loginId: string, password: string) {
-    return `アカウントを発行しました。\nログインURL: ${window.location.origin}/login\nログインID: ${loginId}\nパスワード: ${password}`
+    const lines = [`ログインURL: ${window.location.origin}/login`, `ログインID: ${loginId}`]
+    if (password) lines.push(`パスワード: ${password}`)
+    return lines.join('\n')
   }
 
   async function copyAccountInfo() {
-    if (!createdAccount) return
-    await navigator.clipboard.writeText(accountInfoText(createdAccount.login_id, createdAccount.password))
-    toast.success('コピーしました')
+    if (!form.login_id) { toast.error('ユーザーIDを入力してください'); return }
+    await navigator.clipboard.writeText(accountInfoText(form.login_id, form.password))
+    toast.success(form.password ? 'ログイン情報をコピーしました' : 'ログイン情報をコピーしました（パスワードは未入力のため含まれません）')
   }
 
   async function toggleActive(cast: CastUser) {
@@ -373,11 +373,18 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             )}
             <div className="space-y-1.5">
               <Label>ユーザーID *</Label>
-              <Input
-                value={form.login_id}
-                onChange={e => setForm({ ...form, login_id: e.target.value.trim() })}
-                placeholder="ログイン時に使用するID"
-              />
+              <div className="flex gap-2">
+                <Input
+                  value={form.login_id}
+                  onChange={e => setForm({ ...form, login_id: e.target.value.trim() })}
+                  placeholder="ログイン時に使用するID"
+                  className="flex-1"
+                />
+                <Button type="button" variant="outline" onClick={copyAccountInfo}>
+                  <Copy className="h-3.5 w-3.5 mr-1" />コピー
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">ログインURL・ユーザーID・パスワード（入力済みの場合）をコピーします</p>
             </div>
             <div className="space-y-1.5">
               <Label>源氏名 *</Label>
@@ -472,24 +479,6 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setDeactivateTarget(null)}>キャンセル</Button>
               <Button variant="destructive" onClick={confirmDeactivate}>無効化する</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={!!createdAccount} onOpenChange={open => { if (!open) setCreatedAccount(null) }}>
-        <DialogContent>
-          <DialogHeader><DialogTitle>アカウントを発行しました</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
-            <p className="text-sm text-muted-foreground">
-              以下の内容をコピーして、キャスト本人に送ってください（パスワードはこの画面でしか確認できません）。
-            </p>
-            <pre className="rounded-lg border bg-muted/30 p-3 text-sm whitespace-pre-wrap">
-              {createdAccount && accountInfoText(createdAccount.login_id, createdAccount.password)}
-            </pre>
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setCreatedAccount(null)}>閉じる</Button>
-              <Button onClick={copyAccountInfo}>コピーする</Button>
             </div>
           </div>
         </DialogContent>
