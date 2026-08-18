@@ -24,7 +24,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   if (store && !store.is_active) {
     return (
-      <div className="flex h-dvh items-center justify-center p-6 text-center">
+      <div className="flex h-full items-center justify-center p-6 text-center">
         {profile?.role === 'cast' && <LockBodyScroll />}
         <div className="space-y-2 max-w-sm">
           <p className="text-lg font-bold">この店舗は現在ご利用いただけません</p>
@@ -69,12 +69,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // 管理者は素直にページ全体がブラウザ標準の方法でスクロールする、これまで通りの挙動に戻す
   return (
     <div
-      className={`flex font-sans ${role === 'cast' ? 'h-dvh overflow-hidden' : 'min-h-screen'} ${castSkin?.isDark ? 'dark' : ''}`}
-      style={{
-        backgroundColor: 'var(--app-bg)',
-        ...accentStyle,
-        ...(role === 'cast' ? { height: 'var(--app-vh, 100dvh)' } : {}),
-      }}
+      className={`flex font-sans ${role === 'cast' ? 'h-full overflow-hidden' : 'min-h-screen'} ${castSkin?.isDark ? 'dark' : ''}`}
+      style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
       data-theme={theme}
     >
       {role === 'cast' && <LockBodyScroll />}
