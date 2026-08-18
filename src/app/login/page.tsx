@@ -55,30 +55,6 @@ export default function LoginPage() {
     window.location.href = '/dashboard'
   }
 
-  async function handleResetPassword() {
-    if (!loginId) {
-      setError('ユーザーIDを入力してください')
-      return
-    }
-    setLoading(true)
-    const email = await resolveLoginId(loginId)
-    if (!email) {
-      setError('ユーザーIDまたはパスワードが正しくありません')
-      setLoading(false)
-      return
-    }
-    const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/auth/callback?next=/auth/reset-password`,
-    })
-    setLoading(false)
-    if (error) {
-      setError('パスワードリセットメールの送信に失敗しました')
-    } else {
-      setError(null)
-      alert('パスワードリセットメールを送信しました')
-    }
-  }
-
   return (
     <div
       className="h-screen overflow-hidden flex items-center justify-center p-4"
@@ -131,15 +107,9 @@ export default function LoginPage() {
               <Button type="submit" variant="elevated" className="w-full" disabled={loading}>
                 {loading ? 'ログイン中...' : 'ログイン'}
               </Button>
-              <Button
-                type="button"
-                variant="tonal"
-                className="w-full text-sm"
-                onClick={handleResetPassword}
-                disabled={loading}
-              >
-                パスワードをお忘れの方
-              </Button>
+              <p className="text-center text-sm text-muted-foreground">
+                パスワードを忘れた場合は管理者にお問い合わせください
+              </p>
             </form>
           </CardContent>
         </Card>
