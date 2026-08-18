@@ -21,10 +21,6 @@ import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 
 interface CastUser { id: string; display_name: string | null; real_name: string | null; reward_rate: number | string; is_active: boolean }
-
-function castLabel(c: { display_name: string | null; real_name: string | null }) {
-  return c.real_name ? `${c.display_name ?? '—'}（${c.real_name}）` : (c.display_name ?? '—')
-}
 interface SaleRow {
   cast_id: string; amount: number | string
   is_daily_payment: boolean; reward_rate_override: number | string | null
@@ -179,12 +175,12 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             <Select value={filterCastId} onValueChange={v => { if (v) { setFilterCastId(v); setPage(1) } }}>
               <SelectTrigger className="w-40">
                 <SelectValue>
-                  {filterCastId === 'all' ? '全キャスト' : (() => { const c = casts.find(c => c.id === filterCastId); return c ? castLabel(c) : filterCastId })()}
+                  {filterCastId === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCastId)?.display_name ?? filterCastId)}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
                 <SelectItem value="all">全キャスト</SelectItem>
-                {casts.map(c => <SelectItem key={c.id} value={c.id}>{castLabel(c)}</SelectItem>)}
+                {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -210,7 +206,8 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
           <TableHeader>
             <TableRow>
               <TableHead className="w-8" />
-              <TableHead>キャスト</TableHead>
+              <TableHead>キャスト（源氏名）</TableHead>
+              <TableHead>本名</TableHead>
               <TableHead className="text-right">売上合計</TableHead>
               <TableHead className="text-right">報酬率</TableHead>
               <TableHead className="text-right">基本報酬</TableHead>
@@ -223,7 +220,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
           </TableHeader>
           <TableBody>
             {filteredRows.length === 0 && (
-              <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
+              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
             )}
             {paged.map(r => (
               <TableRow key={r.cast.id}>
@@ -232,10 +229,11 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
                 </TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-1.5">
-                    {castLabel(r.cast)}
+                    {r.cast.display_name ?? '—'}
                     {!r.cast.is_active && <Badge variant="outline" className="text-[10px] font-normal">退店済み</Badge>}
                   </div>
                 </TableCell>
+                <TableCell className="text-muted-foreground">{r.cast.real_name ?? '—'}</TableCell>
                 <TableCell className="text-right">¥{r.salesTotal.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{(r.rewardRate * 100).toFixed(1)}%</TableCell>
                 <TableCell className="text-right">¥{r.baseReward.toLocaleString()}</TableCell>
@@ -274,7 +272,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             <div className="rounded-lg border divide-y max-h-64 overflow-y-auto">
               {targets.map(t => (
                 <div key={t.cast.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                  <span>{castLabel(t.cast)}</span>
+                  <span>{t.cast.display_name ?? '—'}{t.cast.real_name ? `（${t.cast.real_name}）` : ''}</span>
                   <span className="font-medium tabular-nums">¥{t.totalReward.toLocaleString()}</span>
                 </div>
               ))}

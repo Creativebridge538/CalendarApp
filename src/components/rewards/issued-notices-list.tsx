@@ -132,7 +132,8 @@ export function IssuedNoticesList({ notices, casts }: Props) {
               <TableHead className="w-8">
                 <Checkbox checked={allSelected} onCheckedChange={toggleAll} disabled={filtered.length === 0} />
               </TableHead>
-              <TableHead>キャスト</TableHead>
+              <TableHead>キャスト（源氏名）</TableHead>
+              <TableHead>本名</TableHead>
               <TableHead>内容</TableHead>
               <TableHead>発行日</TableHead>
               <TableHead className="text-right">プレビュー</TableHead>
@@ -140,7 +141,7 @@ export function IssuedNoticesList({ notices, casts }: Props) {
           </TableHeader>
           <TableBody>
             {filtered.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+              <TableRow><TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                 {filtersActive ? '絞り込み条件に一致する通知書がありません' : '発行済みの支払通知書はまだありません'}
               </TableCell></TableRow>
             )}
@@ -149,9 +150,8 @@ export function IssuedNoticesList({ notices, casts }: Props) {
                 <TableCell>
                   <Checkbox checked={selected.has(n.id)} onCheckedChange={() => toggleOne(n.id)} />
                 </TableCell>
-                <TableCell className="font-medium">
-                  {n.castName}{n.castRealName ? `（${n.castRealName}）` : ''}
-                </TableCell>
+                <TableCell className="font-medium">{n.castName}</TableCell>
+                <TableCell className="text-muted-foreground">{n.castRealName ?? '—'}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{n.body}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {format(new Date(n.createdAt), 'yyyy/M/d', { locale: ja })}
