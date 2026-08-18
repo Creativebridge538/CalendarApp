@@ -174,32 +174,40 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     return lines.join('\n')
   }
 
-  async function copyAccountInfo() {
-    if (!form.login_id) { toast.error('ユーザーIDを入力してください'); return }
-    await navigator.clipboard.writeText(accountInfoText(form.login_id, form.password, form.email))
-    toast.success(form.password ? 'ログイン情報をコピーしました' : 'ログイン情報をコピーしました（パスワードは未入力のため含まれません）')
-  }
-
   function generatePassword() {
     const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
     const bytes = crypto.getRandomValues(new Uint8Array(10))
     return Array.from(bytes, b => chars[b % chars.length]).join('')
   }
 
-  // 発行後はパスワードを平文で保持していないため、行からコピーする場合は
-  // 新しいパスワードを発行し直してからコピーする（＝旧パスワードは使えなくなる）
-  async function copyCastAccountInfo(cast: CastUser) {
-    if (!cast.login_id) { toast.error('このキャストにはユーザーIDが設定されていません'); return }
-    if (!confirm(`「${cast.display_name ?? cast.login_id}」の新しいパスワードを発行してコピーします。今のパスワードは使えなくなります。よろしいですか？`)) return
-
+  // 発行後はパスワードを平文で保持していないため、常にパスワード込みでコピーするには
+  // その場で新しいパスワードを発行し直す（＝旧パスワードは使えなくなる）
+  async function issueNewPassword(userId: string): Promise<string | null> {
     const password = generatePassword()
     const res = await fetch('/api/admin/update-cast-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ userId: cast.id, password }),
+      body: JSON.stringify({ userId, password }),
     })
-    if (!res.ok) { toast.error('パスワードの発行に失敗しました'); return }
+    return res.ok ? password : null
+  }
 
+  async function copyAccountInfo() {
+    if (!form.login_id) { toast.error('ユーザーIDを入力してください'); return }
+    let password = form.password
+    if (!password && editing) {
+      const issued = await issueNewPassword(editing.id)
+      if (!issued) { toast.error('パスワードの発行に失敗しました'); return }
+      password = issued
+    }
+    await navigator.clipboard.writeText(accountInfoText(form.login_id, password, form.email))
+    toast.success('ログイン情報をコピーしました')
+  }
+
+  async function copyCastAccountInfo(cast: CastUser) {
+    if (!cast.login_id) { toast.error('このキャストにはユーザーIDが設定されていません'); return }
+    const password = await issueNewPassword(cast.id)
+    if (!password) { toast.error('パスワードの発行に失敗しました'); return }
     await navigator.clipboard.writeText(accountInfoText(cast.login_id, password, cast.email))
     toast.success('新しいパスワードを発行してコピーしました')
   }
