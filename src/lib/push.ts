@@ -62,6 +62,17 @@ export function clearAppBadge(): void {
   nav.clearAppBadge?.().catch(() => {})
 }
 
+// Service Worker側でのsetAppBadge呼び出しが効かない環境向けの保険。
+// SWがプッシュ受信時にpostMessageしてきたら、開いているページ側（navigatorコンテキスト）でも立てる
+export function listenForBadgeUpdates(): void {
+  if (!isPushSupported()) return
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type !== 'set-app-badge') return
+    const nav = navigator as Navigator & { setAppBadge?: () => Promise<void> }
+    nav.setAppBadge?.().catch(() => {})
+  })
+}
+
 export async function unsubscribeFromPush(): Promise<void> {
   if (!isPushSupported()) return
   const registration = await navigator.serviceWorker.getRegistration('/sw.js')

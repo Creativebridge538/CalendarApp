@@ -23,6 +23,11 @@ self.addEventListener('push', (event) => {
     Promise.all([
       self.registration.showNotification(title, options),
       setAppBadge(),
+      // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
+      // 開いているページ（window/navigatorコンテキスト）側でも試させる
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+      }),
     ])
   )
 })
@@ -43,15 +48,22 @@ self.addEventListener('notificationclick', (event) => {
 
 // getNotifications()の件数に頼らず、プッシュを受けたら無条件にバッジを立てる
 // （表示直後はgetNotifications()がまだ反映されていないことがあり、件数ベースだと取りこぼすため）
-// 実装によってself.navigator.setAppBadgeとself.setAppBadgeのどちらに生えるか差があるため両方試す
+// 実装によってsetAppBadgeがself.registration / self.navigator / self のどこに生えるか差があるため、
+// 見つかった場所を順番に全部試す（1つの実装だけに賭けない）
+function badgeTargets() {
+  const targets = []
+  if (self.registration && self.registration.setAppBadge) targets.push(self.registration)
+  if (self.navigator && self.navigator.setAppBadge) targets.push(self.navigator)
+  if (self.setAppBadge) targets.push(self)
+  return targets
+}
+
 function setAppBadge() {
-  const fn = (self.navigator && self.navigator.setAppBadge) || self.setAppBadge
-  if (!fn) return Promise.resolve()
-  return fn.call(self.navigator || self).catch(() => {})
+  const targets = badgeTargets()
+  return Promise.all(targets.map(t => t.setAppBadge().catch(() => {})))
 }
 
 function clearAppBadge() {
-  const fn = (self.navigator && self.navigator.clearAppBadge) || self.clearAppBadge
-  if (!fn) return Promise.resolve()
-  return fn.call(self.navigator || self).catch(() => {})
+  const targets = badgeTargets()
+  return Promise.all(targets.map(t => t.clearAppBadge().catch(() => {})))
 }

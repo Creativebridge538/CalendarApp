@@ -21,7 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TimeSelect, normalizeTime } from '@/components/ui/time-select'
 import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, Bell, BellRing, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
-import { sendPushNotification, getPushSubscriptionState, subscribeToPush, clearAppBadge } from '@/lib/push'
+import { sendPushNotification, getPushSubscriptionState, subscribeToPush, clearAppBadge, listenForBadgeUpdates } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
 import { MonthYearPicker } from './month-year-picker'
 import { Logo } from '@/components/logo'
@@ -290,6 +290,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   // アプリを開いた時点でホーム画面アイコンのバッジ（未読件数）をクリアする
   useEffect(() => {
     clearAppBadge()
+    listenForBadgeUpdates()
   }, [])
 
   // ホーム画面未追加（ブラウザ表示）の場合、PWA化の案内を出す。「次回以降表示しない」はlocalStorageに記録
