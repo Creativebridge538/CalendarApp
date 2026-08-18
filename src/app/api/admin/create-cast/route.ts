@@ -11,10 +11,13 @@ export async function POST(request: Request) {
   if (profile?.role !== 'admin') return NextResponse.json({ error: '権限がありません' }, { status: 403 })
 
   const body = await request.json()
-  const { email, password, display_name, real_name, phone, reward_rate, login_id } = body
+  const {
+    email, password, display_name, real_name, phone, reward_rate, login_id,
+    bank_name, bank_branch, bank_account_number, bank_account_holder,
+  } = body
 
-  if (!email || !password || !display_name || !real_name || !login_id) {
-    return NextResponse.json({ error: 'email, password, display_name, real_name, login_id は必須です' }, { status: 400 })
+  if (!email || !password || !display_name || !real_name || !login_id || !bank_name || !bank_branch || !bank_account_number || !bank_account_holder) {
+    return NextResponse.json({ error: 'email, password, display_name, real_name, login_id, bank_name, bank_branch, bank_account_number, bank_account_holder は必須です' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -42,6 +45,10 @@ export async function POST(request: Request) {
     reward_rate: parseFloat(reward_rate) || 0.4,
     is_active: true,
     login_id,
+    bank_name,
+    bank_branch,
+    bank_account_number,
+    bank_account_holder,
   }).eq('id', newUser.user.id)
 
   if (updateError) {
@@ -53,7 +60,7 @@ export async function POST(request: Request) {
   }
 
   const { data: cast } = await admin.from('users')
-    .select('id, display_name, real_name, phone, reward_rate, is_active, email, login_id')
+    .select('id, display_name, real_name, phone, reward_rate, is_active, email, login_id, bank_name, bank_branch, bank_account_number, bank_account_holder')
     .eq('id', newUser.user.id)
     .single()
 

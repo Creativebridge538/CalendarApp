@@ -32,7 +32,10 @@ export default async function PaymentNoticePage({
     return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>
   }
 
-  const { castName, castRealName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
+  const {
+    castName, castRealName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder,
+  } = content
   const store = { name: content.storeName }
   const settings = { logo_url: logoUrl }
 
@@ -79,6 +82,9 @@ export default async function PaymentNoticePage({
         table.summary-table td { padding: 6px 10px; border-bottom: 1px dotted #ccc; }
         table.summary-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
         table.summary-table .final-row td { padding: 8px 10px; font-weight: bold; font-size: 15px; border-top: 1.5px solid #1a1a1a; border-bottom: 1.5px solid #1a1a1a; }
+        table.bank-table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1.5px solid #1a1a1a; margin-top: 20px; }
+        table.bank-table td { padding: 8px 10px; border: 1px solid #1a1a1a; }
+        table.bank-table .bank-header td { font-weight: bold; }
       `}</style>
 
       <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end' }}>
@@ -145,6 +151,24 @@ export default async function PaymentNoticePage({
             ))}
           </tbody>
         </table>
+
+        {(bankName || bankBranch || bankAccountNumber || bankAccountHolder) && (
+          <table className="bank-table">
+            <tbody>
+              <tr className="bank-header"><td colSpan={3}>上記の御支払額総計を下記指定口座へ振込みます</td></tr>
+              <tr>
+                <td>{bankName}</td>
+                <td>{bankBranch}</td>
+                <td>{bankAccountNumber}</td>
+              </tr>
+              <tr>
+                <td>{bankAccountHolder}</td>
+                <td></td>
+                <td></td>
+              </tr>
+            </tbody>
+          </table>
+        )}
 
         <div style={{ fontSize: 11, color: '#555', paddingTop: 8, borderTop: '1px dotted #ccc' }}>
           ※本明細に関するお問い合わせは店舗管理者までご連絡ください

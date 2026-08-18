@@ -773,6 +773,10 @@ export type Database = {
         Row: {
           accent_font: string
           accent_skin: string
+          bank_account_holder: string | null
+          bank_account_number: string | null
+          bank_branch: string | null
+          bank_name: string | null
           birthdate: string | null
           calendar_token: string | null
           created_at: string
@@ -798,6 +802,10 @@ export type Database = {
         Insert: {
           accent_font?: string
           accent_skin?: string
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
           birthdate?: string | null
           calendar_token?: string | null
           created_at?: string
@@ -823,6 +831,10 @@ export type Database = {
         Update: {
           accent_font?: string
           accent_skin?: string
+          bank_account_holder?: string | null
+          bank_account_number?: string | null
+          bank_branch?: string | null
+          bank_name?: string | null
           birthdate?: string | null
           calendar_token?: string | null
           created_at?: string

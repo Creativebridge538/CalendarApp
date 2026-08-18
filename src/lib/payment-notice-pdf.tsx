@@ -60,11 +60,21 @@ const styles = StyleSheet.create({
   colPlatform: { width: '45%' },
   colAmount: { width: '30%', textAlign: 'right' },
   footer: { fontSize: 9, color: '#555', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#ccc', marginTop: 8 },
+  bankBox: { borderWidth: 1.5, borderColor: '#1a1a1a', marginTop: 20 },
+  bankHeaderCell: { padding: 6, borderBottomWidth: 1, borderColor: '#1a1a1a', fontSize: 10, fontWeight: 700 },
+  bankRow: { flexDirection: 'row', borderBottomWidth: 1, borderColor: '#1a1a1a' },
+  bankRowLast: { flexDirection: 'row' },
+  bankColBank: { width: '28%', padding: 6, borderRightWidth: 1, borderColor: '#1a1a1a', fontSize: 10 },
+  bankColBranch: { width: '34%', padding: 6, borderRightWidth: 1, borderColor: '#1a1a1a', fontSize: 10 },
+  bankColNumber: { width: '38%', padding: 6, fontSize: 10 },
 })
 
 export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; issuedAt: string }) {
   ensureFont()
-  const { castName, castRealName, storeName, from, to, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
+  const {
+    castName, castRealName, storeName, from, to, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder,
+  } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
 
   return (
@@ -113,6 +123,22 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
             <Text style={styles.colAmount}>¥{s.amount.toLocaleString()}</Text>
           </View>
         ))}
+
+        {(bankName || bankBranch || bankAccountNumber || bankAccountHolder) && (
+          <View style={styles.bankBox} wrap={false}>
+            <Text style={styles.bankHeaderCell}>上記の御支払額総計を下記指定口座へ振込みます</Text>
+            <View style={styles.bankRow}>
+              <Text style={styles.bankColBank}>{bankName}</Text>
+              <Text style={styles.bankColBranch}>{bankBranch}</Text>
+              <Text style={styles.bankColNumber}>{bankAccountNumber}</Text>
+            </View>
+            <View style={styles.bankRowLast}>
+              <Text style={styles.bankColBank}>{bankAccountHolder}</Text>
+              <Text style={styles.bankColBranch}></Text>
+              <Text style={styles.bankColNumber}></Text>
+            </View>
+          </View>
+        )}
 
         <Text style={styles.footer}>※本明細に関するお問い合わせは店舗管理者までご連絡ください</Text>
       </Page>

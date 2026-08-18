@@ -26,7 +26,7 @@ import { usePagination } from '@/hooks/use-pagination'
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
   'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'is_active' | 'email' | 'profile_answers'
-  | 'photo_url' | 'login_id'
+  | 'photo_url' | 'login_id' | 'bank_name' | 'bank_branch' | 'bank_account_number' | 'bank_account_holder'
 >
 
 interface CastListProps {
@@ -41,7 +41,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<CastUser | null>(null)
-  const [form, setForm] = useState({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40', profile_answers: {} as Record<string, string> })
+  const [form, setForm] = useState({
+    email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40',
+    bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
+    profile_answers: {} as Record<string, string>,
+  })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
   const supabase = createClient()
@@ -68,7 +72,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
 
   function openNew() {
     setEditing(null)
-    setForm({ email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40', profile_answers: {} })
+    setForm({
+      email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40',
+      bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
+      profile_answers: {},
+    })
     setOpen(true)
   }
 
@@ -82,6 +90,10 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
       real_name: cast.real_name ?? '',
       phone: cast.phone ?? '',
       reward_rate: String(Number(cast.reward_rate) * 100),
+      bank_name: cast.bank_name ?? '',
+      bank_branch: cast.bank_branch ?? '',
+      bank_account_number: cast.bank_account_number ?? '',
+      bank_account_holder: cast.bank_account_holder ?? '',
       profile_answers: { ...(cast.profile_answers as Record<string, string> | null ?? {}) },
     })
     setOpen(true)
@@ -106,6 +118,10 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           real_name: form.real_name || null,
           phone: form.phone || null,
           reward_rate: parseFloat(form.reward_rate) / 100,
+          bank_name: form.bank_name || null,
+          bank_branch: form.bank_branch || null,
+          bank_account_number: form.bank_account_number || null,
+          bank_account_holder: form.bank_account_holder || null,
           profile_answers: form.profile_answers,
           login_id: form.login_id,
         }
@@ -379,6 +395,27 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
               </div>
             </div>
+            <div className="pt-3 border-t space-y-3">
+              <p className="text-sm font-medium">振込先口座</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>銀行名 *</Label>
+                  <Input value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} placeholder="例: 三菱UFJ銀行" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>支店名 *</Label>
+                  <Input value={form.bank_branch} onChange={e => setForm({ ...form, bank_branch: e.target.value })} placeholder="例: 青葉台支店" />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>口座番号 *</Label>
+                  <Input value={form.bank_account_number} onChange={e => setForm({ ...form, bank_account_number: toHalfWidthDigits(e.target.value) })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>名義人（カナ）*</Label>
+                  <Input value={form.bank_account_holder} onChange={e => setForm({ ...form, bank_account_holder: e.target.value })} placeholder="例: ヨコタ マナミ" />
+                </div>
+              </div>
+            </div>
             {editing && profileFields.map(field => (
               <div key={field.id} className="space-y-1.5">
                 <Label>{field.label}</Label>
@@ -392,7 +429,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>キャンセル</Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || !form.display_name || !form.real_name || !form.login_id || !form.email || (!editing && !form.password)}
+                disabled={
+                  saving || !form.display_name || !form.real_name || !form.login_id || !form.email
+                  || !form.bank_name || !form.bank_branch || !form.bank_account_number || !form.bank_account_holder
+                  || (!editing && !form.password)
+                }
               >
                 {saving ? '保存中...' : '保存'}
               </Button>
