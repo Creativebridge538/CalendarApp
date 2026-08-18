@@ -3,7 +3,7 @@
 import { Fragment, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format } from 'date-fns'
+import { addDays, format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -117,6 +117,31 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     toast.success('空き枠を削除しました')
   }
 
+  // 店舗設定でシフトの直接確定は同じルームの重複を許可できるようにしたが、
+  // 空き枠の承認だけは設定に関わらず常に重複を禁止したいため、アプリ側で個別にチェックする
+  async function hasRoomConflict(roomId: string, date: string, startTime: string, endTime: string, excludeShiftId?: string) {
+    const prevDay = format(addDays(new Date(`${date}T00:00:00`), -1), 'yyyy-MM-dd')
+    const nextDay = format(addDays(new Date(`${date}T00:00:00`), 1), 'yyyy-MM-dd')
+    let query = supabase.from('shifts').select('id, date, start_time, end_time')
+      .eq('store_id', storeId).eq('room_id', roomId).eq('status', 'confirmed')
+      .gte('date', prevDay).lte('date', nextDay)
+    if (excludeShiftId) query = query.neq('id', excludeShiftId)
+    const { data } = await query
+    if (!data) return false
+
+    const toRange = (d: string, s: string, e: string) => {
+      const start = new Date(`${d}T${s}`)
+      let end = new Date(`${d}T${e}`)
+      if (end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000)
+      return [start.getTime(), end.getTime()] as const
+    }
+    const [newStart, newEnd] = toRange(date, startTime, endTime)
+    return data.some(s => {
+      const [start, end] = toRange(s.date, s.start_time.slice(0, 5), s.end_time.slice(0, 5))
+      return newStart < end && start < newEnd
+    })
+  }
+
   async function handleApplication(appId: string, slotId: string, castId: string, nextStatus: 'approved' | 'rejected' | 'pending') {
     const slot = slots.find(s => s.id === slotId)
     const app = slot?.vacant_slot_applications.find(a => a.id === appId)
@@ -124,6 +149,10 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     if (nextStatus === 'approved' && slot) {
       const approvedCount = slot.vacant_slot_applications.filter(a => a.status === 'approved').length
       if (approvedCount >= slot.capacity) { toast.error(`募集人数（${slot.capacity}人）に達しています`); return }
+      if (slot.room_id) {
+        const conflict = await hasRoomConflict(slot.room_id, slot.date, slot.start_time, slot.end_time, app?.shift_id ?? undefined)
+        if (conflict) { toast.error('この時間帯は同じルームに既に確定シフトがあります'); return }
+      }
     }
 
     const updates: { status: 'approved' | 'rejected' | 'pending'; reviewed_at: string | null } =

@@ -54,6 +54,7 @@ interface Props {
     location_mode: string
     area_label: string
     room_label: string
+    allow_room_double_booking: boolean
     theme: string
     logo_url: string | null
     usd_jpy_rate: number | null
@@ -71,6 +72,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [locationMode, setLocationMode] = useState(initialSettings?.location_mode ?? 'room')
   const [areaLabel, setAreaLabel] = useState(initialSettings?.area_label ?? 'エリア')
   const [roomLabel, setRoomLabel] = useState(initialSettings?.room_label ?? 'ルーム')
+  const [allowRoomDoubleBooking, setAllowRoomDoubleBooking] = useState(initialSettings?.allow_room_double_booking ?? false)
   const [theme, setTheme] = useState(initialSettings?.theme ?? 'default')
   const [logoUrl, setLogoUrl] = useState(initialSettings?.logo_url ?? null)
   const [uploadingLogo, setUploadingLogo] = useState(false)
@@ -109,7 +111,10 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   }
 
   async function saveLocationSettings() {
-    const payload = { location_mode: locationMode, area_label: areaLabel, room_label: roomLabel }
+    const payload = {
+      location_mode: locationMode, area_label: areaLabel, room_label: roomLabel,
+      allow_room_double_booking: allowRoomDoubleBooking,
+    }
     if (initialSettings) {
       const { error } = await supabase.from('store_settings').update(payload).eq('id', initialSettings.id)
       if (error) { toast.error('保存に失敗しました'); return }
@@ -290,10 +295,21 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             </div>
           )}
           {(locationMode === 'room' || locationMode === 'area_and_room') && (
-            <div className="space-y-1.5">
-              <Label>ルームの呼び名</Label>
-              <Input value={roomLabel} onChange={e => setRoomLabel(e.target.value)} placeholder="例: ルーム、席、テーブル" />
-            </div>
+            <>
+              <div className="space-y-1.5">
+                <Label>ルームの呼び名</Label>
+                <Input value={roomLabel} onChange={e => setRoomLabel(e.target.value)} placeholder="例: ルーム、席、テーブル" />
+              </div>
+              <div className="flex items-center justify-between pt-2 border-t">
+                <div>
+                  <p className="text-sm font-medium">同じ{roomLabel}の確定シフトを重複させる</p>
+                  <p className="text-xs text-muted-foreground">
+                    ONにすると、同じ{roomLabel}・同じ時間帯に複数のシフトを確定できます（空き枠の承認は、この設定に関わらず引き続き重複できません）
+                  </p>
+                </div>
+                <Switch checked={allowRoomDoubleBooking} onCheckedChange={setAllowRoomDoubleBooking} />
+              </div>
+            </>
           )}
           <Button onClick={saveLocationSettings}>保存</Button>
         </CardContent>
