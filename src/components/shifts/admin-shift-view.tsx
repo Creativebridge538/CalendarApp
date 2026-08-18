@@ -72,6 +72,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
   const [detailShift, setDetailShift] = useState<Shift | null>(null)
   const [noteInput, setNoteInput] = useState('')
+  const [castNoteInput, setCastNoteInput] = useState('')
   const [scheduleForm, setScheduleForm] = useState({ date: '', start_time: '', end_time: '', area_id: '', room_id: '' })
   const supabase = createClient()
   function checklistBadges(answers: Record<string, boolean | string>) {
@@ -130,6 +131,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   function openDetail(shift: Shift) {
     setDetailShift(shift)
     setNoteInput(shift.admin_note ?? '')
+    setCastNoteInput(shift.notes ?? '')
     setScheduleForm({
       date: shift.date, start_time: shift.start_time.slice(0, 5), end_time: shift.end_time.slice(0, 5),
       area_id: shift.area_id ?? '', room_id: shift.room_id ?? '',
@@ -147,6 +149,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
       || normalizeTime(scheduleForm.end_time) !== detailShift.end_time.slice(0, 5)
       || scheduleForm.area_id !== (detailShift.area_id ?? '')
       || scheduleForm.room_id !== (detailShift.room_id ?? '')
+      || castNoteInput !== (detailShift.notes ?? '')
   }
 
   async function saveSchedule() {
@@ -159,15 +162,16 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
 
     const area_id = (locationMode === 'area_only' || locationMode === 'area_and_room') ? (scheduleForm.area_id || null) : detailShift.area_id
     const room_id = (locationMode === 'room' || locationMode === 'area_and_room') ? (scheduleForm.room_id || null) : detailShift.room_id
+    const notes = castNoteInput || null
 
-    const { error } = await supabase.from('shifts').update({ date: scheduleForm.date, start_time, end_time, area_id, room_id }).eq('id', detailShift.id)
+    const { error } = await supabase.from('shifts').update({ date: scheduleForm.date, start_time, end_time, area_id, room_id, notes }).eq('id', detailShift.id)
     if (error) { toast.error(shiftConflictMessage(error, '変更に失敗しました')); return }
 
     const room = rooms.find(r => r.id === room_id)
     const area = areas.find(a => a.id === area_id)
     const oldLabel = `${format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} ${oldStart}〜${oldEnd}`
     const newLabel = `${format(new Date(scheduleForm.date), 'M/d(E)', { locale: ja })} ${start_time}〜${end_time}`
-    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, rooms: room ? { name: room.name } : null }
+    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, notes, rooms: room ? { name: room.name } : null }
     setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
     setDetailShift(updated)
     toast.success('シフトを変更しました')
@@ -194,15 +198,16 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     const oldEnd = detailShift.end_time.slice(0, 5)
     const area_id = (locationMode === 'area_only' || locationMode === 'area_and_room') ? (scheduleForm.area_id || null) : detailShift.area_id
     const room_id = (locationMode === 'room' || locationMode === 'area_and_room') ? (scheduleForm.room_id || null) : detailShift.room_id
+    const notes = castNoteInput || null
 
     const { error } = await supabase.from('shifts')
-      .update({ date: scheduleForm.date, start_time, end_time, area_id, room_id, admin_note: noteInput || null })
+      .update({ date: scheduleForm.date, start_time, end_time, area_id, room_id, notes, admin_note: noteInput || null })
       .eq('id', detailShift.id)
     if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました')); return }
 
     const room = rooms.find(r => r.id === room_id)
     const area = areas.find(a => a.id === area_id)
-    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, admin_note: noteInput || null, rooms: room ? { name: room.name } : null }
+    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, notes, admin_note: noteInput || null, rooms: room ? { name: room.name } : null }
     setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
     toast.success('変更を保存しました')
     setDetailShift(null)
@@ -233,8 +238,8 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
   }
 
-  async function changeStatus(shift: Shift, status: ShiftStatus, note: string) {
-    const update: { status: ShiftStatus; confirmed_at?: string; admin_note: string | null } = { status, admin_note: note || null }
+  async function changeStatus(shift: Shift, status: ShiftStatus, note: string, castNote: string | null = shift.notes) {
+    const update: { status: ShiftStatus; confirmed_at?: string; admin_note: string | null; notes: string | null } = { status, admin_note: note || null, notes: castNote || null }
     if (status === 'confirmed') update.confirmed_at = new Date().toISOString()
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
     if (error) {
@@ -588,12 +593,10 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   ))}
                 </div>
               )}
-              {detailShift.notes && (
-                <div className="rounded-lg border p-2.5 text-sm">
-                  <p className="text-[10px] font-semibold text-muted-foreground">キャストの備考</p>
-                  <p className="mt-0.5">{detailShift.notes}</p>
-                </div>
-              )}
+              <div className="space-y-1.5">
+                <label className="text-sm font-medium">キャストの備考（管理者も編集できます）</label>
+                <Textarea value={castNoteInput} onChange={e => setCastNoteInput(e.target.value)} rows={2} placeholder="キャストが入力した備考" />
+              </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">管理者メモ（任意・管理者のみ閲覧できます）</label>
                 <Textarea value={noteInput} onChange={e => setNoteInput(e.target.value)} rows={3} placeholder="例: 遅刻連絡あり、来月から時給改定など" />
@@ -603,7 +606,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
                 <Button variant="outline" className="text-destructive border-destructive/30" disabled={detailShift.status === 'rejected'}
-                  onClick={() => changeStatus(detailShift, 'rejected', noteInput)}>
+                  onClick={() => changeStatus(detailShift, 'rejected', noteInput, castNoteInput)}>
                   <X className="h-3.5 w-3.5 mr-1" /> 差し戻す
                 </Button>
                 {detailShift.status === 'confirmed' ? (
@@ -616,7 +619,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   </Button>
                 ) : (
                   <Button className="text-white bg-positive hover:bg-positive/90"
-                    onClick={() => changeStatus(detailShift, 'confirmed', noteInput)}>
+                    onClick={() => changeStatus(detailShift, 'confirmed', noteInput, castNoteInput)}>
                     <Check className="h-3.5 w-3.5 mr-1" /> 確定する
                   </Button>
                 )}
