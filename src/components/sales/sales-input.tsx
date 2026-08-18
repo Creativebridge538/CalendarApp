@@ -111,8 +111,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const [bulkPlatformFill, setBulkPlatformFill] = useState<'manual' | PlatformKey>('manual')
   const [filterCast, setFilterCast] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('all')
-  const [filterFrom, setFilterFrom] = useState('')
-  const [filterTo, setFilterTo] = useState('')
+  // 表示中の月をデフォルトの絞り込み期間にする
+  const [filterFrom, setFilterFrom] = useState(() => `${year}-${String(month).padStart(2, '0')}-01`)
+  const [filterTo, setFilterTo] = useState(() => {
+    const lastDay = new Date(year, month, 0).getDate()
+    return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
+  })
   const supabase = createClient()
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])

@@ -11,6 +11,7 @@ import { Input } from '@/components/ui/input'
 import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -42,6 +43,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [fromInput, setFromInput] = useState(from)
   const [toInput, setToInput] = useState(to)
+  const [filterCastId, setFilterCastId] = useState('all')
   const [issuedAt, setIssuedAt] = useState(initialIssuedAt)
   const supabase = createClient()
   const router = useRouter()
@@ -71,13 +73,17 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     return { cast, rewardRate, salesTotal, baseReward, bonus, deduction, totalReward }
   }), [casts, salesByCast])
 
-  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(rows)
-  const allSelected = rows.length > 0 && rows.every(r => selected.has(r.cast.id))
-  const unissuedRows = useMemo(() => rows.filter(r => !issuedAt[r.cast.id]), [rows, issuedAt])
+  const filteredRows = useMemo(
+    () => filterCastId === 'all' ? rows : rows.filter(r => r.cast.id === filterCastId),
+    [rows, filterCastId]
+  )
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(filteredRows)
+  const allSelected = filteredRows.length > 0 && filteredRows.every(r => selected.has(r.cast.id))
+  const unissuedRows = useMemo(() => filteredRows.filter(r => !issuedAt[r.cast.id]), [filteredRows, issuedAt])
   const unissuedAllSelected = unissuedRows.length > 0 && unissuedRows.every(r => selected.has(r.cast.id))
 
   function toggleAll() {
-    setSelected(allSelected ? new Set() : new Set(rows.map(r => r.cast.id)))
+    setSelected(allSelected ? new Set() : new Set(filteredRows.map(r => r.cast.id)))
   }
   function toggleUnissuedAll() {
     setSelected(unissuedAllSelected ? new Set() : new Set(unissuedRows.map(r => r.cast.id)))
@@ -164,6 +170,20 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             <Input type="date" className="w-40" value={toInput} onChange={e => setToInput(e.target.value)} />
           </div>
           <Button size="sm" variant="outline" onClick={() => applyRange(fromInput, toInput)}>この期間で表示</Button>
+          <div className="space-y-1">
+            <label className="text-xs text-muted-foreground">キャスト</label>
+            <Select value={filterCastId} onValueChange={v => { if (v) { setFilterCastId(v); setPage(1) } }}>
+              <SelectTrigger className="w-40">
+                <SelectValue>
+                  {filterCastId === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCastId)?.display_name ?? filterCastId)}
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent alignItemWithTrigger={false}>
+                <SelectItem value="all">全キャスト</SelectItem>
+                {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -198,7 +218,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.length === 0 && (
+            {filteredRows.length === 0 && (
               <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
             )}
             {paged.map(r => (
