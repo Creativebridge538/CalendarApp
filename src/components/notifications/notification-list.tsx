@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Bell, BellRing, BellOff, CheckCheck, Send, ChevronLeft } from 'lucide-react'
-import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush, clearAppBadge } from '@/lib/push'
+import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush, clearAppBadge, sendPushNotification } from '@/lib/push'
 
 interface Notification {
   id: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string
@@ -30,6 +30,8 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
   const [pushState, setPushState] = useState<'unsupported' | 'denied' | 'subscribed' | 'unsubscribed' | 'loading'>('loading')
   const [testCastId, setTestCastId] = useState('')
   const [sendingCastTest, setSendingCastTest] = useState(false)
+  const [remindCastId, setRemindCastId] = useState('all')
+  const [sendingRemind, setSendingRemind] = useState(false)
   const supabase = createClient()
   const router = useRouter()
   const unreadCount = notifications.filter(n => !n.read_at).length
@@ -112,6 +114,22 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
     if (error || !data) { toast.error('送信に失敗しました'); setSendingCastTest(false); return }
     await sendAndReportPush(testCastId, data.title, data.body, data.link, castName, false)
     setSendingCastTest(false)
+  }
+
+  async function sendShiftReminder() {
+    if (!casts) return
+    const targets = remindCastId === 'all' ? casts : casts.filter(c => c.id === remindCastId)
+    if (targets.length === 0) { toast.error('キャストを選択してください'); return }
+    setSendingRemind(true)
+    const title = 'シフト提出のお願い'
+    const body = 'まだシフトを提出していない場合は、提出をお願いします'
+    const { error } = await supabase.from('notifications').insert(
+      targets.map(t => ({ user_id: t.id, title, body, link: '/cast/shifts' }))
+    )
+    setSendingRemind(false)
+    if (error) { toast.error('送信に失敗しました'); return }
+    for (const t of targets) sendPushNotification(t.id, title, body, '/cast/shifts')
+    toast.success(`${targets.length}人に送信しました`)
   }
 
   async function markRead(id: string) {
@@ -236,6 +254,27 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
               </Select>
               <Button size="sm" variant="outline" onClick={sendTestToCast} disabled={sendingCastTest || !testCastId}>
                 <Send className="h-3.5 w-3.5 mr-1" />{sendingCastTest ? '送信中...' : 'テスト送信'}
+              </Button>
+            </div>
+          </div>
+          <div className="rounded-lg border p-3 space-y-2 mt-3">
+            <p className="text-sm font-medium flex items-center gap-1.5">
+              <Send className="h-3.5 w-3.5 shrink-0" />シフト提出を促す通知を送る
+            </p>
+            <div className="flex items-center gap-2 flex-wrap">
+              <Select value={remindCastId} onValueChange={v => { if (v) setRemindCastId(v) }}>
+                <SelectTrigger className="w-48">
+                  <SelectValue placeholder="キャストを選択">
+                    {remindCastId === 'all' ? '全員' : (casts.find(c => c.id === remindCastId)?.display_name ?? remindCastId)}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent alignItemWithTrigger={false}>
+                  <SelectItem value="all">全員</SelectItem>
+                  {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+                </SelectContent>
+              </Select>
+              <Button size="sm" variant="outline" onClick={sendShiftReminder} disabled={sendingRemind}>
+                <Send className="h-3.5 w-3.5 mr-1" />{sendingRemind ? '送信中...' : '送信'}
               </Button>
             </div>
           </div>
