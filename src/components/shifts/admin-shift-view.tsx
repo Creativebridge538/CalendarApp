@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
-import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote } from 'lucide-react'
+import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote, Trash2 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { sendPushNotification } from '@/lib/push'
@@ -217,6 +217,21 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
       await supabase.from('notifications').insert({ user_id: detailShift.cast_id, title, body, link: '/cast/shifts' })
       sendPushNotification(detailShift.cast_id, title, body, '/cast/shifts')
     }
+  }
+
+  async function handleDelete(shift: Shift) {
+    if (!confirm(`${format(new Date(shift.date), 'M/d(E)', { locale: ja })} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフトを削除しますか？キャストに通知されます。この操作は元に戻せません。`)) return
+    const { error } = await supabase.from('shifts').delete().eq('id', shift.id)
+    if (error) { toast.error('削除に失敗しました'); return }
+    setShifts(shifts.filter(s => s.id !== shift.id))
+    setDetailShift(null)
+    toast.success('シフトを削除しました')
+
+    const dateLabel = format(new Date(shift.date), 'M/d(E)', { locale: ja })
+    const title = 'シフトが削除されました'
+    const body = `${dateLabel} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフトが管理者によって削除されました`
+    await supabase.from('notifications').insert({ user_id: shift.cast_id, title, body, link: '/cast/shifts' })
+    sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
   }
 
   async function changeStatus(shift: Shift, status: ShiftStatus, note: string) {
@@ -585,6 +600,9 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 <Textarea value={noteInput} onChange={e => setNoteInput(e.target.value)} rows={3} placeholder="例: 遅刻連絡あり、来月から時給改定など" />
               </div>
               <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" size="icon" className="text-destructive border-destructive/30 shrink-0" onClick={() => handleDelete(detailShift)} aria-label="削除">
+                  <Trash2 className="h-3.5 w-3.5" />
+                </Button>
                 <Button variant="outline" className="text-destructive border-destructive/30" disabled={detailShift.status === 'rejected'}
                   onClick={() => changeStatus(detailShift, 'rejected', noteInput)}>
                   <X className="h-3.5 w-3.5 mr-1" /> 差し戻す
