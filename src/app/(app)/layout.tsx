@@ -70,7 +70,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <div
       className={`flex font-sans ${role === 'cast' ? 'h-dvh overflow-hidden' : 'min-h-screen'} ${castSkin?.isDark ? 'dark' : ''}`}
-      style={{ backgroundColor: 'var(--app-bg)', ...accentStyle }}
+      style={{
+        backgroundColor: 'var(--app-bg)',
+        ...accentStyle,
+        ...(role === 'cast' ? { height: 'var(--app-vh, 100dvh)' } : {}),
+      }}
       data-theme={theme}
     >
       {role === 'cast' && <LockBodyScroll />}
