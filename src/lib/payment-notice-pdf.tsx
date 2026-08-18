@@ -33,10 +33,11 @@ const styles = StyleSheet.create({
   totalRow: {
     flexDirection: 'row', alignItems: 'baseline', gap: 12,
     borderTopWidth: 1, borderTopColor: '#aaa', borderBottomWidth: 1, borderBottomColor: '#aaa',
-    paddingVertical: 10, marginBottom: 20,
+    paddingVertical: 10, marginBottom: 4,
   },
   totalLabel: { fontSize: 12, fontWeight: 700, width: 70 },
   totalAmount: { fontSize: 20, fontWeight: 700 },
+  taxNote: { fontSize: 9, color: '#555', marginBottom: 16 },
   summaryTable: { marginBottom: 20 },
   summaryRow: {
     flexDirection: 'row', justifyContent: 'space-between',
@@ -76,6 +77,9 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
     bankName, bankBranch, bankAccountNumber, bankAccountHolder,
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
+  // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
+  const taxExcluded = Math.floor(totalReward / 1.1)
+  const taxAmount = totalReward - taxExcluded
 
   return (
     <Document>
@@ -97,6 +101,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
           <Text style={styles.totalLabel}>お支払額</Text>
           <Text style={styles.totalAmount}>¥{totalReward.toLocaleString()}</Text>
         </View>
+        <Text style={styles.taxNote}>※上記金額は消費税10%を含みます（内税）</Text>
 
         <View style={styles.summaryTable}>
           <View style={styles.summaryRow}><Text>売上合計</Text><Text>¥{salesTotal.toLocaleString()}</Text></View>
@@ -104,7 +109,11 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
           <View style={styles.summaryRow}><Text>基本報酬</Text><Text>¥{baseReward.toLocaleString()}</Text></View>
           <View style={styles.summaryRow}><Text>ボーナス</Text><Text>+¥{bonus.toLocaleString()}</Text></View>
           <View style={styles.summaryRow}><Text>控除</Text><Text>-¥{deduction.toLocaleString()}</Text></View>
-          <View style={styles.summaryFinalRow}><Text>合計お支払額</Text><Text>¥{totalReward.toLocaleString()}</Text></View>
+          <View style={styles.summaryRow}>
+            <Text>うち消費税（10%内税）</Text>
+            <Text>¥{taxAmount.toLocaleString()}</Text>
+          </View>
+          <View style={styles.summaryFinalRow}><Text>合計お支払額（10%内税）</Text><Text>¥{totalReward.toLocaleString()}</Text></View>
         </View>
 
         <Text style={styles.breakdownTitle}>売上内訳（{periodLabel}）</Text>

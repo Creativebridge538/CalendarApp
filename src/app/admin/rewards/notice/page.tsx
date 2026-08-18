@@ -40,6 +40,9 @@ export default async function PaymentNoticePage({
   const settings = { logo_url: logoUrl }
 
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
+  // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
+  const taxExcluded = Math.floor(totalReward / 1.1)
+  const taxAmount = totalReward - taxExcluded
 
   return (
     <div style={{ background: '#eef0f2', minHeight: '100vh' }}>
@@ -72,7 +75,7 @@ export default async function PaymentNoticePage({
         .notice-header-grid { display: flex; justify-content: space-between; margin-bottom: 20px; }
         .notice-issuer { text-align: right; }
         .notice-issuer img { height: 44px; width: auto; margin-left: auto; display: block; margin-bottom: 4px; }
-        .notice-total { display: flex; align-items: baseline; gap: 12px; border-top: 1px solid #aaa; border-bottom: 1px solid #aaa; padding: 10px 0; margin-bottom: 20px; }
+        .notice-total { display: flex; align-items: baseline; gap: 12px; border-top: 1px solid #aaa; border-bottom: 1px solid #aaa; padding: 10px 0; margin-bottom: 4px; }
         .notice-total-amount { font-size: 26px; font-weight: bold; font-variant-numeric: tabular-nums; }
         table.notice-table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 20px; }
         table.notice-table th { text-align: left; padding: 6px 8px; border-top: 1.5px solid #1a1a1a; border-bottom: 1.5px solid #1a1a1a; font-weight: normal; }
@@ -115,6 +118,7 @@ export default async function PaymentNoticePage({
           <div style={{ fontSize: 14, fontWeight: 'bold', width: 90 }}>お支払額</div>
           <div className="notice-total-amount">¥{totalReward.toLocaleString()}</div>
         </div>
+        <p style={{ fontSize: 11, color: '#555', marginBottom: 16 }}>※上記金額は消費税10%を含みます（内税）</p>
 
         <table className="summary-table">
           <tbody>
@@ -123,7 +127,8 @@ export default async function PaymentNoticePage({
             <tr><td>基本報酬</td><td className="right">¥{baseReward.toLocaleString()}</td></tr>
             <tr><td>ボーナス</td><td className="right">+¥{bonus.toLocaleString()}</td></tr>
             <tr><td>控除</td><td className="right">-¥{deduction.toLocaleString()}</td></tr>
-            <tr className="final-row"><td>合計お支払額</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
+            <tr><td>うち消費税（10%内税）</td><td className="right">¥{taxAmount.toLocaleString()}</td></tr>
+            <tr className="final-row"><td>合計お支払額（10%内税）</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
           </tbody>
         </table>
 
