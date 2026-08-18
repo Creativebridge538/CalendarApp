@@ -192,7 +192,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
             </button>
           </div>
         </div>
-        {view === 'list' && <div className="flex gap-2 mt-2 flex-wrap">
+        <div className="flex gap-2 mt-2 flex-wrap">
           <Select value={filterStatus} onValueChange={v => { if (v) { setFilterStatus(v); setListPage(1) } }}>
             <SelectTrigger className="w-36">
               <SelectValue>
@@ -247,7 +247,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               ルーム被り {conflicts.size} 件
             </div>
           )}
-        </div>}
+        </div>
       </CardHeader>
       <CardContent className="px-0 md:px-6">
         {view === 'calendar' && (
@@ -255,7 +255,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
         )}
         {view === 'timeline' && (
           <ShiftTimeline
-            shifts={shifts}
+            shifts={filtered}
             areas={areas}
             rooms={rooms}
             locationMode={locationMode}
