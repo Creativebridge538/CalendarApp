@@ -678,11 +678,19 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 <Button variant="outline" size="icon" className="text-destructive border-destructive/30 shrink-0" onClick={() => handleDelete(detailShift)} aria-label="削除">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
-                <Button variant="outline" className="text-destructive border-destructive/30" disabled={detailShift.status === 'rejected'}
-                  onClick={() => changeStatus(detailShift, 'rejected', noteInput, castNoteInput)}>
-                  <X className="h-3.5 w-3.5 mr-1" /> 差し戻す
-                </Button>
-                {detailShift.status === 'confirmed' ? (
+                {detailShift.status !== 'modification_requested' && (
+                  <Button variant="outline" className="text-destructive border-destructive/30" disabled={detailShift.status === 'rejected'}
+                    onClick={() => changeStatus(detailShift, 'rejected', noteInput, castNoteInput)}>
+                    <X className="h-3.5 w-3.5 mr-1" /> 差し戻す
+                  </Button>
+                )}
+                {detailShift.status === 'modification_requested' ? (
+                  <Link href={`/admin/modification-requests?shift=${detailShift.id}`}>
+                    <Button className="text-white bg-positive hover:bg-positive/90">
+                      <Check className="h-3.5 w-3.5 mr-1" /> 修正申請で対応する
+                    </Button>
+                  </Link>
+                ) : detailShift.status === 'confirmed' ? (
                   <Button
                     className="text-white bg-positive hover:bg-positive/90"
                     disabled={!scheduleFormHasChanges() && noteInput === (detailShift.admin_note ?? '')}
