@@ -304,7 +304,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
                 <div>
                   <p className="text-sm font-medium">同じ{roomLabel}の確定シフトを重複させる</p>
                   <p className="text-xs text-muted-foreground">
-                    ONにすると、同じ{roomLabel}・同じ時間帯に複数のシフトを確定できます（空き枠の承認は、この設定に関わらず引き続き重複できません）
+                    ONにすると、{roomLabel}の収容人数の範囲内で同じ時間帯に複数のシフトを確定できます（収容人数未設定の{roomLabel}は人数無制限。空き枠の承認は、この設定に関わらず引き続き重複できません）
                   </p>
                 </div>
                 <Switch checked={allowRoomDoubleBooking} onCheckedChange={setAllowRoomDoubleBooking} />

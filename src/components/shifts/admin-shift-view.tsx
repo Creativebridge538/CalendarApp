@@ -46,12 +46,13 @@ interface Shift {
 interface Props {
   shifts: Shift[]
   casts: { id: string; display_name: string | null }[]
-  rooms: { id: string; name: string; area_id: string | null }[]
+  rooms: { id: string; name: string; area_id: string | null; capacity: number | null }[]
   areas: { id: string; name: string }[]
   storeId: string
   locationMode: string
   areaLabel: string
   roomLabel: string
+  allowRoomDoubleBooking: boolean
   checklistItems: { id: string; label: string; item_type: string }[]
 }
 
@@ -62,7 +63,7 @@ const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive
   draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive', modification_requested: 'secondary',
 }
 
-export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems }: Props) {
+export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, allowRoomDoubleBooking, checklistItems }: Props) {
   const [shifts, setShifts] = useState(initialShifts)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
@@ -72,7 +73,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
   const [detailShift, setDetailShift] = useState<Shift | null>(null)
   const [noteInput, setNoteInput] = useState('')
-  const [scheduleForm, setScheduleForm] = useState({ date: '', start_time: '', end_time: '' })
+  const [scheduleForm, setScheduleForm] = useState({ date: '', start_time: '', end_time: '', area_id: '', room_id: '' })
   const supabase = createClient()
   function checklistBadges(answers: Record<string, boolean | string>) {
     return Object.entries(answers).map(([id, value]) => {
@@ -102,23 +103,51 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const { page: listPage, setPage: setListPage, pageSize: listPageSize, setPageSize: setListPageSize, totalPages: listTotalPages, paged, totalItems: listTotalItems } = usePagination(filtered)
 
   const conflicts = useMemo(() => {
+    const roomCapacity = new Map(rooms.map(r => [r.id, r.capacity]))
     const confirmed = shifts.filter(s => s.status === 'confirmed' && s.room_id)
-    const ids = new Set<string>()
+    const overlapCount = new Map<string, number>()
     for (let i = 0; i < confirmed.length; i++) {
       for (let j = i + 1; j < confirmed.length; j++) {
         const a = confirmed[i], b = confirmed[j]
         if (a.room_id !== b.room_id || a.date !== b.date) continue
         const overlap = a.start_time < b.end_time && b.start_time < a.end_time
-        if (overlap) { ids.add(a.id); ids.add(b.id) }
+        if (overlap) {
+          overlapCount.set(a.id, (overlapCount.get(a.id) ?? 0) + 1)
+          overlapCount.set(b.id, (overlapCount.get(b.id) ?? 0) + 1)
+        }
       }
     }
+    const ids = new Set<string>()
+    for (const s of confirmed) {
+      const count = overlapCount.get(s.id) ?? 0
+      if (count === 0) continue
+      if (!allowRoomDoubleBooking) { ids.add(s.id); continue }
+      const capacity = roomCapacity.get(s.room_id!)
+      if (capacity != null && count + 1 > capacity) ids.add(s.id)
+    }
     return ids
-  }, [shifts])
+  }, [shifts, rooms, allowRoomDoubleBooking])
 
   function openDetail(shift: Shift) {
     setDetailShift(shift)
     setNoteInput(shift.admin_note ?? '')
-    setScheduleForm({ date: shift.date, start_time: shift.start_time.slice(0, 5), end_time: shift.end_time.slice(0, 5) })
+    setScheduleForm({
+      date: shift.date, start_time: shift.start_time.slice(0, 5), end_time: shift.end_time.slice(0, 5),
+      area_id: shift.area_id ?? '', room_id: shift.room_id ?? '',
+    })
+  }
+
+  const scheduleFormRooms = locationMode === 'area_and_room' && scheduleForm.area_id
+    ? rooms.filter(r => r.area_id === scheduleForm.area_id)
+    : rooms
+
+  function scheduleFormHasChanges() {
+    if (!detailShift) return false
+    return scheduleForm.date !== detailShift.date
+      || normalizeTime(scheduleForm.start_time) !== detailShift.start_time.slice(0, 5)
+      || normalizeTime(scheduleForm.end_time) !== detailShift.end_time.slice(0, 5)
+      || scheduleForm.area_id !== (detailShift.area_id ?? '')
+      || scheduleForm.room_id !== (detailShift.room_id ?? '')
   }
 
   async function saveSchedule() {
@@ -127,22 +156,67 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     const end_time = normalizeTime(scheduleForm.end_time)
     const oldStart = detailShift.start_time.slice(0, 5)
     const oldEnd = detailShift.end_time.slice(0, 5)
-    if (scheduleForm.date === detailShift.date && start_time === oldStart && end_time === oldEnd) return
+    if (!scheduleFormHasChanges()) return
 
-    const { error } = await supabase.from('shifts').update({ date: scheduleForm.date, start_time, end_time }).eq('id', detailShift.id)
-    if (error) { toast.error(shiftConflictMessage(error, '時間の変更に失敗しました')); return }
+    const area_id = (locationMode === 'area_only' || locationMode === 'area_and_room') ? (scheduleForm.area_id || null) : detailShift.area_id
+    const room_id = (locationMode === 'room' || locationMode === 'area_and_room') ? (scheduleForm.room_id || null) : detailShift.room_id
 
+    const { error } = await supabase.from('shifts').update({ date: scheduleForm.date, start_time, end_time, area_id, room_id }).eq('id', detailShift.id)
+    if (error) { toast.error(shiftConflictMessage(error, '変更に失敗しました')); return }
+
+    const room = rooms.find(r => r.id === room_id)
+    const area = areas.find(a => a.id === area_id)
     const oldLabel = `${format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} ${oldStart}〜${oldEnd}`
     const newLabel = `${format(new Date(scheduleForm.date), 'M/d(E)', { locale: ja })} ${start_time}〜${end_time}`
-    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time }
+    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, rooms: room ? { name: room.name } : null }
     setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
     setDetailShift(updated)
-    toast.success('シフトの日時を変更しました')
+    toast.success('シフトを変更しました')
 
-    const title = 'シフトの日時が変更されました'
-    const body = `${oldLabel} から ${newLabel} に変更されました`
+    const title = 'シフト内容が変更されました'
+    const locationNote = [area?.name, room?.name].filter(Boolean).join(' / ')
+    const body = `${oldLabel} から ${newLabel}${locationNote ? `（${locationNote}）` : ''} に変更されました`
     await supabase.from('notifications').insert({ user_id: detailShift.cast_id, title, body, link: '/cast/shifts' })
     sendPushNotification(detailShift.cast_id, title, body, '/cast/shifts')
+  }
+
+  // 確定済みシフトは「確定する」ボタンが無効化されていて、日時/ルーム変更や管理者メモの更新を
+  // 保存する手段が無かった。確定済みの場合はこのボタンを「変更を保存」として有効化し、
+  // 日時・ルーム・管理者メモをまとめて保存できるようにする（ステータス自体は変更しない）
+  async function saveConfirmedShiftChanges() {
+    if (!detailShift) return
+    const start_time = normalizeTime(scheduleForm.start_time)
+    const end_time = normalizeTime(scheduleForm.end_time)
+    const scheduleChanged = scheduleFormHasChanges()
+    const noteChanged = noteInput !== (detailShift.admin_note ?? '')
+    if (!scheduleChanged && !noteChanged) return
+
+    const oldStart = detailShift.start_time.slice(0, 5)
+    const oldEnd = detailShift.end_time.slice(0, 5)
+    const area_id = (locationMode === 'area_only' || locationMode === 'area_and_room') ? (scheduleForm.area_id || null) : detailShift.area_id
+    const room_id = (locationMode === 'room' || locationMode === 'area_and_room') ? (scheduleForm.room_id || null) : detailShift.room_id
+
+    const { error } = await supabase.from('shifts')
+      .update({ date: scheduleForm.date, start_time, end_time, area_id, room_id, admin_note: noteInput || null })
+      .eq('id', detailShift.id)
+    if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました')); return }
+
+    const room = rooms.find(r => r.id === room_id)
+    const area = areas.find(a => a.id === area_id)
+    const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, admin_note: noteInput || null, rooms: room ? { name: room.name } : null }
+    setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
+    toast.success('変更を保存しました')
+    setDetailShift(null)
+
+    if (scheduleChanged) {
+      const oldLabel = `${format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} ${oldStart}〜${oldEnd}`
+      const newLabel = `${format(new Date(scheduleForm.date), 'M/d(E)', { locale: ja })} ${start_time}〜${end_time}`
+      const locationNote = [area?.name, room?.name].filter(Boolean).join(' / ')
+      const title = 'シフト内容が変更されました'
+      const body = `${oldLabel} から ${newLabel}${locationNote ? `（${locationNote}）` : ''} に変更されました`
+      await supabase.from('notifications').insert({ user_id: detailShift.cast_id, title, body, link: '/cast/shifts' })
+      sendPushNotification(detailShift.cast_id, title, body, '/cast/shifts')
+    }
   }
 
   async function changeStatus(shift: Shift, status: ShiftStatus, note: string) {
@@ -448,22 +522,51 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 <Badge variant={STATUS_VARIANT[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
               </div>
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">日時（変更するとキャストに通知されます）</label>
+                <label className="text-sm font-medium">日時・{roomLabel}（変更するとキャストに通知されます）</label>
                 <div className="flex flex-wrap items-center gap-2">
                   <Input type="date" className="w-40" value={scheduleForm.date} onChange={e => setScheduleForm({ ...scheduleForm, date: e.target.value })} />
                   <TimeSelect value={scheduleForm.start_time} onChange={v => setScheduleForm({ ...scheduleForm, start_time: v })} />
                   <span className="text-muted-foreground text-sm">〜</span>
                   <TimeSelect value={scheduleForm.end_time} onChange={v => setScheduleForm({ ...scheduleForm, end_time: v })} />
-                  {(scheduleForm.date !== detailShift.date
-                    || normalizeTime(scheduleForm.start_time) !== detailShift.start_time.slice(0, 5)
-                    || normalizeTime(scheduleForm.end_time) !== detailShift.end_time.slice(0, 5)) && (
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(locationMode === 'area_only' || locationMode === 'area_and_room') && areas.length > 0 && (
+                    <Select
+                      value={scheduleForm.area_id || 'none'}
+                      onValueChange={v => setScheduleForm({ ...scheduleForm, area_id: v === 'none' ? '' : (v ?? ''), room_id: '' })}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder={areaLabel}>
+                          {scheduleForm.area_id ? (areas.find(a => a.id === scheduleForm.area_id)?.name ?? '未選択') : '未選択'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">未選択</SelectItem>
+                        {areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {(locationMode === 'room' || (locationMode === 'area_and_room' && scheduleForm.area_id)) && scheduleFormRooms.length > 0 && (
+                    <Select
+                      value={scheduleForm.room_id || 'none'}
+                      onValueChange={v => setScheduleForm({ ...scheduleForm, room_id: v === 'none' ? '' : (v ?? '') })}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue placeholder={roomLabel}>
+                          {scheduleForm.room_id ? (scheduleFormRooms.find(r => r.id === scheduleForm.room_id)?.name ?? '未選択') : '未選択'}
+                        </SelectValue>
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">未選択</SelectItem>
+                        {scheduleFormRooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  )}
+                  {scheduleFormHasChanges() && detailShift.status !== 'confirmed' && (
                     <Button size="sm" onClick={saveSchedule}>変更を保存</Button>
                   )}
                 </div>
               </div>
-              {detailShift.rooms?.name && (
-                <p className="text-sm text-muted-foreground">ルーム: {detailShift.rooms.name}</p>
-              )}
               {checklistBadges(detailShift.checklist_answers).length > 0 && (
                 <div className="flex flex-wrap gap-1">
                   {checklistBadges(detailShift.checklist_answers).map(label => (
@@ -486,10 +589,20 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   onClick={() => changeStatus(detailShift, 'rejected', noteInput)}>
                   <X className="h-3.5 w-3.5 mr-1" /> 差し戻す
                 </Button>
-                <Button className="text-white bg-positive hover:bg-positive/90" disabled={detailShift.status === 'confirmed'}
-                  onClick={() => changeStatus(detailShift, 'confirmed', noteInput)}>
-                  <Check className="h-3.5 w-3.5 mr-1" /> 確定する
-                </Button>
+                {detailShift.status === 'confirmed' ? (
+                  <Button
+                    className="text-white bg-positive hover:bg-positive/90"
+                    disabled={!scheduleFormHasChanges() && noteInput === (detailShift.admin_note ?? '')}
+                    onClick={saveConfirmedShiftChanges}
+                  >
+                    <Check className="h-3.5 w-3.5 mr-1" /> 変更を保存
+                  </Button>
+                ) : (
+                  <Button className="text-white bg-positive hover:bg-positive/90"
+                    onClick={() => changeStatus(detailShift, 'confirmed', noteInput)}>
+                    <Check className="h-3.5 w-3.5 mr-1" /> 確定する
+                  </Button>
+                )}
               </div>
             </div>
           )}

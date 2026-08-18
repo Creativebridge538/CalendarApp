@@ -19,9 +19,9 @@ export default async function AdminShiftsPage() {
       .order('start_time')
       .limit(200),
     supabase.from('users').select('id, display_name').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true),
-    supabase.from('rooms').select('id, name, area_id').eq('store_id', storeId).eq('is_active', true),
+    supabase.from('rooms').select('id, name, area_id, capacity').eq('store_id', storeId).eq('is_active', true),
     supabase.from('areas').select('id, name').eq('store_id', storeId).eq('is_active', true).order('sort_order'),
-    supabase.from('store_settings').select('location_mode, area_label, room_label').eq('store_id', storeId).single(),
+    supabase.from('store_settings').select('location_mode, area_label, room_label, allow_room_double_booking').eq('store_id', storeId).single(),
     supabase.from('shift_checklist_items').select('id, label, item_type').eq('store_id', storeId),
   ])
 
@@ -36,6 +36,7 @@ export default async function AdminShiftsPage() {
         locationMode={settings?.location_mode ?? 'room'}
         areaLabel={settings?.area_label ?? 'エリア'}
         roomLabel={settings?.room_label ?? 'ルーム'}
+        allowRoomDoubleBooking={settings?.allow_room_double_booking ?? false}
         checklistItems={checklistItems ?? []}
       />
     </div>
