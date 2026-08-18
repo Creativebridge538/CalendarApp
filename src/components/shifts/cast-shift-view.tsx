@@ -33,6 +33,12 @@ type ShiftStatus = Database['public']['Enums']['shift_status']
 
 type ChecklistAnswers = Record<string, boolean | string>
 
+// Chrome/Edge（PC・Android）が発火するインストール可能イベント。標準のDOM型には無いため最小限を自前定義
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>
+}
+
 interface Shift {
   id: string; date: string; start_time: string; end_time: string
   status: ShiftStatus; notes: string | null
@@ -199,6 +205,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
   const [showPwaBanner, setShowPwaBanner] = useState(false)
+  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -290,6 +297,26 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   function dismissPwaBannerForever() {
     localStorage.setItem('pwa-banner-dismissed', '1')
     setShowPwaBanner(false)
+  }
+
+  // Chrome/Edge（PC・Android）はネイティブのインストール確認を出せるので、そのイベントを保持しておく
+  useEffect(() => {
+    function handler(e: Event) {
+      e.preventDefault()
+      setInstallPrompt(e as BeforeInstallPromptEvent)
+    }
+    window.addEventListener('beforeinstallprompt', handler)
+    return () => window.removeEventListener('beforeinstallprompt', handler)
+  }, [])
+
+  async function handleInstallClick() {
+    if (!installPrompt) return
+    await installPrompt.prompt()
+    const { outcome } = await installPrompt.userChoice
+    if (outcome === 'accepted') {
+      setShowPwaBanner(false)
+    }
+    setInstallPrompt(null)
   }
 
   async function handleLogout() {
@@ -681,31 +708,47 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 </button>
               </div>
 
-              <div className="rounded-lg bg-muted/50 p-3.5 mb-3 space-y-2.5">
-                <ol className="space-y-2.5">
-                  {[
-                    '画面下(または上)の「…」をタップ(共有アイコンが直接あればそれをタップ)',
-                    '「共有」→「ホーム画面に追加」を選ぶ',
-                    '「ウェブアプリとして開く」をONにして「追加」',
-                  ].map((step, i) => (
-                    <li key={step} className="flex items-start gap-2.5">
-                      <span
-                        className="h-5 w-5 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0"
-                        style={{ backgroundColor: 'var(--brand-accent)' }}
-                      >
-                        {i + 1}
-                      </span>
-                      <span className="text-sm leading-5">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-                <div className="flex items-start gap-2 rounded-lg bg-[color-mix(in_oklch,var(--status-submitted)_18%,transparent)] p-2.5">
-                  <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: 'var(--status-submitted)' }} />
-                  <p className="text-xs leading-5">手順3の「ウェブアプリとして開く」が通知受け取りに必要です</p>
+              {installPrompt ? (
+                <div className="rounded-lg bg-muted/50 p-3.5 mb-3">
+                  <p className="text-sm leading-5">ボタンひとつでホーム画面（デスクトップ）に追加できます</p>
                 </div>
-              </div>
+              ) : (
+                <div className="rounded-lg bg-muted/50 p-3.5 mb-3 space-y-2.5">
+                  <ol className="space-y-2.5">
+                    {[
+                      '画面下(または上)の「…」をタップ(共有アイコンが直接あればそれをタップ)',
+                      '「共有」→「ホーム画面に追加」を選ぶ',
+                      '「ウェブアプリとして開く」をONにして「追加」',
+                    ].map((step, i) => (
+                      <li key={step} className="flex items-start gap-2.5">
+                        <span
+                          className="h-5 w-5 rounded-full text-white text-[11px] font-bold flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: 'var(--brand-accent)' }}
+                        >
+                          {i + 1}
+                        </span>
+                        <span className="text-sm leading-5">{step}</span>
+                      </li>
+                    ))}
+                  </ol>
+                  <div className="flex items-start gap-2 rounded-lg bg-[color-mix(in_oklch,var(--status-submitted)_18%,transparent)] p-2.5">
+                    <AlertTriangle className="h-3.5 w-3.5 shrink-0 mt-0.5" style={{ color: 'var(--status-submitted)' }} />
+                    <p className="text-xs leading-5">手順3の「ウェブアプリとして開く」が通知受け取りに必要です</p>
+                  </div>
+                </div>
+              )}
 
               <div className="flex items-center gap-3">
+                {installPrompt && (
+                  <button
+                    type="button"
+                    onClick={handleInstallClick}
+                    className="flex-1 h-10 rounded-lg text-white text-sm font-medium transition-colors"
+                    style={{ backgroundColor: 'var(--brand-accent)' }}
+                  >
+                    インストール
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => setShowPwaBanner(false)}
