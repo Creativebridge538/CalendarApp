@@ -14,7 +14,9 @@ self.addEventListener('push', (event) => {
     data: { link: data.link || '/' },
   }
 
-  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(
+    self.registration.showNotification(title, options).then(() => updateAppBadge())
+  )
 })
 
 self.addEventListener('notificationclick', (event) => {
@@ -27,6 +29,16 @@ self.addEventListener('notificationclick', (event) => {
         if (client.url.includes(link) && 'focus' in client) return client.focus()
       }
       if (self.clients.openWindow) return self.clients.openWindow(link)
-    })
+    }).then(() => updateAppBadge())
   )
 })
+
+// ホーム画面アイコンのバッジを、現在表示中の通知件数に合わせて更新する
+function updateAppBadge() {
+  if (!self.registration.getNotifications || !self.navigator || !self.navigator.setAppBadge) return Promise.resolve()
+  return self.registration.getNotifications().then((notifications) => (
+    notifications.length > 0
+      ? self.navigator.setAppBadge(notifications.length)
+      : self.navigator.clearAppBadge()
+  )).catch(() => {})
+}

@@ -56,6 +56,12 @@ export async function subscribeToPush(userId: string): Promise<void> {
   }
 }
 
+// アプリを開いた時点で、ホーム画面アイコンのバッジ（未読件数）をクリアする
+export function clearAppBadge(): void {
+  const nav = navigator as Navigator & { clearAppBadge?: () => Promise<void> }
+  nav.clearAppBadge?.().catch(() => {})
+}
+
 export async function unsubscribeFromPush(): Promise<void> {
   if (!isPushSupported()) return
   const registration = await navigator.serviceWorker.getRegistration('/sw.js')

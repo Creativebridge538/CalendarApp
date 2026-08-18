@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Bell, BellRing, BellOff, CheckCheck, Send, ChevronLeft } from 'lucide-react'
-import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush } from '@/lib/push'
+import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush, clearAppBadge } from '@/lib/push'
 
 interface Notification {
   id: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string
@@ -36,6 +36,7 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
 
   useEffect(() => {
     getPushSubscriptionState().then(setPushState).catch(() => setPushState('unsupported'))
+    clearAppBadge()
   }, [])
 
   async function togglePush() {
