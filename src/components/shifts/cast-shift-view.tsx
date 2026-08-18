@@ -19,9 +19,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { TimeSelect, normalizeTime } from '@/components/ui/time-select'
-import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, Bell, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
+import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, Bell, BellRing, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
-import { sendPushNotification } from '@/lib/push'
+import { sendPushNotification, getPushSubscriptionState, subscribeToPush } from '@/lib/push'
 import { ShiftCalendar } from './shift-calendar'
 import { MonthYearPicker } from './month-year-picker'
 import { Logo } from '@/components/logo'
@@ -206,6 +206,8 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
   const [showPwaBanner, setShowPwaBanner] = useState(false)
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null)
+  const [showNotifyBanner, setShowNotifyBanner] = useState(false)
+  const [enablingNotifications, setEnablingNotifications] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -292,11 +294,36 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     const dismissedForever = localStorage.getItem('pwa-banner-dismissed') === '1'
     // eslint-disable-next-line react-hooks/set-state-in-effect -- window/localStorage はマウント後にしか読めないため
     setShowPwaBanner(!isStandalone && !dismissedForever)
+
+    // ホーム画面に追加してPWAとして開いた際、まだ通知を許可していなければオン案内を出す
+    if (isStandalone && localStorage.getItem('notify-banner-dismissed') !== '1') {
+      getPushSubscriptionState().then(state => {
+        if (state === 'unsubscribed') setShowNotifyBanner(true)
+      })
+    }
   }, [])
 
   function dismissPwaBannerForever() {
     localStorage.setItem('pwa-banner-dismissed', '1')
     setShowPwaBanner(false)
+  }
+
+  function dismissNotifyBannerForever() {
+    localStorage.setItem('notify-banner-dismissed', '1')
+    setShowNotifyBanner(false)
+  }
+
+  async function handleEnableNotifications() {
+    setEnablingNotifications(true)
+    try {
+      await subscribeToPush(userId)
+      toast.success('通知をオンにしました')
+      setShowNotifyBanner(false)
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : '通知の設定に失敗しました')
+    } finally {
+      setEnablingNotifications(false)
+    }
   }
 
   // Chrome/Edge（PC・Android）はネイティブのインストール確認を出せるので、そのイベントを保持しておく
@@ -759,6 +786,63 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
               </div>
               <button type="button" onClick={dismissPwaBannerForever} className="w-full text-center text-xs text-muted-foreground mt-2.5">
                 次回以降表示しない
+              </button>
+            </div>
+          </div>
+        )}
+        {showNotifyBanner && (
+          <div className="fixed inset-x-0 bottom-0 z-50 flex justify-center pointer-events-none md:px-3 md:pb-3">
+            <div className="pointer-events-auto w-full md:max-w-sm rounded-t-2xl md:rounded-2xl border-t md:border shadow-xl animate-in slide-in-from-bottom fade-in-0 duration-300 bg-popover p-4 pb-[calc(1rem_+_env(safe-area-inset-bottom))] md:pb-4">
+              <div className="mx-auto -mt-1 mb-2 h-1 w-9 rounded-full bg-foreground/15 md:hidden" />
+
+              <div className="flex items-start gap-3 mb-4">
+                <div className="h-11 w-11 rounded-xl flex items-center justify-center shrink-0" style={{ backgroundColor: 'var(--brand-accent)' }}>
+                  <BellRing className="h-5 w-5 text-white" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-base font-bold">通知をオンにする</p>
+                  <p className="text-sm text-muted-foreground mt-0.5">シフトの確定などをすぐにお届けします</p>
+                </div>
+                <button type="button" onClick={() => setShowNotifyBanner(false)} className="p-1 -mt-1 -mr-1 text-muted-foreground shrink-0" aria-label="閉じる">
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+
+              <div className="rounded-lg bg-muted/50 p-3.5 mb-3 space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground">通知でお知らせすること</p>
+                <ul className="space-y-1.5">
+                  {[
+                    'シフトの確定・差し戻し',
+                    '修正申請の承認・却下',
+                  ].map(item => (
+                    <li key={item} className="flex items-start gap-2 text-sm leading-5">
+                      <span className="h-1.5 w-1.5 rounded-full mt-1.5 shrink-0" style={{ backgroundColor: 'var(--brand-accent)' }} />
+                      {item}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={handleEnableNotifications}
+                  disabled={enablingNotifications}
+                  className="flex-1 h-10 rounded-lg text-white text-sm font-medium transition-colors disabled:opacity-60"
+                  style={{ backgroundColor: 'var(--brand-accent)' }}
+                >
+                  {enablingNotifications ? '設定中...' : '通知をオンにする'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNotifyBanner(false)}
+                  className="flex-1 h-10 rounded-lg border text-sm font-medium hover:bg-muted/40 transition-colors"
+                >
+                  後で
+                </button>
+              </div>
+              <button type="button" onClick={dismissNotifyBannerForever} className="w-full text-center text-xs text-muted-foreground mt-2.5">
+                今後表示しない
               </button>
             </div>
           </div>
