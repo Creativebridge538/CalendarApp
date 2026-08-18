@@ -168,10 +168,12 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   }
 
   function accountInfoText(loginId: string, password: string, email?: string | null) {
-    const lines = [`ログインURL: ${window.location.origin}/login`, `ログインID: ${loginId}`]
-    if (password) lines.push(`パスワード: ${password}`)
-    if (email) lines.push(`メールアドレス: ${email}`)
-    return lines.join('\n')
+    return [
+      `ログインURL: ${window.location.origin}/login`,
+      `メールアドレス: ${email || '—'}`,
+      `ログインID: ${loginId}`,
+      `パスワード: ${password || '—'}`,
+    ].join('\n')
   }
 
   function generatePassword() {
