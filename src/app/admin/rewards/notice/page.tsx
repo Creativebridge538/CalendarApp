@@ -93,8 +93,7 @@ export default async function PaymentNoticePage({
 
         <div className="notice-header-grid">
           <div>
-            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{castName} 様</div>
-            {castRealName && <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>（本名：{castRealName}）</div>}
+            <div style={{ fontSize: 18, fontWeight: 'bold' }}>{castRealName || castName} 様</div>
             <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel} のお支払い明細をお送りいたします。</div>
           </div>
           <div className="notice-issuer">
