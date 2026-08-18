@@ -56,7 +56,7 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
 
   // プッシュ送信の結果をその場で確認できるよう、テスト時だけ結果を待って表示する
   // （通常のsendPushNotificationは呼び出し元をブロックしないよう握りつぶす設計のため、ここでは使わない）
-  async function sendAndReportPush(targetUserId: string, title: string, body: string | null, link: string | null, targetLabel: string) {
+  async function sendAndReportPush(targetUserId: string, title: string, body: string | null, link: string | null, targetLabel: string, isSelf: boolean) {
     try {
       const res = await fetch('/api/push/send', {
         method: 'POST',
@@ -72,7 +72,14 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
           .join(' / ')
         toast.error(`${targetLabel}へのプッシュ送信失敗（${result.total}件中0件成功）${detail ? `: ${detail}` : ''}`, { duration: 15000 })
       } else if (result.total === 0) {
-        toast.error(`${targetLabel}はプッシュ通知の購読が見つかりません（端末で通知をオンにできているか確認してください）`)
+        // 端末側は「オン」表示でもサーバーに登録が残っていないケース（VAPID鍵の更新などで発生）。
+        // 「端末で通知をオンにしてるか確認して」だと画面上すでにオンに見えて混乱するため、再登録を促す
+        toast.error(
+          isSelf
+            ? 'プッシュ通知の登録がサーバーに見つかりません。下の「オフにする」→「オンにする」を押し直して登録し直してください'
+            : `${targetLabel}のプッシュ通知の登録がサーバーに見つかりません。本人の端末で通知を一度「オフ」→「オン」にして登録し直してもらってください`,
+          { duration: 15000 }
+        )
       } else {
         toast.success(`${targetLabel}へテスト通知を送信しました（プッシュ ${result.sent}/${result.total}件成功）`)
       }
@@ -89,7 +96,7 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
       .single()
     if (error || !data) { toast.error('送信に失敗しました'); return }
     setNotifications([data, ...notifications])
-    await sendAndReportPush(userId, data.title, data.body, data.link, '自分')
+    await sendAndReportPush(userId, data.title, data.body, data.link, '自分', true)
   }
 
   async function sendTestToCast() {
@@ -102,7 +109,7 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
       .select()
       .single()
     if (error || !data) { toast.error('送信に失敗しました'); setSendingCastTest(false); return }
-    await sendAndReportPush(testCastId, data.title, data.body, data.link, castName)
+    await sendAndReportPush(testCastId, data.title, data.body, data.link, castName, false)
     setSendingCastTest(false)
   }
 
