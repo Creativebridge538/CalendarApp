@@ -195,6 +195,15 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     })
   }
 
+  // 修正依頼中のシフトは、詳細ダイアログを経由せず修正申請管理へ直接飛ばす
+  function handleShiftClick(shift: Shift) {
+    if (shift.status === 'modification_requested') {
+      router.push(`/admin/modification-requests?shift=${shift.id}`)
+      return
+    }
+    openDetail(shift)
+  }
+
   const scheduleFormRooms = locationMode === 'area_and_room' && scheduleForm.area_id
     ? rooms.filter(r => r.area_id === scheduleForm.area_id)
     : rooms
@@ -426,7 +435,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               {paged.map((shift) => (
                 <div
                   key={shift.id}
-                  onClick={() => openDetail(shift)}
+                  onClick={() => handleShiftClick(shift)}
                   className={cn(
                     'rounded-lg border p-3 space-y-2 cursor-pointer active:bg-muted/40',
                     conflicts.has(shift.id) ? 'border-destructive/40 bg-destructive/10' : 'bg-card'
@@ -499,7 +508,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               </TableHeader>
               <TableBody>
                 {paged.map((shift) => (
-                  <TableRow key={shift.id} className={cn('cursor-pointer', conflicts.has(shift.id) ? 'bg-destructive/10' : '')} onClick={() => openDetail(shift)}>
+                  <TableRow key={shift.id} className={cn('cursor-pointer', conflicts.has(shift.id) ? 'bg-destructive/10' : '')} onClick={() => handleShiftClick(shift)}>
                     <TableCell className="font-medium">
                       {format(new Date(shift.date), 'M/d(E)', { locale: ja })}
                     </TableCell>
@@ -568,7 +577,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               <button
                 key={shift.id}
                 type="button"
-                onClick={() => { setDayDetailDate(null); openDetail(shift) }}
+                onClick={() => { setDayDetailDate(null); handleShiftClick(shift) }}
                 className="w-full flex items-center gap-3 px-3 py-2.5 rounded-md hover:bg-muted/40 transition-colors text-left border-b last:border-b-0"
               >
                 <span className="flex-1 min-w-0">
