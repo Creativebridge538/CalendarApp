@@ -207,8 +207,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       is_daily_payment: form.is_daily_payment,
       rate_override: form.is_daily_payment && isPlatform && form.rate_override ? parseFloat(form.rate_override) : null,
       reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) / 100 : null,
-      daily_payment_at: form.is_daily_payment
-        ? new Date(form.daily_payment_at || Date.now()).toISOString()
+      // 日時が未入力なら「不明」として null のままにする（チェック時に自動入力されるため、
+      // 空欄になるのは移行前の既存行を編集した場合のみ。これを現在時刻で埋めてしまうと
+      // チェックと無関係な編集のたびに日時が上書きされてしまう）
+      daily_payment_at: form.is_daily_payment && form.daily_payment_at
+        ? new Date(form.daily_payment_at).toISOString()
         : null,
       notes: form.notes || null,
       worked_hours: form.worked_hours ? parseFloat(form.worked_hours) : null,
