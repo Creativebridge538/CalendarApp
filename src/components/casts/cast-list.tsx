@@ -16,10 +16,12 @@ import {
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
 import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { toHalfWidthDigits } from '@/lib/zenkaku'
+import { usePagination } from '@/hooks/use-pagination'
 
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
@@ -43,6 +45,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
   const supabase = createClient()
+  const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedCasts, totalItems } = usePagination(casts)
 
   function toggleSelected(id: string) {
     setSelected(prev => {
@@ -225,7 +228,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                   </TableCell>
                 </TableRow>
               )}
-              {casts.map((cast) => (
+              {pagedCasts.map((cast) => (
                 <TableRow key={cast.id} className={!cast.is_active ? 'opacity-50' : ''}>
                   <TableCell className="font-medium">
                     {cast.display_name ?? '—'}
@@ -264,7 +267,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             )}
             {casts.length > 0 && (
               <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3">
-                {casts.map(cast => (
+                {pagedCasts.map(cast => (
                   <div
                     key={cast.id}
                     role="button"
@@ -313,6 +316,10 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             )}
           </>
         )}
+        <Pagination
+          page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+          onPageChange={setPage} onPageSizeChange={setPageSize}
+        />
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>

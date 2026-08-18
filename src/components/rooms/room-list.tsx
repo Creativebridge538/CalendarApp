@@ -10,8 +10,10 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Pagination } from '@/components/ui/pagination'
 import { Plus, Pencil, Trash2 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
+import { usePagination } from '@/hooks/use-pagination'
 
 type Room = Database['public']['Tables']['rooms']['Row']
 type Area = Database['public']['Tables']['areas']['Row']
@@ -30,6 +32,7 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
   const [editing, setEditing] = useState<Room | null>(null)
   const [form, setForm] = useState({ name: '', capacity: '', notes: '', area_id: '' })
   const supabase = createClient()
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(rooms)
 
   const activeAreas = areas.filter(a => a.is_active).sort((a, b) => a.sort_order - b.sort_order)
 
@@ -110,7 +113,7 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
                 </TableCell>
               </TableRow>
             )}
-            {rooms.map((room) => (
+            {paged.map((room) => (
               <TableRow key={room.id}>
                 <TableCell className="font-medium">{room.name}</TableCell>
                 {activeAreas.length > 0 && <TableCell>{getAreaName(room.area_id)}</TableCell>}
@@ -124,6 +127,10 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
             ))}
           </TableBody>
         </Table>
+        <Pagination
+          page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+          onPageChange={setPage} onPageSizeChange={setPageSize}
+        />
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>

@@ -11,8 +11,10 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Pagination } from '@/components/ui/pagination'
 import { Download } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
+import { usePagination } from '@/hooks/use-pagination'
 
 interface Notice {
   id: string
@@ -42,6 +44,7 @@ export function IssuedNoticesList({ notices, casts }: Props) {
     && (!filterTo || n.from <= filterTo)
   ), [notices, filterCast, filterFrom, filterTo])
   const filtersActive = filterCast !== 'all' || !!filterFrom || !!filterTo
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(filtered)
 
   const allSelected = filtered.length > 0 && filtered.every(n => selected.has(n.id))
 
@@ -98,13 +101,13 @@ export function IssuedNoticesList({ notices, casts }: Props) {
         <div className="flex items-end gap-2 flex-wrap mb-3">
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">開始日</Label>
-            <Input type="date" className="w-40" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} />
+            <Input type="date" className="w-40" value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setPage(1) }} />
           </div>
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">終了日</Label>
-            <Input type="date" className="w-40" value={filterTo} onChange={e => setFilterTo(e.target.value)} />
+            <Input type="date" className="w-40" value={filterTo} onChange={e => { setFilterTo(e.target.value); setPage(1) }} />
           </div>
-          <Select value={filterCast} onValueChange={v => { if (v) setFilterCast(v) }}>
+          <Select value={filterCast} onValueChange={v => { if (v) { setFilterCast(v); setPage(1) } }}>
             <SelectTrigger className="w-40">
               <SelectValue>
                 {filterCast === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCast)?.display_name ?? filterCast)}
@@ -116,7 +119,7 @@ export function IssuedNoticesList({ notices, casts }: Props) {
             </SelectContent>
           </Select>
           {filtersActive && (
-            <Button size="sm" variant="ghost" onClick={() => { setFilterCast('all'); setFilterFrom(''); setFilterTo('') }}>
+            <Button size="sm" variant="ghost" onClick={() => { setFilterCast('all'); setFilterFrom(''); setFilterTo(''); setPage(1) }}>
               絞り込みを解除
             </Button>
           )}
@@ -140,7 +143,7 @@ export function IssuedNoticesList({ notices, casts }: Props) {
                 {filtersActive ? '絞り込み条件に一致する通知書がありません' : '発行済みの支払通知書はまだありません'}
               </TableCell></TableRow>
             )}
-            {filtered.map(n => (
+            {paged.map(n => (
               <TableRow key={n.id}>
                 <TableCell>
                   <Checkbox checked={selected.has(n.id)} onCheckedChange={() => toggleOne(n.id)} />
@@ -157,6 +160,10 @@ export function IssuedNoticesList({ notices, casts }: Props) {
             ))}
           </TableBody>
         </Table>
+        <Pagination
+          page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+          onPageChange={setPage} onPageSizeChange={setPageSize}
+        />
       </CardContent>
     </Card>
   )

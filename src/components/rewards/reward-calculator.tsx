@@ -12,10 +12,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
+import { usePagination } from '@/hooks/use-pagination'
 
 interface CastUser { id: string; display_name: string | null; reward_rate: number | string; is_active: boolean }
 interface SaleRow {
@@ -69,6 +71,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     return { cast, rewardRate, salesTotal, baseReward, bonus, deduction, totalReward }
   }), [casts, salesByCast])
 
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(rows)
   const allSelected = rows.length > 0 && rows.every(r => selected.has(r.cast.id))
   const unissuedRows = useMemo(() => rows.filter(r => !issuedAt[r.cast.id]), [rows, issuedAt])
   const unissuedAllSelected = unissuedRows.length > 0 && unissuedRows.every(r => selected.has(r.cast.id))
@@ -198,7 +201,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             {rows.length === 0 && (
               <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
             )}
-            {rows.map(r => (
+            {paged.map(r => (
               <TableRow key={r.cast.id}>
                 <TableCell>
                   <Checkbox checked={selected.has(r.cast.id)} onCheckedChange={() => toggleOne(r.cast.id)} />
@@ -231,6 +234,10 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             ))}
           </TableBody>
         </Table>
+        <Pagination
+          page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+          onPageChange={setPage} onPageSizeChange={setPageSize}
+        />
       </CardContent>
 
       <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>

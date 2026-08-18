@@ -14,10 +14,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
+import { usePagination } from '@/hooks/use-pagination'
 import type { Database } from '@/lib/supabase/database.types'
 
 type SaleInsert = Database['public']['Tables']['sales']['Insert']
@@ -121,6 +123,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     && (!filterTo || s.date <= filterTo)
   ), [sales, filterCast, filterPlatform, filterFrom, filterTo])
   const filtersActive = filterCast !== 'all' || filterPlatform !== 'all' || !!filterFrom || !!filterTo
+  const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedSales, totalItems } = usePagination(filteredSales)
 
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
@@ -339,13 +342,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           <div className="flex items-end gap-2 flex-wrap mb-3">
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">開始日</Label>
-              <Input type="date" className="w-40" value={filterFrom} onChange={e => setFilterFrom(e.target.value)} />
+              <Input type="date" className="w-40" value={filterFrom} onChange={e => { setFilterFrom(e.target.value); setPage(1) }} />
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">終了日</Label>
-              <Input type="date" className="w-40" value={filterTo} onChange={e => setFilterTo(e.target.value)} />
+              <Input type="date" className="w-40" value={filterTo} onChange={e => { setFilterTo(e.target.value); setPage(1) }} />
             </div>
-            <Select value={filterCast} onValueChange={v => { if (v) setFilterCast(v) }}>
+            <Select value={filterCast} onValueChange={v => { if (v) { setFilterCast(v); setPage(1) } }}>
               <SelectTrigger className="w-40">
                 <SelectValue>
                   {filterCast === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCast)?.display_name ?? filterCast)}
@@ -356,7 +359,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
               </SelectContent>
             </Select>
-            <Select value={filterPlatform} onValueChange={v => { if (v) setFilterPlatform(v) }}>
+            <Select value={filterPlatform} onValueChange={v => { if (v) { setFilterPlatform(v); setPage(1) } }}>
               <SelectTrigger className="w-36">
                 <SelectValue>{filterPlatform === 'all' ? '全プラットフォーム' : PLATFORM_LABEL[filterPlatform]}</SelectValue>
               </SelectTrigger>
@@ -369,7 +372,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               </SelectContent>
             </Select>
             {filtersActive && (
-              <Button size="sm" variant="ghost" onClick={() => { setFilterCast('all'); setFilterPlatform('all'); setFilterFrom(''); setFilterTo('') }}>
+              <Button size="sm" variant="ghost" onClick={() => { setFilterCast('all'); setFilterPlatform('all'); setFilterFrom(''); setFilterTo(''); setPage(1) }}>
                 <X className="h-3.5 w-3.5 mr-1" />絞り込みを解除
               </Button>
             )}
@@ -393,7 +396,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   {filtersActive ? '絞り込み条件に一致する売上がありません' : '売上データがありません'}
                 </TableCell></TableRow>
               )}
-              {filteredSales.map(sale => {
+              {pagedSales.map(sale => {
                 const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
@@ -430,6 +433,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               })}
             </TableBody>
           </Table>
+          <Pagination
+            page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 

@@ -10,8 +10,10 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
 import { Plus, Pencil, ToggleLeft, ToggleRight, GripVertical } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
+import { usePagination } from '@/hooks/use-pagination'
 
 type Area = Database['public']['Tables']['areas']['Row']
 
@@ -72,6 +74,7 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
   }
 
   const sorted = [...areas].sort((a, b) => a.sort_order - b.sort_order)
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(sorted)
 
   return (
     <Card>
@@ -100,7 +103,7 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
                 </TableCell>
               </TableRow>
             )}
-            {sorted.map(area => (
+            {paged.map(area => (
               <TableRow key={area.id} className={!area.is_active ? 'opacity-50' : ''}>
                 <TableCell><GripVertical className="h-4 w-4 text-muted-foreground" /></TableCell>
                 <TableCell className="font-medium">{area.name}</TableCell>
@@ -124,6 +127,10 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
             ))}
           </TableBody>
         </Table>
+        <Pagination
+          page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+          onPageChange={setPage} onPageSizeChange={setPageSize}
+        />
       </CardContent>
 
       <Dialog open={open} onOpenChange={setOpen}>

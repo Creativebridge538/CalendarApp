@@ -13,12 +13,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
 import { Switch } from '@/components/ui/switch'
 import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
 import { Plus, Check, X, ChevronDown, Trash2 } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { shiftConflictMessage } from '@/lib/shift-conflict'
+import { usePagination } from '@/hooks/use-pagination'
 
 interface Application { id: string; status: string; cast_id: string; shift_id: string | null; cast: { display_name: string | null } | null }
 interface Slot {
@@ -41,6 +43,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
   const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '', capacity: '1' })
   const supabase = createClient()
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(slots)
 
   async function handleCreate() {
     const capacity = Math.max(1, parseInt(form.capacity) || 1)
@@ -185,7 +188,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
             {slots.length === 0 && (
               <TableRow><TableCell colSpan={7} className="text-center text-muted-foreground py-8">空き枠がありません</TableCell></TableRow>
             )}
-            {slots.map(slot => {
+            {paged.map(slot => {
               const approvedCount = slot.vacant_slot_applications.filter(a => a.status === 'approved').length
               const isFull = approvedCount >= slot.capacity
               return (
@@ -253,6 +256,10 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
             })}
           </TableBody>
         </Table>
+        <Pagination
+          page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+          onPageChange={setPage} onPageSizeChange={setPageSize}
+        />
       </CardContent>
 
       <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) setDateCalendarOpen(false) }}>

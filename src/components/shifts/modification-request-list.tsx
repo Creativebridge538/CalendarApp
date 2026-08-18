@@ -9,6 +9,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Pagination } from '@/components/ui/pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
@@ -16,6 +17,7 @@ import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
 import { Check, X, ChevronDown, Pencil } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
+import { usePagination } from '@/hooks/use-pagination'
 
 interface Request {
   id: string
@@ -43,6 +45,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
   const [approveForm, setApproveForm] = useState({ date: '', start_time: '18:00', end_time: '23:00' })
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
   const supabase = createClient()
+  const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(requests)
 
   function openApprove(req: Request) {
     setApproveTarget(req)
@@ -124,7 +127,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
                   </TableCell>
                 </TableRow>
               )}
-              {requests.map(req => (
+              {paged.map(req => (
                 <TableRow key={req.id}>
                   <TableCell className="font-medium">{req.shifts?.cast?.display_name ?? '—'}</TableCell>
                   <TableCell>
@@ -155,6 +158,10 @@ export function ModificationRequestList({ requests: initialRequests }: { request
               ))}
             </TableBody>
           </Table>
+          <Pagination
+            page={page} totalPages={totalPages} pageSize={pageSize} totalItems={totalItems}
+            onPageChange={setPage} onPageSizeChange={setPageSize}
+          />
         </CardContent>
       </Card>
 

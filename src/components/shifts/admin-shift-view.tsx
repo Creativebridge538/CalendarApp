@@ -14,11 +14,13 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote, ChevronLeft, ChevronRight } from 'lucide-react'
+import { Pagination } from '@/components/ui/pagination'
+import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { sendPushNotification } from '@/lib/push'
 import { shiftConflictMessage } from '@/lib/shift-conflict'
+import { usePagination } from '@/hooks/use-pagination'
 import { ShiftCalendar } from './shift-calendar'
 import { ShiftTimeline } from './shift-timeline'
 
@@ -67,7 +69,6 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [periodMode, setPeriodMode] = useState<'all' | 'day' | 'week'>('all')
   const [periodDate, setPeriodDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'))
   const [view, setView] = useState<'calendar' | 'timeline' | 'list'>('list')
-  const [listPage, setListPage] = useState(1)
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
   const [detailShift, setDetailShift] = useState<Shift | null>(null)
   const [noteInput, setNoteInput] = useState('')
@@ -98,10 +99,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   }), [shifts, filterStatus, filterCast, periodRange])
 
   // リスト表示は件数が多いと際限なく縦に伸びてしまうため、ページ単位で区切る
-  const LIST_PAGE_SIZE = 30
-  const listTotalPages = Math.max(1, Math.ceil(filtered.length / LIST_PAGE_SIZE))
-  const listPageClamped = Math.min(listPage, listTotalPages)
-  const paged = filtered.slice((listPageClamped - 1) * LIST_PAGE_SIZE, listPageClamped * LIST_PAGE_SIZE)
+  const { page: listPage, setPage: setListPage, pageSize: listPageSize, setPageSize: setListPageSize, totalPages: listTotalPages, paged, totalItems: listTotalItems } = usePagination(filtered)
 
   const conflicts = useMemo(() => {
     const confirmed = shifts.filter(s => s.status === 'confirmed' && s.room_id)
@@ -396,27 +394,10 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               </TableBody>
             </Table>
 
-            {listTotalPages > 1 && (
-              <div className="flex items-center justify-center gap-3 py-4">
-                <Button
-                  size="sm" variant="outline"
-                  disabled={listPageClamped <= 1}
-                  onClick={() => setListPage(listPageClamped - 1)}
-                >
-                  <ChevronLeft className="h-3.5 w-3.5 mr-1" /> 前へ
-                </Button>
-                <span className="text-sm text-muted-foreground tabular-nums">
-                  {listPageClamped} / {listTotalPages}
-                </span>
-                <Button
-                  size="sm" variant="outline"
-                  disabled={listPageClamped >= listTotalPages}
-                  onClick={() => setListPage(listPageClamped + 1)}
-                >
-                  次へ <ChevronRight className="h-3.5 w-3.5 ml-1" />
-                </Button>
-              </div>
-            )}
+            <Pagination
+              page={listPage} totalPages={listTotalPages} pageSize={listPageSize} totalItems={listTotalItems}
+              onPageChange={setListPage} onPageSizeChange={setListPageSize}
+            />
           </>
         )}
       </CardContent>
