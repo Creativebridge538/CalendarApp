@@ -1,3 +1,8 @@
+// 新しいService Workerを即座に有効化する（バッジ対応など更新の反映待ちで
+// アプリを完全に終了させないと反映されない、という事態を避けるため）
+self.addEventListener('install', () => { self.skipWaiting() })
+self.addEventListener('activate', (event) => { event.waitUntil(self.clients.claim()) })
+
 self.addEventListener('push', (event) => {
   let data = {}
   try {
@@ -15,7 +20,10 @@ self.addEventListener('push', (event) => {
   }
 
   event.waitUntil(
-    self.registration.showNotification(title, options).then(() => updateAppBadge())
+    Promise.all([
+      self.registration.showNotification(title, options),
+      setAppBadge(),
+    ])
   )
 })
 
@@ -29,16 +37,21 @@ self.addEventListener('notificationclick', (event) => {
         if (client.url.includes(link) && 'focus' in client) return client.focus()
       }
       if (self.clients.openWindow) return self.clients.openWindow(link)
-    }).then(() => updateAppBadge())
+    }).then(() => clearAppBadge())
   )
 })
 
-// ホーム画面アイコンのバッジを、現在表示中の通知件数に合わせて更新する
-function updateAppBadge() {
-  if (!self.registration.getNotifications || !self.navigator || !self.navigator.setAppBadge) return Promise.resolve()
-  return self.registration.getNotifications().then((notifications) => (
-    notifications.length > 0
-      ? self.navigator.setAppBadge(notifications.length)
-      : self.navigator.clearAppBadge()
-  )).catch(() => {})
+// getNotifications()の件数に頼らず、プッシュを受けたら無条件にバッジを立てる
+// （表示直後はgetNotifications()がまだ反映されていないことがあり、件数ベースだと取りこぼすため）
+// 実装によってself.navigator.setAppBadgeとself.setAppBadgeのどちらに生えるか差があるため両方試す
+function setAppBadge() {
+  const fn = (self.navigator && self.navigator.setAppBadge) || self.setAppBadge
+  if (!fn) return Promise.resolve()
+  return fn.call(self.navigator || self).catch(() => {})
+}
+
+function clearAppBadge() {
+  const fn = (self.navigator && self.navigator.clearAppBadge) || self.clearAppBadge
+  if (!fn) return Promise.resolve()
+  return fn.call(self.navigator || self).catch(() => {})
 }
