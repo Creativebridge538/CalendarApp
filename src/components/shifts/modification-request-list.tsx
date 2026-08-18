@@ -1,6 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -45,7 +47,17 @@ export function ModificationRequestList({ requests: initialRequests }: { request
   const [approveForm, setApproveForm] = useState({ date: '', start_time: '18:00', end_time: '23:00' })
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const highlightShiftId = searchParams.get('shift')
   const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(requests)
+
+  // シフト管理からのリンクで来た場合、該当申請があるページへ自動で移動する
+  useEffect(() => {
+    if (!highlightShiftId) return
+    const index = requests.findIndex(r => r.shift_id === highlightShiftId)
+    if (index >= 0) setPage(Math.floor(index / pageSize) + 1)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlightShiftId])
 
   function openApprove(req: Request) {
     setApproveTarget(req)
@@ -128,13 +140,16 @@ export function ModificationRequestList({ requests: initialRequests }: { request
                 </TableRow>
               )}
               {paged.map(req => (
-                <TableRow key={req.id}>
+                <TableRow key={req.id} className={req.shift_id === highlightShiftId ? 'bg-primary/5 ring-1 ring-primary/30' : undefined}>
                   <TableCell className="font-medium">{req.shifts?.cast?.display_name ?? '—'}</TableCell>
                   <TableCell>
                     <p>{req.shifts ? format(new Date(req.shifts.date), 'M/d(E)', { locale: ja }) : '—'}</p>
                     <p className="text-xs text-muted-foreground">
                       {req.shifts?.start_time.slice(0, 5)} 〜 {req.shifts?.end_time.slice(0, 5)}
                     </p>
+                    <Link href={`/admin/shifts?shift=${req.shift_id}`} className="text-[10px] text-primary underline underline-offset-2">
+                      シフト管理で見る
+                    </Link>
                   </TableCell>
                   <TableCell>
                     {req.new_date && <p>{format(new Date(req.new_date), 'M/d(E)', { locale: ja })}</p>}

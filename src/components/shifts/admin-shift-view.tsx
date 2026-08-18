@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useMemo, useEffect } from 'react'
+import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -75,6 +77,18 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [castNoteInput, setCastNoteInput] = useState('')
   const [scheduleForm, setScheduleForm] = useState({ date: '', start_time: '', end_time: '', area_id: '', room_id: '' })
   const supabase = createClient()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // 修正申請管理からのリンク（?shift=<id>）で来た場合、該当シフトの詳細を自動で開く
+  useEffect(() => {
+    const shiftId = searchParams.get('shift')
+    if (!shiftId) return
+    const target = shifts.find(s => s.id === shiftId)
+    if (target) openDetail(target)
+    router.replace('/admin/shifts', { scroll: false })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // キャスト側の操作（修正申請の提出など）によるステータス変更を、リロードなしに反映する
   useEffect(() => {
@@ -577,7 +591,14 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
             <div className="space-y-4 mt-2">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-medium">{detailShift.cast?.display_name ?? '—'}</p>
-                <Badge variant={STATUS_VARIANT[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
+                <div className="flex items-center gap-2">
+                  {detailShift.status === 'modification_requested' && (
+                    <Link href={`/admin/modification-requests?shift=${detailShift.id}`} className="text-xs text-primary underline underline-offset-2">
+                      修正申請を確認
+                    </Link>
+                  )}
+                  <Badge variant={STATUS_VARIANT[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
+                </div>
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">日時・{roomLabel}（変更するとキャストに通知されます）</label>
