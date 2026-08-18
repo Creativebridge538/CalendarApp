@@ -20,7 +20,11 @@ import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 
-interface CastUser { id: string; display_name: string | null; reward_rate: number | string; is_active: boolean }
+interface CastUser { id: string; display_name: string | null; real_name: string | null; reward_rate: number | string; is_active: boolean }
+
+function castLabel(c: { display_name: string | null; real_name: string | null }) {
+  return c.real_name ? `${c.display_name ?? '—'}（${c.real_name}）` : (c.display_name ?? '—')
+}
 interface SaleRow {
   cast_id: string; amount: number | string
   is_daily_payment: boolean; reward_rate_override: number | string | null
@@ -175,12 +179,12 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             <Select value={filterCastId} onValueChange={v => { if (v) { setFilterCastId(v); setPage(1) } }}>
               <SelectTrigger className="w-40">
                 <SelectValue>
-                  {filterCastId === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCastId)?.display_name ?? filterCastId)}
+                  {filterCastId === 'all' ? '全キャスト' : (() => { const c = casts.find(c => c.id === filterCastId); return c ? castLabel(c) : filterCastId })()}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent alignItemWithTrigger={false}>
                 <SelectItem value="all">全キャスト</SelectItem>
-                {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+                {casts.map(c => <SelectItem key={c.id} value={c.id}>{castLabel(c)}</SelectItem>)}
               </SelectContent>
             </Select>
           </div>
@@ -228,7 +232,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
                 </TableCell>
                 <TableCell className="font-medium">
                   <div className="flex items-center gap-1.5">
-                    {r.cast.display_name ?? '—'}
+                    {castLabel(r.cast)}
                     {!r.cast.is_active && <Badge variant="outline" className="text-[10px] font-normal">退店済み</Badge>}
                   </div>
                 </TableCell>
@@ -270,7 +274,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
             <div className="rounded-lg border divide-y max-h-64 overflow-y-auto">
               {targets.map(t => (
                 <div key={t.cast.id} className="flex items-center justify-between px-3 py-2 text-sm">
-                  <span>{t.cast.display_name ?? '—'}</span>
+                  <span>{castLabel(t.cast)}</span>
                   <span className="font-medium tabular-nums">¥{t.totalReward.toLocaleString()}</span>
                 </div>
               ))}

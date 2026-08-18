@@ -17,9 +17,9 @@ export default async function IssuedNoticesPage() {
 
   const castIds = [...new Set((noticeRows ?? []).map(n => n.user_id))]
   const { data: castRows } = castIds.length > 0
-    ? await supabase.from('users').select('id, display_name').in('id', castIds)
+    ? await supabase.from('users').select('id, display_name, real_name').in('id', castIds)
     : { data: [] }
-  const castNameById = new Map((castRows ?? []).map(c => [c.id, c.display_name]))
+  const castById = new Map((castRows ?? []).map(c => [c.id, c]))
 
   // linkの from/to をここで解析しておく（クライアント側では文字列パースをしない）
   const notices = (noticeRows ?? []).flatMap(n => {
@@ -28,8 +28,9 @@ export default async function IssuedNoticesPage() {
       const from = url.searchParams.get('from')
       const to = url.searchParams.get('to')
       if (!from || !to) return []
+      const cast = castById.get(n.user_id)
       return [{
-        id: n.id, castId: n.user_id, castName: castNameById.get(n.user_id) ?? '—',
+        id: n.id, castId: n.user_id, castName: cast?.display_name ?? '—', castRealName: cast?.real_name ?? null,
         body: n.body, from, to, createdAt: n.created_at,
       }]
     } catch {

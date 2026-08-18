@@ -20,6 +20,7 @@ interface Notice {
   id: string
   castId: string
   castName: string
+  castRealName: string | null
   body: string | null
   from: string
   to: string
@@ -148,7 +149,9 @@ export function IssuedNoticesList({ notices, casts }: Props) {
                 <TableCell>
                   <Checkbox checked={selected.has(n.id)} onCheckedChange={() => toggleOne(n.id)} />
                 </TableCell>
-                <TableCell className="font-medium">{n.castName}</TableCell>
+                <TableCell className="font-medium">
+                  {n.castName}{n.castRealName ? `（${n.castRealName}）` : ''}
+                </TableCell>
                 <TableCell className="text-sm text-muted-foreground">{n.body}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {format(new Date(n.createdAt), 'yyyy/M/d', { locale: ja })}

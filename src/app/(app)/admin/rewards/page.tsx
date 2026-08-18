@@ -21,7 +21,7 @@ export default async function RewardsPage({
   const to = toParam || format(endOfMonth(now), 'yyyy-MM-dd')
 
   const [{ data: allCasts }, { data: sales }] = await Promise.all([
-    supabase.from('users').select('id, display_name, reward_rate, is_active')
+    supabase.from('users').select('id, display_name, real_name, reward_rate, is_active')
       .eq('store_id', storeId).eq('role', 'cast').order('display_name'),
     supabase.from('sales').select('cast_id, amount, is_daily_payment, reward_rate_override, bonus, deduction')
       .eq('store_id', storeId).gte('date', from).lte('date', to),
