@@ -179,6 +179,12 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     toast.success(form.password ? 'ログイン情報をコピーしました' : 'ログイン情報をコピーしました（パスワードは未入力のため含まれません）')
   }
 
+  async function copyCastAccountInfo(cast: CastUser) {
+    if (!cast.login_id) { toast.error('このキャストにはユーザーIDが設定されていません'); return }
+    await navigator.clipboard.writeText(accountInfoText(cast.login_id, ''))
+    toast.success('ログイン情報をコピーしました（パスワードは編集画面で入力した場合のみ含まれます）')
+  }
+
   async function toggleActive(cast: CastUser) {
     // 無効化は影響が大きい（ログイン不可・一覧から外れる）ので確認を挟む。再有効化は即実行してよい
     if (cast.is_active) { setDeactivateTarget(cast); return }
@@ -270,6 +276,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                     </Badge>
                   </TableCell>
                   <TableCell className="text-right space-x-1">
+                    <Button size="sm" variant="outline" onClick={() => copyCastAccountInfo(cast)}>
+                      <Copy className="h-3.5 w-3.5 mr-1" />コピー
+                    </Button>
                     <Button size="sm" variant="outline" onClick={() => openEdit(cast)}>
                       <Pencil className="h-3.5 w-3.5 mr-1" />編集
                     </Button>
