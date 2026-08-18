@@ -28,6 +28,7 @@ const styles = StyleSheet.create({
   issuedAt: { fontSize: 10 },
   headerGrid: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 20 },
   castName: { fontSize: 15, fontWeight: 700 },
+  castRealName: { fontSize: 9, color: '#555', marginTop: 2 },
   periodNote: { fontSize: 10, color: '#555', marginTop: 6 },
   storeName: { fontSize: 10, fontWeight: 700, textAlign: 'right' },
   totalRow: {
@@ -64,7 +65,7 @@ const styles = StyleSheet.create({
 
 export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; issuedAt: string }) {
   ensureFont()
-  const { castName, storeName, from, to, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
+  const { castName, castRealName, storeName, from, to, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
 
   return (
@@ -78,6 +79,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
         <View style={styles.headerGrid}>
           <View>
             <Text style={styles.castName}>{castName} 様</Text>
+            {castRealName && <Text style={styles.castRealName}>（本名：{castRealName}）</Text>}
             <Text style={styles.periodNote}>{periodLabel} のお支払い明細をお送りいたします。</Text>
           </View>
           <Text style={styles.storeName}>{storeName}</Text>

@@ -13,8 +13,8 @@ export async function POST(request: Request) {
   const body = await request.json()
   const { email, password, display_name, real_name, phone, reward_rate, login_id } = body
 
-  if (!email || !password || !display_name || !login_id) {
-    return NextResponse.json({ error: 'email, password, display_name, login_id は必須です' }, { status: 400 })
+  if (!email || !password || !display_name || !real_name || !login_id) {
+    return NextResponse.json({ error: 'email, password, display_name, real_name, login_id は必須です' }, { status: 400 })
   }
 
   const admin = createAdminClient()

@@ -32,7 +32,7 @@ export default async function PaymentNoticePage({
     return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>
   }
 
-  const { castName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
+  const { castName, castRealName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward } = content
   const store = { name: content.storeName }
   const settings = { logo_url: logoUrl }
 
@@ -94,6 +94,7 @@ export default async function PaymentNoticePage({
         <div className="notice-header-grid">
           <div>
             <div style={{ fontSize: 18, fontWeight: 'bold' }}>{castName} 様</div>
+            {castRealName && <div style={{ fontSize: 11, color: '#555', marginTop: 2 }}>（本名：{castRealName}）</div>}
             <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel} のお支払い明細をお送りいたします。</div>
           </div>
           <div className="notice-issuer">

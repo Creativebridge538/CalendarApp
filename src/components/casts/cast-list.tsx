@@ -357,7 +357,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>本名</Label>
+              <Label>本名 *</Label>
               <Input value={form.real_name} onChange={e => setForm({ ...form, real_name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
@@ -392,7 +392,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>キャンセル</Button>
               <Button
                 onClick={handleSave}
-                disabled={saving || !form.display_name || !form.login_id || !form.email || (!editing && !form.password)}
+                disabled={saving || !form.display_name || !form.real_name || !form.login_id || !form.email || (!editing && !form.password)}
               >
                 {saving ? '保存中...' : '保存'}
               </Button>

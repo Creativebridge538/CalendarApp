@@ -615,7 +615,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">ボーナス</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">控除</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b">備考</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b min-w-[12rem]">備考</th>
                       <th className="w-8 border-b" />
                     </tr>
                   </thead>

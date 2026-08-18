@@ -6,6 +6,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 export interface NoticeContent {
   castName: string
+  castRealName: string
   storeName: string
   logoUrl: string | null
   from: string
@@ -24,7 +25,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
-    supabase.from('users').select('display_name, reward_rate').eq('id', castId).eq('store_id', storeId).single(),
+    supabase.from('users').select('display_name, real_name, reward_rate').eq('id', castId).eq('store_id', storeId).single(),
     supabase.from('sales').select('date, platform, amount, is_daily_payment, reward_rate_override, bonus, deduction')
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
@@ -49,6 +50,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
 
   return {
     castName: cast.display_name ?? '',
+    castRealName: cast.real_name ?? '',
     storeName: store?.name ?? '',
     logoUrl: settings?.logo_url ?? null,
     from, to, rewardRate,
