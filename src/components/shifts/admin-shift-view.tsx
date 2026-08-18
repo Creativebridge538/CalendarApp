@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format, addDays } from 'date-fns'
@@ -75,6 +75,45 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [castNoteInput, setCastNoteInput] = useState('')
   const [scheduleForm, setScheduleForm] = useState({ date: '', start_time: '', end_time: '', area_id: '', room_id: '' })
   const supabase = createClient()
+
+  // キャスト側の操作（修正申請の提出など）によるステータス変更を、リロードなしに反映する
+  useEffect(() => {
+    const channel = supabase
+      .channel(`admin-shifts-${storeId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'shifts', filter: `store_id=eq.${storeId}` },
+        payload => {
+          if (payload.eventType === 'DELETE') {
+            const oldRow = payload.old as { id: string }
+            setShifts(prev => prev.filter(s => s.id !== oldRow.id))
+            return
+          }
+          const row = payload.new as Database['public']['Tables']['shifts']['Row']
+          const room = rooms.find(r => r.id === row.room_id)
+          const cast = casts.find(c => c.id === row.cast_id)
+          const joined: Shift = {
+            id: row.id, date: row.date, start_time: row.start_time, end_time: row.end_time,
+            status: row.status, notes: row.notes, admin_note: row.admin_note,
+            is_period_day: row.is_period_day, cast_id: row.cast_id,
+            checklist_answers: (row.checklist_answers ?? {}) as Record<string, boolean | string>,
+            room_id: row.room_id, area_id: row.area_id,
+            rooms: room ? { name: room.name } : null,
+            cast: cast ? { display_name: cast.display_name } : null,
+          }
+          setShifts(prev => {
+            const existing = prev.find(s => s.id === row.id)
+            if (!existing) return [joined, ...prev]
+            return prev.map(s => s.id === row.id ? joined : s)
+          })
+          if (detailShift?.id === row.id) setDetailShift(joined)
+        }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storeId])
+
   function checklistBadges(answers: Record<string, boolean | string>) {
     return Object.entries(answers).map(([id, value]) => {
       const item = checklistItems.find(c => c.id === id)
@@ -594,8 +633,8 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 </div>
               )}
               <div className="space-y-1.5">
-                <label className="text-sm font-medium">キャストの備考（管理者も編集できます）</label>
-                <Textarea value={castNoteInput} onChange={e => setCastNoteInput(e.target.value)} rows={2} placeholder="キャストが入力した備考" />
+                <label className="text-sm font-medium">備考（キャスト・管理者どちらも編集できます）</label>
+                <Textarea value={castNoteInput} onChange={e => setCastNoteInput(e.target.value)} rows={2} placeholder="キャストとの連絡・申し送りなど" />
               </div>
               <div className="space-y-1.5">
                 <label className="text-sm font-medium">管理者メモ（任意・管理者のみ閲覧できます）</label>
