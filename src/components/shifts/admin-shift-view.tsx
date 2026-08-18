@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
@@ -62,6 +62,10 @@ const STATUS_LABEL: Record<ShiftStatus, string> = {
 }
 const STATUS_VARIANT: Record<ShiftStatus, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   draft: 'outline', submitted: 'secondary', confirmed: 'default', rejected: 'destructive', modification_requested: 'secondary',
+}
+// 修正依頼中はBadgeのvariantに無い色（紫）で目立たせる
+const STATUS_STYLE: Partial<Record<ShiftStatus, CSSProperties>> = {
+  modification_requested: { backgroundColor: 'var(--status-modification-requested)', color: 'white' },
 }
 
 export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, storeId, locationMode, areaLabel, roomLabel, checklistItems }: Props) {
@@ -435,7 +439,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                       </span>
                       <span className="font-medium text-sm truncate">{shift.cast?.display_name ?? '—'}</span>
                     </div>
-                    <Badge variant={STATUS_VARIANT[shift.status]} className="shrink-0">
+                    <Badge variant={STATUS_VARIANT[shift.status]} className="shrink-0" style={STATUS_STYLE[shift.status]}>
                       {STATUS_LABEL[shift.status]}
                     </Badge>
                   </div>
@@ -517,7 +521,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Badge variant={STATUS_VARIANT[shift.status]}>{STATUS_LABEL[shift.status]}</Badge>
+                        <Badge variant={STATUS_VARIANT[shift.status]} style={STATUS_STYLE[shift.status]}>{STATUS_LABEL[shift.status]}</Badge>
                         {shift.admin_note && (
                           <span title={shift.admin_note}>
                             <StickyNote className="h-3.5 w-3.5 text-muted-foreground" />
@@ -574,7 +578,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     {shift.rooms?.name && ` ・ ${shift.rooms.name}`}
                   </span>
                 </span>
-                <Badge variant={STATUS_VARIANT[shift.status]} className="shrink-0">{STATUS_LABEL[shift.status]}</Badge>
+                <Badge variant={STATUS_VARIANT[shift.status]} className="shrink-0" style={STATUS_STYLE[shift.status]}>{STATUS_LABEL[shift.status]}</Badge>
               </button>
             ))}
           </div>
@@ -597,7 +601,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                       修正申請を確認
                     </Link>
                   )}
-                  <Badge variant={STATUS_VARIANT[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
+                  <Badge variant={STATUS_VARIANT[detailShift.status]} style={STATUS_STYLE[detailShift.status]}>{STATUS_LABEL[detailShift.status]}</Badge>
                 </div>
               </div>
               <div className="space-y-1.5">
