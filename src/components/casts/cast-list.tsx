@@ -48,6 +48,8 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
+  // このセッション中にコピー用に発行したパスワードのキャッシュ（cast.id -> password）
+  const [generatedPasswords, setGeneratedPasswords] = useState<Record<string, string>>({})
   const supabase = createClient()
   const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedCasts, totalItems } = usePagination(casts)
 
@@ -157,6 +159,8 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload, email } : c))
             return
           }
+          // 手動で入力したパスワードで上書きされたので、コピー用キャッシュも合わせておく
+          setGeneratedPasswords(prev => ({ ...prev, [editing.id]: form.password }))
         }
         setCasts(casts.map(c => c.id === editing.id ? { ...c, ...payload, email } : c))
         toast.success('キャスト情報を更新しました')
@@ -183,22 +187,29 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   }
 
   // 発行後はパスワードを平文で保持していないため、常にパスワード込みでコピーするには
-  // その場で新しいパスワードを発行し直す（＝旧パスワードは使えなくなる）
-  async function issueNewPassword(userId: string): Promise<string | null> {
+  // その場で新しいパスワードを発行し直す（＝旧パスワードは使えなくなる）。
+  // 同じキャストに対して2回目以降コピーした時に毎回別のパスワードが発行されると、
+  // 直前にコピーして送った内容が無効になってしまうため、一度発行したパスワードは
+  // このセッション中（画面を離れるまで）使い回す
+  async function issueOrReusePassword(userId: string): Promise<string | null> {
+    const cached = generatedPasswords[userId]
+    if (cached) return cached
     const password = generatePassword()
     const res = await fetch('/api/admin/update-cast-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ userId, password }),
     })
-    return res.ok ? password : null
+    if (!res.ok) return null
+    setGeneratedPasswords(prev => ({ ...prev, [userId]: password }))
+    return password
   }
 
   async function copyAccountInfo() {
     if (!form.login_id) { toast.error('ユーザーIDを入力してください'); return }
     let password = form.password
     if (!password && editing) {
-      const issued = await issueNewPassword(editing.id)
+      const issued = await issueOrReusePassword(editing.id)
       if (!issued) { toast.error('パスワードの発行に失敗しました'); return }
       password = issued
     }
@@ -208,10 +219,10 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
 
   async function copyCastAccountInfo(cast: CastUser) {
     if (!cast.login_id) { toast.error('このキャストにはユーザーIDが設定されていません'); return }
-    const password = await issueNewPassword(cast.id)
+    const password = await issueOrReusePassword(cast.id)
     if (!password) { toast.error('パスワードの発行に失敗しました'); return }
     await navigator.clipboard.writeText(accountInfoText(cast.login_id, password, cast.email))
-    toast.success('新しいパスワードを発行してコピーしました')
+    toast.success('ログイン情報をコピーしました')
   }
 
   async function toggleActive(cast: CastUser) {
