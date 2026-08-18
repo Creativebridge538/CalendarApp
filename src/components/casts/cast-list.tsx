@@ -167,22 +167,41 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     }
   }
 
-  function accountInfoText(loginId: string, password: string) {
+  function accountInfoText(loginId: string, password: string, email?: string | null) {
     const lines = [`ログインURL: ${window.location.origin}/login`, `ログインID: ${loginId}`]
     if (password) lines.push(`パスワード: ${password}`)
+    if (email) lines.push(`メールアドレス: ${email}`)
     return lines.join('\n')
   }
 
   async function copyAccountInfo() {
     if (!form.login_id) { toast.error('ユーザーIDを入力してください'); return }
-    await navigator.clipboard.writeText(accountInfoText(form.login_id, form.password))
+    await navigator.clipboard.writeText(accountInfoText(form.login_id, form.password, form.email))
     toast.success(form.password ? 'ログイン情報をコピーしました' : 'ログイン情報をコピーしました（パスワードは未入力のため含まれません）')
   }
 
+  function generatePassword() {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789'
+    const bytes = crypto.getRandomValues(new Uint8Array(10))
+    return Array.from(bytes, b => chars[b % chars.length]).join('')
+  }
+
+  // 発行後はパスワードを平文で保持していないため、行からコピーする場合は
+  // 新しいパスワードを発行し直してからコピーする（＝旧パスワードは使えなくなる）
   async function copyCastAccountInfo(cast: CastUser) {
     if (!cast.login_id) { toast.error('このキャストにはユーザーIDが設定されていません'); return }
-    await navigator.clipboard.writeText(accountInfoText(cast.login_id, ''))
-    toast.success('ログイン情報をコピーしました（パスワードは編集画面で入力した場合のみ含まれます）')
+    if (!confirm(`「${cast.display_name ?? cast.login_id}」の新しいパスワードを発行してコピーします。今のパスワードは使えなくなります。よろしいですか？`)) return
+
+    const password = generatePassword()
+    const res = await fetch('/api/admin/update-cast-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: cast.id, password }),
+    })
+    if (!res.ok) { toast.error('パスワードの発行に失敗しました'); return }
+
+    await navigator.clipboard.writeText(accountInfoText(cast.login_id, password, cast.email))
+    toast.success('新しいパスワードを発行してコピーしました')
   }
 
   async function toggleActive(cast: CastUser) {
