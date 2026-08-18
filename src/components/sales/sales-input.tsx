@@ -28,9 +28,17 @@ interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
   platform: string; raw_units: number | string | null
   is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
+  daily_payment_at: string | null
   worked_hours: number | string | null
   bonus: number | string; deduction: number | string
   cast: { display_name: string | null } | null
+}
+
+// datetime-local inputは秒・タイムゾーンなしの "yyyy-MM-ddTHH:mm" 形式を要求する
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso)
+  const pad = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
 
 interface Props {
@@ -78,7 +86,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
     amount: '', raw_units: '',
-    is_daily_payment: false, rate_override: '', reward_rate_override: '',
+    is_daily_payment: false, rate_override: '', reward_rate_override: '', daily_payment_at: '',
     notes: '', worked_hours: '', bonus: '', deduction: '',
   }), [year, month])
   const emptyBulkRow = (date?: string): BulkRow => ({
@@ -170,6 +178,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       is_daily_payment: sale.is_daily_payment,
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
       reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
+      daily_payment_at: sale.daily_payment_at ? toDatetimeLocal(sale.daily_payment_at) : '',
       notes: sale.notes ?? '',
       worked_hours: sale.worked_hours != null ? String(sale.worked_hours) : '',
       bonus: Number(sale.bonus) ? String(sale.bonus) : '',
@@ -198,6 +207,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       is_daily_payment: form.is_daily_payment,
       rate_override: form.is_daily_payment && isPlatform && form.rate_override ? parseFloat(form.rate_override) : null,
       reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) / 100 : null,
+      daily_payment_at: form.is_daily_payment
+        ? new Date(form.daily_payment_at || Date.now()).toISOString()
+        : null,
       notes: form.notes || null,
       worked_hours: form.worked_hours ? parseFloat(form.worked_hours) : null,
       bonus: form.bonus ? parseInt(form.bonus) : 0,
@@ -409,7 +421,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <TableCell>
                       <div className="flex items-center gap-1 flex-wrap">
                         <Badge variant="outline">{PLATFORM_LABEL[sale.platform] ?? sale.platform}</Badge>
-                        {sale.is_daily_payment && <Badge variant="secondary">日払い</Badge>}
+                        {sale.is_daily_payment && (
+                          <Badge variant="secondary" className="whitespace-nowrap">
+                            日払い済み{sale.daily_payment_at && `（${format(new Date(sale.daily_payment_at), 'M/d HH:mm', { locale: ja })}）`}
+                          </Badge>
+                        )}
                       </div>
                     </TableCell>
                     <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
@@ -533,8 +549,15 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
               <div className="pt-3 border-t space-y-3">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <Checkbox checked={form.is_daily_payment} onCheckedChange={c => setForm({ ...form, is_daily_payment: !!c })} />
-                  日払い（この回だけ単価・報酬率を上書きする）
+                  <Checkbox
+                    checked={form.is_daily_payment}
+                    onCheckedChange={c => setForm({
+                      ...form,
+                      is_daily_payment: !!c,
+                      daily_payment_at: c ? (form.daily_payment_at || toDatetimeLocal(new Date().toISOString())) : '',
+                    })}
+                  />
+                  日払い済み（この回だけ単価・報酬率を上書きする）
                 </label>
                 {form.is_daily_payment && (
                   <div className="grid grid-cols-2 gap-3 pl-1">
@@ -550,6 +573,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                         <Input type="number" min="0" max="100" step="1" className="pr-8" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
                       </div>
+                    </div>
+                    <div className="space-y-1.5 col-span-2">
+                      <Label className="text-xs text-muted-foreground font-normal">日払い済み日時</Label>
+                      <Input type="datetime-local" value={form.daily_payment_at} onChange={e => setForm({ ...form, daily_payment_at: e.target.value })} />
                     </div>
                   </div>
                 )}

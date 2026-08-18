@@ -244,7 +244,7 @@ export function CastRewardDashboard({
                       <div key={i} className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-1.5 text-muted-foreground">
                           {PLATFORM_LABEL[r.platform] ?? r.platform}
-                          {r.is_daily_payment && <Badge variant="outline" className="text-[10px]">日払い</Badge>}
+                          {r.is_daily_payment && <Badge variant="outline" className="text-[10px]">日払い済み</Badge>}
                         </span>
                         <span className="tabular-nums">¥{r.amount.toLocaleString()}</span>
                       </div>

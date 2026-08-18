@@ -315,6 +315,7 @@ export type Database = {
           cast_id: string
           created_at: string
           created_by: string | null
+          daily_payment_at: string | null
           date: string
           deduction: number
           fx_rate_snapshot: number | null
@@ -337,6 +338,7 @@ export type Database = {
           cast_id: string
           created_at?: string
           created_by?: string | null
+          daily_payment_at?: string | null
           date: string
           deduction?: number
           fx_rate_snapshot?: number | null
@@ -359,6 +361,7 @@ export type Database = {
           cast_id?: string
           created_at?: string
           created_by?: string | null
+          daily_payment_at?: string | null
           date?: string
           deduction?: number
           fx_rate_snapshot?: number | null
