@@ -54,12 +54,13 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
   }
 
   async function handleSave() {
+    if (!form.area_id) { toast.error(`${areaLabel}を選択してください`); return }
     const payload = {
       name: form.name,
       capacity: form.capacity ? parseInt(form.capacity) : null,
       notes: form.notes || null,
       store_id: storeId,
-      area_id: form.area_id || null,
+      area_id: form.area_id,
     }
     if (editing) {
       const { error } = await supabase.from('rooms').update(payload).eq('id', editing.id)
@@ -92,14 +93,19 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
     <Card>
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>{roomLabel}管理</CardTitle>
-        <Button size="sm" onClick={openNew}><Plus className="h-4 w-4 mr-1" /> {roomLabel}追加</Button>
+        <Button size="sm" onClick={openNew} disabled={activeAreas.length === 0}><Plus className="h-4 w-4 mr-1" /> {roomLabel}追加</Button>
       </CardHeader>
       <CardContent>
+        {activeAreas.length === 0 && (
+          <p className="text-sm text-muted-foreground pb-4">
+            {roomLabel}を追加するには、先に{areaLabel}を登録してください
+          </p>
+        )}
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead>{roomLabel}名</TableHead>
-              {activeAreas.length > 0 && <TableHead>{areaLabel}</TableHead>}
+              <TableHead>{areaLabel}</TableHead>
               <TableHead className="text-right">収容人数</TableHead>
               <TableHead>備考</TableHead>
               <TableHead className="text-right">操作</TableHead>
@@ -116,7 +122,7 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
             {paged.map((room) => (
               <TableRow key={room.id}>
                 <TableCell className="font-medium">{room.name}</TableCell>
-                {activeAreas.length > 0 && <TableCell>{getAreaName(room.area_id)}</TableCell>}
+                <TableCell>{getAreaName(room.area_id)}</TableCell>
                 <TableCell className="text-right">{room.capacity ?? '—'}</TableCell>
                 <TableCell>{room.notes ?? '—'}</TableCell>
                 <TableCell className="text-right space-x-1">
@@ -143,24 +149,21 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
               <Label>{roomLabel}名 *</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
-            {activeAreas.length > 0 && (
-              <div className="space-y-1.5">
-                <Label>{areaLabel}</Label>
-                <Select value={form.area_id || 'none'} onValueChange={v => setForm({ ...form, area_id: v === 'none' ? '' : (v ?? '') })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder={`${areaLabel}を選択（任意）`}>
-                      {form.area_id ? (activeAreas.find(a => a.id === form.area_id)?.name ?? 'なし') : 'なし'}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="none">なし</SelectItem>
-                    {activeAreas.map(a => (
-                      <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
+            <div className="space-y-1.5">
+              <Label>{areaLabel} *</Label>
+              <Select value={form.area_id} onValueChange={v => setForm({ ...form, area_id: v ?? '' })}>
+                <SelectTrigger>
+                  <SelectValue placeholder={`${areaLabel}を選択`}>
+                    {activeAreas.find(a => a.id === form.area_id)?.name}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {activeAreas.map(a => (
+                    <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
             <div className="space-y-1.5">
               <Label>収容人数</Label>
               <Input type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
@@ -171,7 +174,7 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-              <Button onClick={handleSave} disabled={!form.name}>保存</Button>
+              <Button onClick={handleSave} disabled={!form.name || !form.area_id}>保存</Button>
             </div>
           </div>
         </DialogContent>
