@@ -752,19 +752,19 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 )}
                 <ChevronRight className="h-4 w-4 text-muted-foreground shrink-0" />
               </Link>
-              <div className="flex items-center justify-between mx-4 md:mx-0 mb-2 gap-2">
-                <div className="flex items-center gap-2 text-[10px] text-muted-foreground flex-nowrap overflow-x-auto">
-                  <span className="flex items-center gap-1 shrink-0">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.submitted }} />提出済み
+              <div className="flex items-center justify-between mx-4 md:mx-0 mb-2 gap-1.5">
+                <div className="flex items-center gap-1.5 text-[9px] text-muted-foreground flex-nowrap overflow-x-auto min-w-0">
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.submitted }} />提出済み
                   </span>
-                  <span className="flex items-center gap-1 shrink-0">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.confirmed }} />確定
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.confirmed }} />確定
                   </span>
-                  <span className="flex items-center gap-1 shrink-0">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.rejected }} />差し戻し
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.rejected }} />差し戻し
                   </span>
-                  <span className="flex items-center gap-1 shrink-0">
-                    <span className="h-2 w-2 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.modification_requested }} />修正依頼中
+                  <span className="flex items-center gap-0.5 shrink-0">
+                    <span className="h-1.5 w-1.5 rounded-full shrink-0" style={{ backgroundColor: STATUS_DOT.modification_requested }} />修正依頼中
                   </span>
                 </div>
                 <div className="inline-flex rounded-full bg-muted p-0.5 shrink-0">
@@ -772,7 +772,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                     type="button"
                     onClick={() => setCalendarMode('time')}
                     className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                      'px-2 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap',
                       calendarMode === 'time' ? 'bg-[var(--brand-accent)] text-white' : 'text-muted-foreground'
                     )}
                   >
@@ -782,7 +782,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                     type="button"
                     onClick={() => setCalendarMode('amount')}
                     className={cn(
-                      'px-3 py-1 rounded-full text-xs font-medium transition-colors',
+                      'px-2 py-1 rounded-full text-[11px] font-medium transition-colors whitespace-nowrap',
                       calendarMode === 'amount' ? 'bg-[var(--brand-accent)] text-white' : 'text-muted-foreground'
                     )}
                   >
