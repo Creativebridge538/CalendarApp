@@ -663,7 +663,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
 
   return (
     <div className="space-y-4">
-      <Card elevated className="rounded-none border-x-0 md:rounded-lg md:border-x">
+      <Card elevated className="rounded-none border-x-0 md:rounded-lg md:border-x overflow-visible">
         <CardHeader className="px-4 md:px-6 sticky top-0 z-20 bg-card">
           <div className="flex items-center justify-between gap-2">
             <button
