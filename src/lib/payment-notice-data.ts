@@ -16,7 +16,7 @@ export interface NoticeContent {
   from: string
   to: string
   rewardRate: number
-  salesRows: { date: string; platformLabel: string; amount: number; isDailyPayment: boolean }[]
+  salesRows: { date: string; platformLabel: string; amount: number; isDailyPayment: boolean; dailyPaymentAt: string | null }[]
   salesTotal: number
   baseReward: number
   bonus: number
@@ -30,7 +30,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
-    supabase.from('sales').select('date, platform, amount, is_daily_payment, reward_rate_override, bonus, deduction')
+    supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction')
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
       .order('date'),
@@ -64,7 +64,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     from, to, rewardRate,
     salesRows: salesRows.map(s => ({
       date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
-      amount: Number(s.amount), isDailyPayment: s.is_daily_payment,
+      amount: Number(s.amount), isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
     })),
     salesTotal, baseReward, bonus, deduction, totalReward,
   }

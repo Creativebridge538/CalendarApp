@@ -145,7 +145,12 @@ export default async function PaymentNoticePage({
             {salesRows.map((s, i) => (
               <tr key={i}>
                 <td>{format(new Date(s.date), 'M/d(E)', { locale: ja })}</td>
-                <td>{s.platformLabel}{s.isDailyPayment && '（日払い済み）'}</td>
+                <td>
+                  {s.platformLabel}
+                  {s.isDailyPayment && (s.dailyPaymentAt
+                    ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
+                    : '（日払い済み）')}
+                </td>
                 <td className="right">¥{s.amount.toLocaleString()}</td>
               </tr>
             ))}

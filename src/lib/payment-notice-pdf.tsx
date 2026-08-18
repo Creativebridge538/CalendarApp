@@ -119,7 +119,12 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
         {salesRows.map((s, i) => (
           <View key={i} style={styles.tableRow} wrap={false}>
             <Text style={styles.colDate}>{format(new Date(s.date), 'M/d(E)', { locale: ja })}</Text>
-            <Text style={styles.colPlatform}>{s.platformLabel}{s.isDailyPayment && '（日払い済み）'}</Text>
+            <Text style={styles.colPlatform}>
+              {s.platformLabel}
+              {s.isDailyPayment && (s.dailyPaymentAt
+                ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
+                : '（日払い済み）')}
+            </Text>
             <Text style={styles.colAmount}>¥{s.amount.toLocaleString()}</Text>
           </View>
         ))}
