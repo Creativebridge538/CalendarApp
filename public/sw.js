@@ -19,14 +19,16 @@ self.addEventListener('push', (event) => {
     data: { link: data.link || '/' },
   }
 
+  const badgeCount = typeof data.badge === 'number' ? data.badge : 1
+
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(title, options),
-      setAppBadge(),
+      setAppBadge(badgeCount),
       // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
       // 開いているページ（window/navigatorコンテキスト）側でも試させる
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+        for (const client of clientList) client.postMessage({ type: 'set-app-badge', count: badgeCount })
       }).catch(() => {}),
     ])
   )
@@ -58,11 +60,11 @@ function badgeTargets() {
   return targets
 }
 
-function setAppBadge() {
+function setAppBadge(count) {
   const targets = badgeTargets()
   // 成功したwindow側の単体テストはsetAppBadge(1)と数値を渡していた。
   // 引数なしのsetAppBadge()は「未指定」を表す別の呼び方で、実装によって挙動が違う可能性があるため揃える
-  return Promise.all(targets.map(t => t.setAppBadge(1).catch(() => {})))
+  return Promise.all(targets.map(t => t.setAppBadge(count).catch(() => {})))
 }
 
 function clearAppBadge() {

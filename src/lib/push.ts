@@ -69,7 +69,7 @@ export function listenForBadgeUpdates(): void {
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data?.type !== 'set-app-badge') return
     const nav = navigator as Navigator & { setAppBadge?: (count?: number) => Promise<void> }
-    nav.setAppBadge?.(1).catch(() => {})
+    nav.setAppBadge?.(event.data.count ?? 1).catch(() => {})
   })
 }
 

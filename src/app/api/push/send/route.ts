@@ -40,7 +40,11 @@ export async function POST(request: Request) {
     return NextResponse.json({ sent: 0, total: 0 })
   }
 
-  const payload = JSON.stringify({ title, body: body ?? undefined, link: link ?? undefined })
+  // ホーム画面アイコンのバッジに未読件数を反映する（setAppBadge(1)固定だと常に1のままになるため）
+  const { count: unreadCount } = await admin.from('notifications')
+    .select('*', { count: 'exact', head: true }).eq('user_id', user_id).is('read_at', null)
+
+  const payload = JSON.stringify({ title, body: body ?? undefined, link: link ?? undefined, badge: unreadCount ?? 1 })
 
   const results = await Promise.allSettled(
     subscriptions.map(sub =>
