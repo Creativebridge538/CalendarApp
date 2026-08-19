@@ -233,11 +233,6 @@ export function CastRewardDashboard({
                   </p>
                   <p className="text-lg font-bold tabular-nums">¥{detail.total.toLocaleString()}</p>
                 </div>
-                {detail.shift && (
-                  <p className="text-xs text-muted-foreground">
-                    シフト時間: {detail.shift.start_time.slice(0, 5)} 〜 {detail.shift.end_time.slice(0, 5)}
-                  </p>
-                )}
                 {detail.rows.length > 0 && (
                   <div className="space-y-1">
                     {detail.rows.map((r, i) => (
