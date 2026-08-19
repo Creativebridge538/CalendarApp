@@ -171,7 +171,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
         .eq('id', s.id)
         .select('id')
       const ok = !error && !!data && data.length > 0
-      return { id: s.id, ok, amount: converted.jpy }
+      if (!ok) console.error('[fx-bulk-change] update failed', { id: s.id, error, matched: data?.length ?? 0 })
+      return { id: s.id, ok, amount: converted.jpy, errorMessage: error?.message ?? null }
     }))
     setFxSaving(false)
 
@@ -182,7 +183,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       setSales(prev => prev.map(s => amountById.has(s.id) ? { ...s, amount: amountById.get(s.id)! } : s))
     }
     if (failed.length > 0) {
-      toast.error(`${succeeded.length}件更新しました（${failed.length}件は失敗）`)
+      const reason = failed[0].errorMessage ?? '更新条件に一致しませんでした（権限設定をご確認ください）'
+      toast.error(`${succeeded.length}件更新しました（${failed.length}件は失敗: ${reason}）`)
     } else {
       toast.success(`${succeeded.length}件の為替レートを更新しました`)
       setFxDialogOpen(false)
