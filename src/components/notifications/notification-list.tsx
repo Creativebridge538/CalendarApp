@@ -32,7 +32,6 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
   const [sendingCastTest, setSendingCastTest] = useState(false)
   const [remindCastId, setRemindCastId] = useState('all')
   const [sendingRemind, setSendingRemind] = useState(false)
-  const [badgeDebugText, setBadgeDebugText] = useState<string | null>(null)
   const supabase = createClient()
   const router = useRouter()
   const unreadCount = notifications.filter(n => !n.read_at).length
@@ -40,16 +39,6 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
   useEffect(() => {
     getPushSubscriptionState().then(setPushState).catch(() => setPushState('unsupported'))
     clearAppBadge()
-
-    // バッジ診断用：Service Workerがプッシュ受信時にローカルキャッシュへ書いた結果を読んで画面に出す。
-    // 原因が分かったら削除する
-    if ('caches' in window) {
-      caches.open('badge-debug-v1')
-        .then(cache => cache.match('/__badge-debug__'))
-        .then(res => res?.text())
-        .then(text => { if (text) setBadgeDebugText(text) })
-        .catch(() => {})
-    }
   }, [])
 
   async function togglePush() {
@@ -259,15 +248,6 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
             <p className="text-xs text-muted-foreground">
               iPhoneでは、Safariでホーム画面に追加してそのアイコンから開いた場合のみ通知を受け取れます。
             </p>
-          )}
-          {badgeDebugText && (
-            <div className="rounded-lg border p-2.5 space-y-1">
-              <p className="text-xs font-semibold">【バッジ診断結果】プッシュ受信時にService Workerが記録した内容</p>
-              <pre className="text-[11px] whitespace-pre-wrap break-all text-muted-foreground">{badgeDebugText}</pre>
-              <button type="button" className="text-[11px] text-muted-foreground underline" onClick={() => setBadgeDebugText(null)}>
-                閉じる
-              </button>
-            </div>
           )}
         </div>
       )}
