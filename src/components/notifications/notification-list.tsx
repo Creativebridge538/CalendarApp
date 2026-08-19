@@ -91,6 +91,19 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
     }
   }
 
+  // Service Workerを介さず、開いているこの画面から直接setAppBadgeを呼んで結果を見る。
+  // プッシュ配信には一切影響しない独立したテストなので、通知が壊れる心配なく試せる
+  async function testAppBadge() {
+    const nav = navigator as Navigator & { setAppBadge?: (n?: number) => Promise<void> }
+    if (!nav.setAppBadge) { toast.error('このブラウザ/画面ではsetAppBadgeが見つかりません'); return }
+    try {
+      await nav.setAppBadge(1)
+      toast.success('setAppBadge(1)を呼び出しました。アプリのアイコンにバッジは出ていますか？')
+    } catch (e) {
+      toast.error(`setAppBadgeでエラー: ${e instanceof Error ? e.message : String(e)}`, { duration: 15000 })
+    }
+  }
+
   async function sendTestNotification() {
     const { data, error } = await supabase
       .from('notifications')
@@ -215,12 +228,15 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
                   {pushState === 'subscribed' ? <BellRing className="h-3.5 w-3.5 shrink-0" /> : <BellOff className="h-3.5 w-3.5 shrink-0" />}
                   プッシュ通知（アプリを開いていなくても通知を受け取れます）
                 </p>
-                <div className="flex items-center gap-2 shrink-0">
+                <div className="flex items-center gap-2 shrink-0 flex-wrap">
                   {pushState === 'subscribed' && (
                     <Button size="sm" variant="outline" onClick={sendTestNotification}>
                       <Send className="h-3.5 w-3.5 mr-1" />通知テスト
                     </Button>
                   )}
+                  <Button size="sm" variant="outline" onClick={testAppBadge}>
+                    バッジ単体テスト
+                  </Button>
                   <Button size="sm" variant={pushState === 'subscribed' ? 'outline' : 'default'} onClick={togglePush}>
                     {pushState === 'subscribed' ? 'オフにする' : 'オンにする'}
                   </Button>
