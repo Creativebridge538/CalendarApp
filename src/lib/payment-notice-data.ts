@@ -69,3 +69,10 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     salesTotal, baseReward, bonus, deduction, totalReward,
   }
 }
+
+// 例: 20260815_55000_山田太郎_支払通知書.pdf（対象期間の終了日_支払額_本名(または源氏名)）
+export function noticeFileName(content: Pick<NoticeContent, 'to' | 'totalReward' | 'castRealName' | 'castName'>): string {
+  const date = content.to.replace(/-/g, '')
+  const name = (content.castRealName || content.castName || 'unknown').replace(/[/\\]/g, '-')
+  return `${date}_${content.totalReward}_${name}_支払通知書.pdf`
+}

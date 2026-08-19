@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit } from 'lucide-react'
+import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
@@ -136,6 +136,55 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   ), [sales, filterCast, filterPlatform, filterFrom, filterTo])
   const filtersActive = filterCast !== 'all' || filterPlatform !== 'all' || !!filterFrom || !!filterTo
   const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedSales, totalItems } = usePagination(filteredSales)
+
+  const [fxDialogOpen, setFxDialogOpen] = useState(false)
+  const [fxNewRate, setFxNewRate] = useState('')
+  const [fxSaving, setFxSaving] = useState(false)
+
+  // 為替レートが実際に金額計算へ影響する行だけを対象にする
+  // （FC2は円建てのため対象外／固定単価モードのプラットフォームも対象外／日払いのレート上書き行はそちらが優先されるため対象外）
+  function usesFxRate(platform: string): boolean {
+    if (platform === 'manual' || platform === 'fc2') return false
+    const config = platformSettings[platform as PlatformKey]
+    return (config?.mode ?? 'formula') !== 'fixed'
+  }
+  const fxTargets = useMemo(
+    () => filteredSales.filter(s => usesFxRate(s.platform) && s.raw_units != null && s.rate_override == null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [filteredSales, platformSettings]
+  )
+
+  async function handleFxBulkChange() {
+    const newRate = parseFloat(fxNewRate)
+    if (!newRate || newRate <= 0) { toast.error('為替レートを入力してください'); return }
+    if (fxTargets.length === 0) { toast.error('対象の売上がありません'); return }
+
+    setFxSaving(true)
+    const results = await Promise.all(fxTargets.map(async s => {
+      const platform = s.platform as PlatformKey
+      const rawUnits = Number(s.raw_units)
+      const converted = calcPlatformAmount(platform, rawUnits, platformSettings[platform], newRate, null)
+      const { error } = await supabase.from('sales')
+        .update({ amount: converted.jpy, usd_amount: converted.usd, fx_rate_snapshot: newRate })
+        .eq('id', s.id)
+      return { id: s.id, error, amount: converted.jpy }
+    }))
+    setFxSaving(false)
+
+    const succeeded = results.filter(r => !r.error)
+    const failed = results.filter(r => r.error)
+    if (succeeded.length > 0) {
+      const amountById = new Map(succeeded.map(r => [r.id, r.amount]))
+      setSales(prev => prev.map(s => amountById.has(s.id) ? { ...s, amount: amountById.get(s.id)! } : s))
+    }
+    if (failed.length > 0) {
+      toast.error(`${succeeded.length}件更新しました（${failed.length}件は失敗）`)
+    } else {
+      toast.success(`${succeeded.length}件の為替レートを更新しました`)
+      setFxDialogOpen(false)
+      setFxNewRate('')
+    }
+  }
 
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
@@ -353,6 +402,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <Link href={`/admin/sales?year=${next.year}&month=${next.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
                 翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
               </Link>
+              <Button size="sm" variant="outline" onClick={() => setFxDialogOpen(true)}><RefreshCw className="h-3.5 w-3.5 mr-1" />為替を一括変更</Button>
               <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1" />追加</Button>
             </div>
           </div>
@@ -753,6 +803,40 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               </div>
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={fxDialogOpen} onOpenChange={o => { setFxDialogOpen(o); if (!o) setFxNewRate('') }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>為替レートを一括変更</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              現在の絞り込み条件（{filterFrom || '指定なし'}〜{filterTo || '指定なし'}・
+              {filterCast === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCast)?.display_name ?? '')}・
+              {filterPlatform === 'all' ? '全プラットフォーム' : PLATFORM_LABEL[filterPlatform]}）に一致する、
+              為替レートを使用しているプラットフォーム売上の金額を、新しいレートで再計算します。
+            </p>
+            <div className="rounded-md border px-3 py-2 text-sm">
+              対象件数: <span className="font-medium">{fxTargets.length}件</span>
+              {fxTargets.length === 0 && <span className="text-muted-foreground">（絞り込み条件を調整してください）</span>}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground">新しい為替レート（USD/JPY）</Label>
+              <Input
+                type="number" min="0" step="0.01" value={fxNewRate}
+                onChange={e => setFxNewRate(e.target.value)}
+                placeholder={usdJpyRate != null ? `現在の設定値: ${usdJpyRate}` : '例: 150.5'}
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setFxDialogOpen(false)}>キャンセル</Button>
+              <Button onClick={handleFxBulkChange} disabled={fxSaving || fxTargets.length === 0}>
+                <RefreshCw className="h-3.5 w-3.5 mr-1" />{fxSaving ? '更新中...' : `${fxTargets.length}件を更新`}
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </div>

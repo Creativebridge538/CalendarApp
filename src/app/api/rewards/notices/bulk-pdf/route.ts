@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
-import { fetchNoticeContent } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 
 interface NoticeRequest { cast_id: string; from: string; to: string; issued_at: string }
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
     const content = await fetchNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
     if (!content) { console.error('[bulk-pdf] cast not found in store', { cast_id: n.cast_id }); return null }
     const buffer = await renderToBuffer(NoticeDocument({ content, issuedAt: n.issued_at }))
-    const filename = `${content.castName || 'unknown'}_${n.from}_${n.to}.pdf`.replace(/[/\\]/g, '-')
+    const filename = noticeFileName(content)
     return { filename, buffer }
   }))
 

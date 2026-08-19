@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { PrintButton } from './print-button'
+import { DownloadPdfButton } from './download-button'
 import { fetchNoticeContent } from '@/lib/payment-notice-data'
 
 export default async function PaymentNoticePage({
@@ -90,7 +91,8 @@ export default async function PaymentNoticePage({
         table.bank-table .bank-header td { font-weight: bold; }
       `}</style>
 
-      <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end' }}>
+      <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+        <DownloadPdfButton castId={cast_id} from={from} to={to} />
         <PrintButton />
       </div>
 
@@ -181,7 +183,8 @@ export default async function PaymentNoticePage({
         )}
 
         <div style={{ fontSize: 11, color: '#555', paddingTop: 8, borderTop: '1px dotted #ccc' }}>
-          ※本明細に関するお問い合わせは店舗管理者までご連絡ください
+          ※本明細に関するお問い合わせは店舗管理者までご連絡ください<br />
+          ※本支払通知書の受領後、1週間以内に記載内容に誤りがある旨のご連絡がない場合は、記載内容のとおりご確認いただいたものとみなします。
         </div>
       </div>
     </div>

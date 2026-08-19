@@ -154,7 +154,10 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
           </View>
         )}
 
-        <Text style={styles.footer}>※本明細に関するお問い合わせは店舗管理者までご連絡ください</Text>
+        <Text style={styles.footer}>
+          ※本明細に関するお問い合わせは店舗管理者までご連絡ください{'\n'}
+          ※本支払通知書の受領後、1週間以内に記載内容に誤りがある旨のご連絡がない場合は、記載内容のとおりご確認いただいたものとみなします。
+        </Text>
       </Page>
     </Document>
   )
