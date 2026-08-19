@@ -24,6 +24,9 @@ export default async function CastShiftsPage() {
     supabase.from('sales').select('date, amount, shift_id, is_daily_payment, reward_rate_override').eq('cast_id', user.id),
   ])
 
+  const { count: unreadNotificationCount } = await supabase.from('notifications')
+    .select('*', { count: 'exact', head: true }).eq('user_id', user.id).is('read_at', null)
+
   const amountByDate: Record<string, number> = {}
   const salesByShiftId: Record<string, { amount: number; reward: number }> = {}
   const rewardRate = Number(profile.reward_rate)
@@ -55,6 +58,7 @@ export default async function CastShiftsPage() {
         rewardSummary={rewardSummary}
         amountByDate={amountByDate}
         salesByShiftId={salesByShiftId}
+        unreadNotificationCount={unreadNotificationCount ?? 0}
       />
     </div>
   )

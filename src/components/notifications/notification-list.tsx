@@ -39,6 +39,14 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
   useEffect(() => {
     getPushSubscriptionState().then(setPushState).catch(() => setPushState('unsupported'))
     clearAppBadge()
+
+    // 通知ページを開いた時点で全件既読にする（ベルアイコンの未読件数バッジをここで消すため）
+    const unreadIds = initial.filter(n => !n.read_at).map(n => n.id)
+    if (unreadIds.length > 0) {
+      supabase.from('notifications').update({ read_at: new Date().toISOString() }).in('id', unreadIds)
+        .then(() => setNotifications(prev => prev.map(n => unreadIds.includes(n.id) ? { ...n, read_at: n.read_at ?? new Date().toISOString() } : n)))
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   async function togglePush() {

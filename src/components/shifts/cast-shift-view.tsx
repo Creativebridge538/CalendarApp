@@ -82,6 +82,7 @@ interface Props {
   rewardSummary: MonthToDateSummary
   amountByDate: Record<string, number>
   salesByShiftId: Record<string, { amount: number; reward: number }>
+  unreadNotificationCount: number
 }
 
 const HOUR_HEIGHT = 56
@@ -200,7 +201,8 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, castName, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, castName, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId, unreadNotificationCount: initialUnreadNotificationCount }: Props) {
+  const [unreadNotificationCount, setUnreadNotificationCount] = useState(initialUnreadNotificationCount)
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
   const [calendarMode, setCalendarMode] = useState<'time' | 'amount'>('time')
@@ -281,6 +283,20 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
             return prev.map(s => s.id === row.id ? joined : s)
           })
         }
+      )
+      .subscribe()
+    return () => { supabase.removeChannel(channel) }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [castId])
+
+  // 新しい通知が届いたら、リロードなしにベルアイコンの未読件数を増やす
+  useEffect(() => {
+    const channel = supabase
+      .channel(`cast-notifications-${castId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${castId}` },
+        () => setUnreadNotificationCount(prev => prev + 1)
       )
       .subscribe()
     return () => { supabase.removeChannel(channel) }
@@ -707,10 +723,19 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
             <div className="flex items-center gap-1 shrink-0">
               <Link
                 href="/notifications"
-                className="p-1.5 rounded-full hover:bg-muted text-muted-foreground"
+                className="relative p-1.5 rounded-full hover:bg-muted text-muted-foreground"
                 aria-label="通知"
+                onClick={() => setUnreadNotificationCount(0)}
               >
                 <Bell className="h-5 w-5" />
+                {unreadNotificationCount > 0 && (
+                  <span
+                    className="absolute top-0.5 right-0.5 min-w-[1rem] h-4 px-1 rounded-full text-[10px] font-bold text-white flex items-center justify-center"
+                    style={{ backgroundColor: 'var(--status-rejected, #D96C6C)' }}
+                  >
+                    {unreadNotificationCount > 99 ? '99+' : unreadNotificationCount}
+                  </span>
+                )}
               </Link>
               <button
                 type="button"
