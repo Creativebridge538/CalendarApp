@@ -3,7 +3,6 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { PrintButton } from './print-button'
 import { DownloadPdfButton } from './download-button'
 import { fetchNoticeContent } from '@/lib/payment-notice-data'
 
@@ -93,7 +92,6 @@ export default async function PaymentNoticePage({
 
       <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
         <DownloadPdfButton castId={cast_id} from={from} to={to} />
-        <PrintButton />
       </div>
 
       <div className="notice-page">
