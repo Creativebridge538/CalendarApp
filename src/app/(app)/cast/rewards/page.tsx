@@ -3,7 +3,6 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { CastRewardDashboard } from '@/components/rewards/cast-reward-dashboard'
-import { shiftHours } from '@/lib/shift-hours'
 
 function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
@@ -66,22 +65,16 @@ export default async function CastRewardsPage() {
 
   const shiftsByDate = new Map(shiftsList.map(s => [s.date, s]))
 
-  // 日付ごとの勤務時間合計（同日に複数シフトがある場合は合算）
+  // 勤務時間は「売上入力時に管理者が稼働時間を登録した分」だけを対象にする。
+  // シフトの予定時間は実際の稼働時間とは限らないため、時給計算などに使わない。
+  // 稼働時間が未登録の売上は、時間関連の集計からは除外する（金額自体は他の集計には引き続き含まれる）
   const hoursByDate = new Map<string, number>()
-  for (const s of shiftsList) {
-    hoursByDate.set(s.date, (hoursByDate.get(s.date) ?? 0) + shiftHours(s.start_time, s.end_time))
-  }
-  // 売上入力時に管理者が稼働時間を入力していれば、シフトの時間より優先して反映する
-  const workedHoursByDate = new Map<string, number>()
   for (const s of salesList) {
     if (s.worked_hours == null) continue
-    workedHoursByDate.set(s.date, (workedHoursByDate.get(s.date) ?? 0) + Number(s.worked_hours))
-  }
-  for (const [date, hours] of workedHoursByDate.entries()) {
-    hoursByDate.set(date, hours)
+    hoursByDate.set(s.date, (hoursByDate.get(s.date) ?? 0) + Number(s.worked_hours))
   }
 
-  // 出勤日数・時間は「実際に出勤し終えたもの」だけを対象にする（未来日・未確定のシフトは予定でしかないため除外）
+  // 出勤日数は「実際に出勤し終えたもの」だけを対象にする（未来日・未確定のシフトは予定でしかないため除外）
   const attendedShiftsThisMonth = shiftsList.filter(s => s.date <= today && s.status === 'confirmed')
   const attendedDatesThisMonth = new Set(attendedShiftsThisMonth.map(s => s.date))
 
@@ -97,8 +90,7 @@ export default async function CastRewardsPage() {
     calendarDays.push({
       date, day: d,
       amount: salesByDate.get(date)?.total ?? 0,
-      // まだ出勤していない（未来日・未確定）シフトの時間は表示しない
-      hours: attendedDatesThisMonth.has(date) ? (hoursByDate.get(date) ?? 0) : 0,
+      hours: hoursByDate.get(date) ?? 0,
       isToday: date === today,
     })
   }
@@ -117,7 +109,14 @@ export default async function CastRewardsPage() {
   const avgPerWorkedDay = workedDaysThisMonth > 0 ? Math.round(thisMonthTotal / workedDaysThisMonth) : 0
 
   const attendanceDaysThisMonth = attendedDatesThisMonth.size
-  const totalHoursThisMonth = [...attendedDatesThisMonth].reduce((sum, date) => sum + (hoursByDate.get(date) ?? 0), 0)
+  const totalHoursThisMonth = [...hoursByDate.entries()]
+    .filter(([date]) => date >= monthStart && date <= monthEnd)
+    .reduce((sum, [, hours]) => sum + hours, 0)
+
+  // 時給は「稼働時間が登録されている売上」だけを対象に計算する（未登録の売上はここに含めない）
+  const salesWithHoursThisMonth = salesList.filter(s => s.date >= monthStart && s.date <= monthEnd && s.worked_hours != null)
+  const amountWithHoursThisMonth = salesWithHoursThisMonth.reduce((sum, s) => sum + Number(s.amount), 0)
+  const hourlyWage = totalHoursThisMonth > 0 ? Math.round(amountWithHoursThisMonth / totalHoursThisMonth) : null
 
   // 今月のプラットフォーム別内訳
   const platformBreakdownMap = new Map<string, number>()
@@ -210,6 +209,7 @@ export default async function CastRewardsPage() {
         avgPerWorkedDay={avgPerWorkedDay}
         attendanceDaysThisMonth={attendanceDaysThisMonth}
         totalHoursThisMonth={totalHoursThisMonth}
+        hourlyWage={hourlyWage}
         platformBreakdown={platformBreakdown}
         trend={trend}
         weekday={weekday}
