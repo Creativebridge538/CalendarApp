@@ -33,9 +33,18 @@ export async function POST(request: Request) {
 
   if (createError) {
     console.error('create-cast: createUser failed', createError)
-    const message = createError.message.includes('already registered')
-      ? 'このメールアドレスは既に登録されています'
-      : 'キャストの作成に失敗しました。時間をおいて再度お試しください'
+    let message: string
+    if (createError.message.includes('already registered') || createError.message.includes('already been registered')) {
+      message = 'このメールアドレスは既に登録されています'
+    } else if (createError.message.toLowerCase().includes('password')) {
+      message = `パスワードが要件を満たしていません（${createError.message}）`
+    } else if (createError.message.toLowerCase().includes('email')) {
+      message = `メールアドレスが不正です（${createError.message}）`
+    } else if (createError.status === 429 || createError.code === 'over_request_rate_limit' || createError.message.toLowerCase().includes('rate limit')) {
+      message = 'リクエストが多すぎます。しばらく時間をおいてから再度お試しください'
+    } else {
+      message = `キャストの作成に失敗しました: ${createError.message}`
+    }
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
@@ -58,7 +67,7 @@ export async function POST(request: Request) {
     await admin.auth.admin.deleteUser(newUser.user.id)
     const message = updateError.message.includes('duplicate') || updateError.code === '23505'
       ? 'このユーザーIDは既に使用されています'
-      : 'プロフィール設定に失敗しました'
+      : `プロフィール設定に失敗しました: ${updateError.message}`
     return NextResponse.json({ error: message }, { status: 400 })
   }
 

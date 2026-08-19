@@ -9,7 +9,8 @@
       "mcp__Claude_Preview__preview_fill",
       "mcp__Claude_Preview__preview_click",
       "Bash(npx tsc --noEmit *)",
-      "Bash(supabase status *)"
+      "Bash(supabase status *)",
+      "Bash(git push:*)"
     ]
   }
 }
