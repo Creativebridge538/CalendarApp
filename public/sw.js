@@ -19,16 +19,21 @@ self.addEventListener('push', (event) => {
     data: { link: data.link || '/' },
   }
 
+  // バッジ設定を先に済ませてから通知を出す。並行実行だと、通知表示のタイミングで
+  // iOS側がこのプッシュの処理を完了したとみなし、他の処理(バッジ設定)が完了する前に
+  // Service Workerごと止めてしまっている可能性があるため、順序を入れ替えて試す。
+  // 通知表示は必ず1回だけ行う（2回出すと通知自体が握りつぶされることが分かっているため）
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(title, options),
-      setAppBadge(),
-      // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
-      // 開いているページ（window/navigatorコンテキスト）側でも試させる
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
-      }),
-    ])
+    setAppBadge()
+      .catch(() => {})
+      .then(() => self.registration.showNotification(title, options))
+      .then(() => (
+        // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
+        // 開いているページ（window/navigatorコンテキスト）側でも試させる（通知表示後、失敗しても無視）
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+          for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+        }).catch(() => {})
+      ))
   )
 })
 
