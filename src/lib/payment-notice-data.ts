@@ -70,9 +70,9 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   }
 }
 
-// 例: 20260815_55000_山田太郎_支払通知書.pdf（対象期間の終了日_支払額_本名(または源氏名)）
-export function noticeFileName(content: Pick<NoticeContent, 'to' | 'totalReward' | 'castRealName' | 'castName'>): string {
-  const date = content.to.replace(/-/g, '')
+// 例: 20260801-20260815_55000_山田太郎_支払通知書.pdf（対象期間(開始日-終了日)_支払額_本名(または源氏名)）
+export function noticeFileName(content: Pick<NoticeContent, 'from' | 'to' | 'totalReward' | 'castRealName' | 'castName'>): string {
+  const period = `${content.from.replace(/-/g, '')}-${content.to.replace(/-/g, '')}`
   const name = (content.castRealName || content.castName || 'unknown').replace(/[/\\]/g, '-')
-  return `${date}_${content.totalReward}_${name}_支払通知書.pdf`
+  return `${period}_${content.totalReward}_${name}_支払通知書.pdf`
 }
