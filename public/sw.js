@@ -60,7 +60,9 @@ function badgeTargets() {
 
 function setAppBadge() {
   const targets = badgeTargets()
-  return Promise.all(targets.map(t => t.setAppBadge().catch(() => {})))
+  // 成功したwindow側の単体テストはsetAppBadge(1)と数値を渡していた。
+  // 引数なしのsetAppBadge()は「未指定」を表す別の呼び方で、実装によって挙動が違う可能性があるため揃える
+  return Promise.all(targets.map(t => t.setAppBadge(1).catch(() => {})))
 }
 
 function clearAppBadge() {

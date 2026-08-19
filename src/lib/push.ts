@@ -68,8 +68,8 @@ export function listenForBadgeUpdates(): void {
   if (!isPushSupported()) return
   navigator.serviceWorker.addEventListener('message', (event) => {
     if (event.data?.type !== 'set-app-badge') return
-    const nav = navigator as Navigator & { setAppBadge?: () => Promise<void> }
-    nav.setAppBadge?.().catch(() => {})
+    const nav = navigator as Navigator & { setAppBadge?: (count?: number) => Promise<void> }
+    nav.setAppBadge?.(1).catch(() => {})
   })
 }
 
