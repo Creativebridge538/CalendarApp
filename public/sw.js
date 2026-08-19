@@ -12,23 +12,33 @@ self.addEventListener('push', (event) => {
   }
 
   const title = data.title || '通知'
-  const options = {
-    body: data.body || '',
-    icon: '/icon-192.png',
-    badge: '/icon-192.png',
-    data: { link: data.link || '/' },
-  }
 
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(title, options),
-      setAppBadge().then(report => showBadgeDebugNotification(report)),
-      // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
-      // 開いているページ（window/navigatorコンテキスト）側でも試させる
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
-      }),
-    ])
+    setAppBadge().then(report => {
+      // iOSは1プッシュにつき通知は1件までしか許容しないため、診断結果は別通知にせず
+      // 同じ通知のbodyに追記して見えるようにする（原因が分かったら元に戻す）
+      const debugLine = report.found.length === 0
+        ? '[badge診断] setAppBadgeが見つかりません(registration/navigator/selfどこにも無い)'
+        : report.errors.length > 0
+          ? `[badge診断] 発見:${report.found.join(',')} エラー:${report.errors.join(' | ')}`
+          : `[badge診断] 発見:${report.found.join(',')} エラーなし`
+
+      const options = {
+        body: `${data.body || ''}\n\n${debugLine}`,
+        icon: '/icon-192.png',
+        badge: '/icon-192.png',
+        data: { link: data.link || '/' },
+      }
+
+      return Promise.all([
+        self.registration.showNotification(title, options),
+        // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
+        // 開いているページ（window/navigatorコンテキスト）側でも試させる
+        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+          for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+        }),
+      ])
+    })
   )
 })
 
@@ -61,21 +71,10 @@ function setAppBadge() {
   const report = { found: targets.map(([name]) => name), errors: [] }
   return Promise.all(
     targets.map(([name, t]) => t.setAppBadge().catch(e => { report.errors.push(`${name}: ${e && e.message ? e.message : e}`) }))
-  ).then(() => report)
+  ).then(() => report).catch(e => { report.errors.push(`unexpected: ${e && e.message ? e.message : e}`); return report })
 }
 
 function clearAppBadge() {
   const targets = badgeTargets()
   return Promise.all(targets.map(([, t]) => t.clearAppBadge().catch(() => {})))
-}
-
-// 実機のコンソールを見なくても原因を確認できるよう、バッジ設定の結果を通知として出す一時的な診断用。
-// 原因が分かったら削除する
-function showBadgeDebugNotification(report) {
-  const body = report.found.length === 0
-    ? 'setAppBadgeが見つかりませんでした（registration/navigator/selfのどこにも存在しない）'
-    : report.errors.length > 0
-      ? `見つかった場所: ${report.found.join(', ')} / エラー: ${report.errors.join(' | ')}`
-      : `見つかった場所: ${report.found.join(', ')} / エラーなしで呼び出し完了`
-  return self.registration.showNotification('【診断】バッジ設定結果', { body })
 }
