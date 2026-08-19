@@ -19,21 +19,16 @@ self.addEventListener('push', (event) => {
     data: { link: data.link || '/' },
   }
 
-  // バッジ設定を先に済ませてから通知を出す。並行実行だと、通知表示のタイミングで
-  // iOS側がこのプッシュの処理を完了したとみなし、他の処理(バッジ設定)が完了する前に
-  // Service Workerごと止めてしまっている可能性があるため、順序を入れ替えて試す。
-  // 通知表示は必ず1回だけ行う（2回出すと通知自体が握りつぶされることが分かっているため）
+  // 通知表示・バッジ設定・診断ログ送信は互いに独立させる（どれか1つが失敗/遅延しても
+  // 他に影響しないように）。通知表示は必ず1回だけ行う
   event.waitUntil(
-    setAppBadge()
-      .catch(() => {})
-      .then(() => self.registration.showNotification(title, options))
-      .then(() => (
-        // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
-        // 開いているページ（window/navigatorコンテキスト）側でも試させる（通知表示後、失敗しても無視）
-        self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-          for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
-        }).catch(() => {})
-      ))
+    Promise.all([
+      self.registration.showNotification(title, options),
+      setAppBadge(),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+      }).catch(() => {}),
+    ])
   )
 })
 
@@ -51,24 +46,35 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-// getNotifications()の件数に頼らず、プッシュを受けたら無条件にバッジを立てる
-// （表示直後はgetNotifications()がまだ反映されていないことがあり、件数ベースだと取りこぼすため）
 // 実装によってsetAppBadgeがself.registration / self.navigator / self のどこに生えるか差があるため、
 // 見つかった場所を順番に全部試す（1つの実装だけに賭けない）
 function badgeTargets() {
   const targets = []
-  if (self.registration && self.registration.setAppBadge) targets.push(self.registration)
-  if (self.navigator && self.navigator.setAppBadge) targets.push(self.navigator)
-  if (self.setAppBadge) targets.push(self)
+  if (self.registration && self.registration.setAppBadge) targets.push(['registration', self.registration])
+  if (self.navigator && self.navigator.setAppBadge) targets.push(['navigator', self.navigator])
+  if (self.setAppBadge) targets.push(['self', self])
   return targets
+}
+
+// 実機のコンソールを見なくても原因を確認できるよう、結果をサーバーにこっそり送る（通知表示には一切影響しない）。
+// 原因が分かったら削除する
+function reportBadgeDebug(report) {
+  return fetch('/api/debug/badge-log', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(report),
+  }).catch(() => {})
 }
 
 function setAppBadge() {
   const targets = badgeTargets()
-  return Promise.all(targets.map(t => t.setAppBadge().catch(() => {})))
+  const report = { at: 'push', found: targets.map(([name]) => name), errors: [] }
+  return Promise.all(
+    targets.map(([name, t]) => t.setAppBadge().catch(e => { report.errors.push(`${name}: ${e && e.message ? e.message : e}`) }))
+  ).then(() => reportBadgeDebug(report)).catch(e => reportBadgeDebug({ ...report, unexpected: String(e) }))
 }
 
 function clearAppBadge() {
   const targets = badgeTargets()
-  return Promise.all(targets.map(t => t.clearAppBadge().catch(() => {})))
+  return Promise.all(targets.map(([, t]) => t.clearAppBadge().catch(() => {})))
 }
