@@ -377,12 +377,12 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             {!editing ? (
               <div className="space-y-1.5">
                 <Label>パスワード *</Label>
-                <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="8文字以上" />
+                <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="8文字以上" autoComplete="new-password" />
               </div>
             ) : (
               <div className="space-y-1.5">
                 <Label>パスワード変更</Label>
-                <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="変更する場合のみ入力（8文字以上）" />
+                <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="変更する場合のみ入力（8文字以上）" autoComplete="new-password" />
               </div>
             )}
             <div className="space-y-1.5">
