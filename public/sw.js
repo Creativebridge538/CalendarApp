@@ -19,16 +19,16 @@ self.addEventListener('push', (event) => {
     data: { link: data.link || '/' },
   }
 
-  // 通知表示・バッジ設定・診断ログ送信は互いに独立させる（どれか1つが失敗/遅延しても
-  // 他に影響しないように）。通知表示は必ず1回だけ行う
+  // event.waitUntil()は複数回呼べて、それぞれ独立したPromiseとして扱われる。
+  // 通知表示をPromise.allで束ねると、他の処理(バッジ設定やログ送信)が長引いた時に
+  // 通知表示そのものも巻き添えで遅延・キャンセルされる可能性があるため、完全に分離する。
+  // 通知表示は必ず1回だけ行う
+  event.waitUntil(self.registration.showNotification(title, options))
+  event.waitUntil(setAppBadge())
   event.waitUntil(
-    Promise.all([
-      self.registration.showNotification(title, options),
-      setAppBadge(),
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
-      }).catch(() => {}),
-    ])
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+    }).catch(() => {})
   )
 })
 
@@ -59,11 +59,14 @@ function badgeTargets() {
 // 実機のコンソールを見なくても原因を確認できるよう、結果をサーバーにこっそり送る（通知表示には一切影響しない）。
 // 原因が分かったら削除する
 function reportBadgeDebug(report) {
-  return fetch('/api/debug/badge-log', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(report),
-  }).catch(() => {})
+  return Promise.race([
+    fetch('/api/debug/badge-log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(report),
+    }).catch(() => {}),
+    new Promise(resolve => setTimeout(resolve, 3000)),
+  ])
 }
 
 function setAppBadge() {
