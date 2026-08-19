@@ -22,7 +22,7 @@ self.addEventListener('push', (event) => {
   event.waitUntil(
     Promise.all([
       self.registration.showNotification(title, options),
-      setAppBadge(),
+      setAppBadge().then(report => showBadgeDebugNotification(report)),
       // Service Worker側でのAPI呼び出しが効かない環境向けの保険として、
       // 開いているページ（window/navigatorコンテキスト）側でも試させる
       self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
@@ -46,24 +46,36 @@ self.addEventListener('notificationclick', (event) => {
   )
 })
 
-// getNotifications()の件数に頼らず、プッシュを受けたら無条件にバッジを立てる
-// （表示直後はgetNotifications()がまだ反映されていないことがあり、件数ベースだと取りこぼすため）
 // 実装によってsetAppBadgeがself.registration / self.navigator / self のどこに生えるか差があるため、
 // 見つかった場所を順番に全部試す（1つの実装だけに賭けない）
 function badgeTargets() {
   const targets = []
-  if (self.registration && self.registration.setAppBadge) targets.push(self.registration)
-  if (self.navigator && self.navigator.setAppBadge) targets.push(self.navigator)
-  if (self.setAppBadge) targets.push(self)
+  if (self.registration && self.registration.setAppBadge) targets.push(['registration', self.registration])
+  if (self.navigator && self.navigator.setAppBadge) targets.push(['navigator', self.navigator])
+  if (self.setAppBadge) targets.push(['self', self])
   return targets
 }
 
 function setAppBadge() {
   const targets = badgeTargets()
-  return Promise.all(targets.map(t => t.setAppBadge().catch(() => {})))
+  const report = { found: targets.map(([name]) => name), errors: [] }
+  return Promise.all(
+    targets.map(([name, t]) => t.setAppBadge().catch(e => { report.errors.push(`${name}: ${e && e.message ? e.message : e}`) }))
+  ).then(() => report)
 }
 
 function clearAppBadge() {
   const targets = badgeTargets()
-  return Promise.all(targets.map(t => t.clearAppBadge().catch(() => {})))
+  return Promise.all(targets.map(([, t]) => t.clearAppBadge().catch(() => {})))
+}
+
+// 実機のコンソールを見なくても原因を確認できるよう、バッジ設定の結果を通知として出す一時的な診断用。
+// 原因が分かったら削除する
+function showBadgeDebugNotification(report) {
+  const body = report.found.length === 0
+    ? 'setAppBadgeが見つかりませんでした（registration/navigator/selfのどこにも存在しない）'
+    : report.errors.length > 0
+      ? `見つかった場所: ${report.found.join(', ')} / エラー: ${report.errors.join(' | ')}`
+      : `見つかった場所: ${report.found.join(', ')} / エラーなしで呼び出し完了`
+  return self.registration.showNotification('【診断】バッジ設定結果', { body })
 }
