@@ -56,17 +56,14 @@ function badgeTargets() {
   return targets
 }
 
-// 実機のコンソールを見なくても原因を確認できるよう、結果をサーバーにこっそり送る（通知表示には一切影響しない）。
+// 実機のコンソールを見なくても原因を確認できるよう、結果をブラウザのローカルキャッシュに書いておく。
+// サーバーへのfetchはネットワーク往復が絡んで通知表示自体を巻き込んで止めていた疑いがあるため、
+// ネットワークを使わないCache APIに変更。ページ側（notification-list.tsx）がこれを読んで画面に表示する。
 // 原因が分かったら削除する
 function reportBadgeDebug(report) {
-  return Promise.race([
-    fetch('/api/debug/badge-log', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(report),
-    }).catch(() => {}),
-    new Promise(resolve => setTimeout(resolve, 3000)),
-  ])
+  return caches.open('badge-debug-v1')
+    .then(cache => cache.put('/__badge-debug__', new Response(JSON.stringify(report))))
+    .catch(() => {})
 }
 
 function setAppBadge() {
