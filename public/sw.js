@@ -19,16 +19,19 @@ self.addEventListener('push', (event) => {
     data: { link: data.link || '/' },
   }
 
-  // event.waitUntil()は複数回呼べて、それぞれ独立したPromiseとして扱われる。
-  // 通知表示をPromise.allで束ねると、他の処理(バッジ設定やログ送信)が長引いた時に
-  // 通知表示そのものも巻き添えで遅延・キャンセルされる可能性があるため、完全に分離する。
-  // 通知表示は必ず1回だけ行う
-  event.waitUntil(self.registration.showNotification(title, options))
-  event.waitUntil(setAppBadge())
+  // 別々のevent.waitUntil()呼び出しでは、通知表示以外の処理が完了する前に
+  // Service Worker自体が終了してしまっている疑いが強いため、1つのPromise.allに
+  // まとめて、通知表示を含む全処理が完了するまでSWを生かす方式に戻す。
+  // 通知表示は必ず1回だけ行う（ネットワーク通信は含まないので、通知表示を巻き込んで
+  // 止まるリスクは低いはず）
   event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
-      for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
-    }).catch(() => {})
+    Promise.all([
+      self.registration.showNotification(title, options),
+      setAppBadge(),
+      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+        for (const client of clientList) client.postMessage({ type: 'set-app-badge' })
+      }).catch(() => {}),
+    ])
   )
 })
 
