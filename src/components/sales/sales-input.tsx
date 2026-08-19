@@ -163,6 +163,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     const results = await Promise.all(fxTargets.map(async s => {
       const platform = s.platform as PlatformKey
       const rawUnits = Number(s.raw_units)
+      const before = Number(s.amount)
       const converted = calcPlatformAmount(platform, rawUnits, platformSettings[platform], newRate, null)
       // RLSの条件に一致しない場合、Supabaseはerrorを返さず0件更新のまま成功扱いになることがあるため、
       // 実際に更新された行をselectで確認する（他の保存処理と同じパターン）
@@ -172,21 +173,28 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
         .select('id')
       const ok = !error && !!data && data.length > 0
       if (!ok) console.error('[fx-bulk-change] update failed', { id: s.id, error, matched: data?.length ?? 0 })
-      return { id: s.id, ok, amount: converted.jpy, errorMessage: error?.message ?? null }
+      return { id: s.id, ok, before, after: converted.jpy, errorMessage: error?.message ?? null }
     }))
     setFxSaving(false)
 
     const succeeded = results.filter(r => r.ok)
     const failed = results.filter(r => !r.ok)
     if (succeeded.length > 0) {
-      const amountById = new Map(succeeded.map(r => [r.id, r.amount]))
+      const amountById = new Map(succeeded.map(r => [r.id, r.after]))
       setSales(prev => prev.map(s => amountById.has(s.id) ? { ...s, amount: amountById.get(s.id)! } : s))
     }
     if (failed.length > 0) {
       const reason = failed[0].errorMessage ?? '更新条件に一致しませんでした（権限設定をご確認ください）'
       toast.error(`${succeeded.length}件更新しました（${failed.length}件は失敗: ${reason}）`)
     } else {
-      toast.success(`${succeeded.length}件の為替レートを更新しました`)
+      const changed = succeeded.filter(r => r.before !== r.after)
+      if (changed.length === 0) {
+        // 更新自体は成功しているが、再計算後の金額が元と一致していた場合（同じレートを入力した等）
+        toast.success(`${succeeded.length}件を更新しましたが、金額は変わりませんでした（例: ¥${succeeded[0].before.toLocaleString()} → ¥${succeeded[0].after.toLocaleString()}）`)
+      } else {
+        const sample = changed[0]
+        toast.success(`${succeeded.length}件の為替レートを更新しました（例: ¥${sample.before.toLocaleString()} → ¥${sample.after.toLocaleString()}）`)
+      }
       setFxDialogOpen(false)
       setFxNewRate('')
     }
