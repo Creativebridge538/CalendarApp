@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isPlatformOwner } from '@/lib/platform-owner'
 import { SignupReviewList } from '@/components/internal/signup-review-list'
+import { InternalLogoutButton } from '@/components/internal/logout-button'
 
 export default async function InternalSignupsPage() {
   const supabase = await createClient()
@@ -25,9 +26,12 @@ export default async function InternalSignupsPage() {
             <h1 className="text-xl font-bold">新規店舗の申込レビュー</h1>
             <p className="text-sm text-muted-foreground mt-0.5">承認すると店舗と管理者アカウントが作成され、招待メールが送信されます</p>
           </div>
-          <Link href="/internal/stores" className="text-sm text-primary underline underline-offset-2">
-            店舗一覧へ
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/internal/stores" className="text-sm text-primary underline underline-offset-2">
+              店舗一覧へ
+            </Link>
+            <InternalLogoutButton />
+          </div>
         </div>
         <SignupReviewList pending={pending ?? []} recent={recent ?? []} />
       </div>

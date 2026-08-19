@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { isPlatformOwner } from '@/lib/platform-owner'
 import { StoreList } from '@/components/internal/store-list'
+import { InternalLogoutButton } from '@/components/internal/logout-button'
 
 export default async function InternalStoresPage() {
   const supabase = await createClient()
@@ -32,9 +33,12 @@ export default async function InternalStoresPage() {
             <h1 className="text-xl font-bold">店舗一覧</h1>
             <p className="text-sm text-muted-foreground mt-0.5">登録済みの全店舗の閲覧・利用停止/再開ができます</p>
           </div>
-          <Link href="/internal/signups" className="text-sm text-primary underline underline-offset-2">
-            新規店舗の申込レビューへ
-          </Link>
+          <div className="flex items-center gap-3">
+            <Link href="/internal/signups" className="text-sm text-primary underline underline-offset-2">
+              新規店舗の申込レビューへ
+            </Link>
+            <InternalLogoutButton />
+          </div>
         </div>
         <StoreList stores={rows} />
       </div>
