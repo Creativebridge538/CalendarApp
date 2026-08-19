@@ -164,15 +164,19 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       const platform = s.platform as PlatformKey
       const rawUnits = Number(s.raw_units)
       const converted = calcPlatformAmount(platform, rawUnits, platformSettings[platform], newRate, null)
-      const { error } = await supabase.from('sales')
+      // RLSの条件に一致しない場合、Supabaseはerrorを返さず0件更新のまま成功扱いになることがあるため、
+      // 実際に更新された行をselectで確認する（他の保存処理と同じパターン）
+      const { data, error } = await supabase.from('sales')
         .update({ amount: converted.jpy, usd_amount: converted.usd, fx_rate_snapshot: newRate })
         .eq('id', s.id)
-      return { id: s.id, error, amount: converted.jpy }
+        .select('id')
+      const ok = !error && !!data && data.length > 0
+      return { id: s.id, ok, amount: converted.jpy }
     }))
     setFxSaving(false)
 
-    const succeeded = results.filter(r => !r.error)
-    const failed = results.filter(r => r.error)
+    const succeeded = results.filter(r => r.ok)
+    const failed = results.filter(r => !r.ok)
     if (succeeded.length > 0) {
       const amountById = new Map(succeeded.map(r => [r.id, r.amount]))
       setSales(prev => prev.map(s => amountById.has(s.id) ? { ...s, amount: amountById.get(s.id)! } : s))
