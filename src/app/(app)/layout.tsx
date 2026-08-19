@@ -76,7 +76,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       {role === 'cast' && <LockBodyScroll />}
       <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
       <main
-        className={`flex-1 min-w-0 md:pt-0 ${role === 'cast' ? 'overflow-y-auto pb-[max(calc(var(--cast-tabbar-h,0px)_+_1rem),9rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
+        className={`flex-1 min-w-0 md:pt-0 ${role === 'cast' ? 'overflow-y-auto pb-[calc(var(--cast-tabbar-h,4.5rem)_+_1rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
       >
         {children}
       </main>
