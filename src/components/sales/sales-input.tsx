@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -63,6 +63,28 @@ function defaultDateFor(year: number, month: number): string {
 
 function effectiveRewardRate(sale: Pick<Sale, 'is_daily_payment' | 'reward_rate_override'>, castRewardRate: number): number {
   return sale.is_daily_payment && sale.reward_rate_override != null ? Number(sale.reward_rate_override) : castRewardRate
+}
+
+// 日払いの報酬率上書き（%）は同じ値を繰り返し使うことが多いため、店舗ごとにブラウザへ保存し次回から選べるようにする
+function rateTemplateKey(storeId: string): string {
+  return `sales-reward-rate-override-templates:${storeId}`
+}
+function loadRateTemplates(storeId: string): number[] {
+  try {
+    const raw = localStorage.getItem(rateTemplateKey(storeId))
+    return raw ? JSON.parse(raw) : []
+  } catch {
+    return []
+  }
+}
+function saveRateTemplate(storeId: string, value: number): number[] {
+  const next = [value, ...loadRateTemplates(storeId).filter(v => v !== value)].slice(0, 8)
+  try {
+    localStorage.setItem(rateTemplateKey(storeId), JSON.stringify(next))
+  } catch {
+    // localStorageが使えない環境ではテンプレ保存を諦める（機能自体への影響はない）
+  }
+  return next
 }
 
 // スプレッドシートからのコピペを想定した一括登録行。列の並びはBULK_COLUMNSと対応させる
@@ -136,6 +158,80 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   ), [sales, filterCast, filterPlatform, filterFrom, filterTo])
   const filtersActive = filterCast !== 'all' || filterPlatform !== 'all' || !!filterFrom || !!filterTo
   const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedSales, totalItems } = usePagination(filteredSales)
+
+  const [rateTemplates, setRateTemplates] = useState<number[]>([])
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- localStorage はマウント後にしか読めないため
+    setRateTemplates(loadRateTemplates(storeId))
+  }, [storeId])
+  function applyRateTemplate(value: number, target: 'form' | 'bulkDaily') {
+    if (target === 'form') setForm(f => ({ ...f, reward_rate_override: String(value) }))
+    else setBulkDailyRate(String(value))
+  }
+  function rememberRateTemplate(value: number) {
+    setRateTemplates(saveRateTemplate(storeId, value))
+  }
+
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [dailyDialogOpen, setDailyDialogOpen] = useState(false)
+  const [bulkDailyRate, setBulkDailyRate] = useState('')
+  const [bulkDailyAt, setBulkDailyAt] = useState('')
+  const [bulkDailySaving, setBulkDailySaving] = useState(false)
+
+  function toggleAllSelected() {
+    const allSelected = filteredSales.length > 0 && filteredSales.every(s => selected.has(s.id))
+    setSelected(allSelected ? new Set() : new Set(filteredSales.map(s => s.id)))
+  }
+  function toggleOneSelected(id: string) {
+    setSelected(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  async function handleBulkDailyChange() {
+    const targets = filteredSales.filter(s => selected.has(s.id))
+    if (targets.length === 0) { toast.error('対象の売上を選択してください'); return }
+    const pct = bulkDailyRate ? parseFloat(bulkDailyRate) : null
+    const at = bulkDailyAt ? new Date(bulkDailyAt).toISOString() : new Date().toISOString()
+
+    setBulkDailySaving(true)
+    const results = await Promise.all(targets.map(async s => {
+      const { data, error } = await supabase.from('sales')
+        .update({
+          is_daily_payment: true,
+          daily_payment_at: at,
+          reward_rate_override: pct != null && !Number.isNaN(pct) ? pct / 100 : null,
+        })
+        .eq('id', s.id)
+        .select('id')
+      const ok = !error && !!data && data.length > 0
+      if (!ok) console.error('[bulk-daily-change] update failed', { id: s.id, error })
+      return { id: s.id, ok }
+    }))
+    setBulkDailySaving(false)
+
+    const succeeded = new Set(results.filter(r => r.ok).map(r => r.id))
+    if (succeeded.size > 0) {
+      setSales(prev => prev.map(s => succeeded.has(s.id)
+        ? { ...s, is_daily_payment: true, daily_payment_at: at, reward_rate_override: pct != null && !Number.isNaN(pct) ? pct / 100 : null }
+        : s
+      ))
+    }
+    if (pct != null && !Number.isNaN(pct)) rememberRateTemplate(pct)
+
+    const failedCount = targets.length - succeeded.size
+    if (failedCount > 0) {
+      toast.error(`${succeeded.size}件を日払いに変更しました（${failedCount}件は失敗）`)
+    } else {
+      toast.success(`${succeeded.size}件を日払いに変更しました`)
+      setSelected(new Set())
+      setDailyDialogOpen(false)
+      setBulkDailyRate('')
+      setBulkDailyAt('')
+    }
+  }
 
   const [fxDialogOpen, setFxDialogOpen] = useState(false)
   const [fxNewRate, setFxNewRate] = useState('')
@@ -288,6 +384,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       created_by: userId,
     }
 
+    if (form.is_daily_payment && form.reward_rate_override) {
+      const pct = parseFloat(form.reward_rate_override)
+      if (!Number.isNaN(pct)) rememberRateTemplate(pct)
+    }
+
     if (editing) {
       const { data, error } = await supabase.from('sales').update(payload).eq('id', editing.id).select('id')
       if (error || !data || data.length === 0) { toast.error('更新に失敗しました'); return }
@@ -417,6 +518,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
               </Link>
               <Button size="sm" variant="outline" onClick={() => setFxDialogOpen(true)}><RefreshCw className="h-3.5 w-3.5 mr-1" />為替を一括変更</Button>
+              <Button size="sm" variant="outline" disabled={selected.size === 0} onClick={() => setDailyDialogOpen(true)}>
+                選択した{selected.size}件を日払いに変更
+              </Button>
               <Button size="sm" onClick={openCreate}><Plus className="h-4 w-4 mr-1" />追加</Button>
             </div>
           </div>
@@ -463,6 +567,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-8">
+                  <Checkbox
+                    checked={filteredSales.length > 0 && filteredSales.every(s => selected.has(s.id))}
+                    onCheckedChange={toggleAllSelected}
+                    disabled={filteredSales.length === 0}
+                  />
+                </TableHead>
                 <TableHead>日付</TableHead>
                 <TableHead>キャスト</TableHead>
                 <TableHead>稼働時間</TableHead>
@@ -475,7 +586,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             </TableHeader>
             <TableBody>
               {filteredSales.length === 0 && (
-                <TableRow><TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
                   {filtersActive ? '絞り込み条件に一致する売上がありません' : '売上データがありません'}
                 </TableCell></TableRow>
               )}
@@ -484,6 +595,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
                   <TableRow key={sale.id}>
+                    <TableCell>
+                      <Checkbox checked={selected.has(sale.id)} onCheckedChange={() => toggleOneSelected(sale.id)} />
+                    </TableCell>
                     <TableCell>{format(new Date(sale.date), 'M/d(E)', { locale: ja })}</TableCell>
                     <TableCell>{sale.cast?.display_name ?? '—'}</TableCell>
                     <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
@@ -644,6 +758,18 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                         <Input type="number" min="0" max="100" step="1" className="pr-8" value={form.reward_rate_override} onChange={e => setForm({ ...form, reward_rate_override: e.target.value })} placeholder="通常の報酬率を使う場合は空欄" />
                         <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
                       </div>
+                      {rateTemplates.length > 0 && (
+                        <div className="flex flex-wrap gap-1 pt-0.5">
+                          {rateTemplates.map(v => (
+                            <button
+                              key={v} type="button" onClick={() => applyRateTemplate(v, 'form')}
+                              className="px-2 py-0.5 rounded-full border text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                            >
+                              {v}%
+                            </button>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="space-y-1.5 col-span-2">
                       <Label className="text-xs text-muted-foreground font-normal">日払い済み日時</Label>
@@ -848,6 +974,52 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <Button variant="outline" onClick={() => setFxDialogOpen(false)}>キャンセル</Button>
               <Button onClick={handleFxBulkChange} disabled={fxSaving || fxTargets.length === 0}>
                 <RefreshCw className="h-3.5 w-3.5 mr-1" />{fxSaving ? '更新中...' : `${fxTargets.length}件を更新`}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dailyDialogOpen} onOpenChange={o => { setDailyDialogOpen(o); if (!o) { setBulkDailyRate(''); setBulkDailyAt('') } }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>選択した売上を日払いに変更</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-md border px-3 py-2 text-sm">
+              対象件数: <span className="font-medium">{selected.size}件</span>
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground font-normal">報酬率上書き（%・空欄で通常の報酬率のまま）</Label>
+              <div className="relative">
+                <Input
+                  type="number" min="0" max="100" step="1" className="pr-8" value={bulkDailyRate}
+                  onChange={e => setBulkDailyRate(e.target.value)}
+                  placeholder="通常の報酬率を使う場合は空欄"
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
+              {rateTemplates.length > 0 && (
+                <div className="flex flex-wrap gap-1 pt-0.5">
+                  {rateTemplates.map(v => (
+                    <button
+                      key={v} type="button" onClick={() => applyRateTemplate(v, 'bulkDaily')}
+                      className="px-2 py-0.5 rounded-full border text-xs text-muted-foreground hover:bg-accent hover:text-foreground"
+                    >
+                      {v}%
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div className="space-y-1.5">
+              <Label className="text-xs text-muted-foreground font-normal">日払い済み日時（空欄で現在時刻）</Label>
+              <Input type="datetime-local" value={bulkDailyAt} onChange={e => setBulkDailyAt(e.target.value)} />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setDailyDialogOpen(false)}>キャンセル</Button>
+              <Button onClick={handleBulkDailyChange} disabled={bulkDailySaving || selected.size === 0}>
+                {bulkDailySaving ? '更新中...' : `${selected.size}件を日払いに変更`}
               </Button>
             </div>
           </div>
