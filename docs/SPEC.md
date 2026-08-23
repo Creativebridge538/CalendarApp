@@ -14,7 +14,7 @@
 
 ## 1. プロダクト概要
 
-キャバレー・ホステスバー等、水商売系の代理店・店舗向けの多店舗対応業務管理SaaS。開発中の呼称は「Club Stella」だが、実際には店舗ごとに独立したブランド名でデプロイされる（後述のマルチテナント運用を参照）。
+キャバレー・ホステスバー等、水商売系の代理店・店舗向けの多店舗対応業務管理SaaS。店舗ごとに独立したブランド名でデプロイされる（後述のマルチテナント運用を参照）。
 
 主な利用者は2種類:
 
@@ -46,7 +46,7 @@ Node.jsの実行環境固有の注意点は `AGENTS.md` を参照（このプロ
 2026-08時点で稼働中のデプロイが2系統ある:
 
 1. **自社運用環境**（GitHubリポジトリ: `rayzyfurukawa/CalendarApp`。git remote名 `origin`）
-2. **クライアント（Club Stella実運用先）向け環境**（GitHubリポジトリ: `eve8008/CalendarApp`。git remote名 `client-eve8008`。専用のVercelプロジェクト・専用のSupabaseプロジェクトを新規に作成して払い出し済み）
+2. **クライアント向け環境**（GitHubリポジトリ: `eve8008/CalendarApp`。git remote名 `client-eve8008`。専用のVercelプロジェクト・専用のSupabaseプロジェクトを新規に作成して払い出し済み）
 
 コード変更は**両方のリポジトリのmainブランチにpushする**運用になっている（`git push origin main` と `git push client-eve8008 main:main` の両方）。DBマイグレーションも同様に**両方のSupabaseプロジェクトに個別適用が必要**（`supabase link`で対象を切り替えてから`db push`。1つに適用しても他方には自動反映されない）。
 
