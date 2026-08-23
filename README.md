@@ -38,6 +38,7 @@ pnpm dev
 | `SUPABASE_DB_PASSWORD` | `supabase db push --linked` 実行時 | マイグレーション適用時のみ |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT` | Web Push通知 | ○（通知機能を使う場合） |
 | `RESEND_API_KEY` | 報酬確定通知メール送信 | 任意（未設定時は送信をスキップ） |
+| `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | 支払通知書PDFのGoogle Drive保存機能（OAuth） | 任意（未設定時はGoogle Drive連携ボタンがエラーを返す） |
 
 ## よく使うコマンド
 

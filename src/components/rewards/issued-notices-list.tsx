@@ -1,10 +1,11 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { toast } from 'sonner'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Button } from '@/components/ui/button'
+import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -12,7 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
-import { Download } from 'lucide-react'
+import { Download, HardDriveUpload, Link2Off } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 
@@ -30,14 +31,27 @@ interface Notice {
 interface Props {
   notices: Notice[]
   casts: { id: string; display_name: string | null }[]
+  googleDriveConnected: boolean
 }
 
-export function IssuedNoticesList({ notices, casts }: Props) {
+export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Props) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [filterCast, setFilterCast] = useState('all')
   const [filterFrom, setFilterFrom] = useState(() => format(startOfMonth(new Date()), 'yyyy-MM-dd'))
   const [filterTo, setFilterTo] = useState(() => format(endOfMonth(new Date()), 'yyyy-MM-dd'))
   const [downloading, setDownloading] = useState(false)
+  const [driveUploading, setDriveUploading] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  useEffect(() => {
+    const status = searchParams.get('google_drive')
+    if (status === 'connected') toast.success('Google Driveと連携しました')
+    else if (status === 'error') toast.error('Google Driveとの連携に失敗しました')
+    if (status) router.replace('/admin/issued-notices')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const filtered = useMemo(() => notices.filter(n =>
     (filterCast === 'all' || n.castId === filterCast)
@@ -87,15 +101,66 @@ export function IssuedNoticesList({ notices, casts }: Props) {
     toast.success(`${targets.length}件をダウンロードしました`)
   }
 
+  async function handleDriveUpload() {
+    const targets = filtered.filter(n => selected.has(n.id))
+    if (targets.length === 0) { toast.error('保存する通知書を選択してください'); return }
+
+    setDriveUploading(true)
+    const res = await fetch('/api/rewards/notices/drive-upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        notices: targets.map(n => ({ cast_id: n.castId, from: n.from, to: n.to, issued_at: n.createdAt })),
+      }),
+    })
+    const json = await res.json()
+    setDriveUploading(false)
+    if (!res.ok) { toast.error(json.error ?? 'Google Driveへの保存に失敗しました'); return }
+
+    if (json.failed > 0) {
+      toast.error(`${json.uploaded}件を保存しました（${json.failed}件は失敗）`)
+    } else {
+      toast.success(`${json.uploaded}件をGoogle Driveに保存しました`)
+    }
+  }
+
+  async function handleDisconnect() {
+    if (!confirm('Google Driveとの連携を解除しますか？')) return
+    setDisconnecting(true)
+    const res = await fetch('/api/google-drive/disconnect', { method: 'POST' })
+    setDisconnecting(false)
+    if (!res.ok) { toast.error('連携解除に失敗しました'); return }
+    toast.success('連携を解除しました')
+    router.refresh()
+  }
+
   return (
     <Card>
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-2">
           <CardTitle>発行済み支払通知書</CardTitle>
-          <Button size="sm" onClick={handleBulkDownload} disabled={downloading || selected.size === 0}>
-            <Download className="h-3.5 w-3.5 mr-1" />
-            {downloading ? 'ダウンロード中...' : `選択した${selected.size}件を一括ダウンロード`}
-          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {googleDriveConnected ? (
+              <>
+                <Button size="sm" variant="outline" onClick={handleDriveUpload} disabled={driveUploading || selected.size === 0}>
+                  <HardDriveUpload className="h-3.5 w-3.5 mr-1" />
+                  {driveUploading ? '保存中...' : `選択した${selected.size}件をGoogle Driveに保存`}
+                </Button>
+                <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={disconnecting} title="Google Driveとの連携を解除">
+                  <Link2Off className="h-3.5 w-3.5" />
+                </Button>
+              </>
+            ) : (
+              <a href="/api/google-drive/connect" className={buttonVariants({ size: 'sm', variant: 'outline' })}>
+                <HardDriveUpload className="h-3.5 w-3.5 mr-1" />
+                Google Driveと連携
+              </a>
+            )}
+            <Button size="sm" onClick={handleBulkDownload} disabled={downloading || selected.size === 0}>
+              <Download className="h-3.5 w-3.5 mr-1" />
+              {downloading ? 'ダウンロード中...' : `選択した${selected.size}件を一括ダウンロード`}
+            </Button>
+          </div>
         </div>
       </CardHeader>
       <CardContent>

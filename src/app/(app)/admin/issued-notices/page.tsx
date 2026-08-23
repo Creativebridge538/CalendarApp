@@ -42,9 +42,12 @@ export default async function IssuedNoticesPage() {
     .map(c => ({ id: c.id, display_name: c.display_name }))
     .sort((a, b) => (a.display_name ?? '').localeCompare(b.display_name ?? '', 'ja'))
 
+  const { data: driveToken } = await supabase.from('store_google_drive_tokens')
+    .select('store_id').eq('store_id', profile.store_id!).maybeSingle()
+
   return (
     <div className="p-6">
-      <IssuedNoticesList notices={notices} casts={casts} />
+      <IssuedNoticesList notices={notices} casts={casts} googleDriveConnected={!!driveToken} />
     </div>
   )
 }

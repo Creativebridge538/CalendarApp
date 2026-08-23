@@ -626,6 +626,48 @@ export type Database = {
           },
         ]
       }
+      store_google_drive_tokens: {
+        Row: {
+          connected_by: string | null
+          created_at: string
+          refresh_token: string
+          root_folder_id: string | null
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          connected_by?: string | null
+          created_at?: string
+          refresh_token: string
+          root_folder_id?: string | null
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          connected_by?: string | null
+          created_at?: string
+          refresh_token?: string
+          root_folder_id?: string | null
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "store_google_drive_tokens_connected_by_fkey"
+            columns: ["connected_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "store_google_drive_tokens_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: true
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       store_settings: {
         Row: {
           area_label: string

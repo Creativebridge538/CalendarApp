@@ -39,6 +39,7 @@
 | `push_subscriptions` | — | 本人の購読のみ全操作 |
 | `store_signup_requests` | ポリシーなし（service_role専用） | ポリシーなし（service_role専用） |
 | `cast_profile_fields` | 全操作 | 自店舗分を参照 |
+| `store_google_drive_tokens` | 自店舗分を全操作 | 参照不可（別テーブルにして`store_settings`の全員参照ポリシーから隔離） |
 
 ## 既知の設計判断（意図的な制限であり不具合ではないもの）
 

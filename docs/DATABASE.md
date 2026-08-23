@@ -14,12 +14,13 @@ Supabase（Postgres）。スキーマの正はコードの説明文ではなく 
 | `shift_modification_requests` | 確定後のシフト変更申請 |
 | `vacant_slots` / `vacant_slot_applications` | 管理者が公開する空き枠と、キャストからの応募 |
 | `sales` | 売上（プラットフォーム別・手入力）。ボーナス/控除、稼働時間もここに持つ |
-| `reward_calculations` | 月次報酬計算結果。確定(`is_finalized`)後は通常編集しない運用 |
+| `reward_calculations` | 月次報酬計算結果を保存する想定で用意されたテーブルだが、現行実装では使われていない（`src`配下から参照なし）。報酬・支払通知書は`sales`から都度ライブ計算している（`src/lib/payment-notice-data.ts`）。削除するか実際に使うか要判断 |
 | `notifications` | アプリ内通知 |
 | `shift_checklist_items` | シフト提出時の確認項目（店舗ごとにカスタム） |
 | `push_subscriptions` | Web Push購読情報 |
 | `cast_profile_fields` | キャストプロフィールのカスタム項目定義 |
 | `store_signup_requests` | セルフサーブ新規店舗申込（承認制。RLSポリシーなし＝service_role専用） |
+| `store_google_drive_tokens` | 支払通知書PDFのGoogle Drive保存機能用のOAuthリフレッシュトークン。`store_settings`は所属ユーザー全員がselectできるポリシーがあるため、あえて別テーブルにしてadmin限定のRLSにしている |
 
 ## 重要な制約
 
