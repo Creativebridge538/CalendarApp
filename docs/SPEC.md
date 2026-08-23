@@ -290,7 +290,7 @@ RLSポリシーなし＝`service_role`専用（`/api/store-signup`と`/api/inter
 - 為替レート一括変更: 既に登録済みの売上について、絞り込み条件に一致するプラットフォーム売上の金額を新しいレートで再計算・更新する機能（`sales-input.tsx`の「為替を一括変更」）
 - 支払通知書PDF: `src/lib/payment-notice-pdf.tsx`（react-pdf）でサーバー生成。ファイル名は`{開始日}-{終了日}_{支払額}_{本名}_支払通知書.pdf`形式に統一（`noticeFileName()` in `payment-notice-data.ts`）
 - 発行済み支払通知書の一括ダウンロード（ZIP）、および個別のPDFダウンロード（ブラウザ印刷は使わない。共有時にレイアウトが崩れる問題があったため撤去済み）
-- **Google Drive連携（2026-08-23実装、要Google Cloud側の初期設定。7節参照）**: 発行済み支払通知書を選択してGoogle Driveへ直接アップロード保存できる。年月フォルダに自動整理される
+- **Google Drive連携**: 発行済み支払通知書を選択してGoogle Driveへ直接アップロード保存できる。年月フォルダに自動整理される（`src/lib/google-drive.ts`、`src/app/api/google-drive/*`）
 
 ### 6.3 通知・PWA
 
@@ -302,37 +302,3 @@ RLSポリシーなし＝`service_role`専用（`/api/store-signup`と`/api/inter
 
 - `/internal/stores`: 全店舗の一覧・利用停止/再開
 - `/internal/signups`: `/apply`から届いた新規店舗申込のレビュー・承認（承認すると店舗・管理者アカウント作成、招待メール送信）
-
-## 7. Google Drive連携のセットアップ手順（未完了）
-
-コード実装（OAuth接続/コールバック/切断ルート、Drive APIラッパー、アップロードAPI、UI）は完了しているが、**利用にはGoogle Cloud Console側の設定と環境変数投入が必要**。案件（Vercelプロジェクト）ごとに個別のGoogle Cloud OAuthクライアントを用意すること（redirect_uriがデプロイ先ドメインに紐づくため）。
-
-1. Google Cloud Consoleで新規プロジェクトを作成
-2. 「APIとサービス」→「認証情報」からOAuthクライアントID（種類: ウェブアプリケーション）を作成
-   - 承認済みのリダイレクトURI: `https://<デプロイ先ドメイン>/api/google-drive/callback`
-3. OAuth同意画面の設定。公開ステータスは「テスト」のままでよい（`drive.file`スコープは非機微スコープだが、本番公開には審査が必要になるため、利用者が限定的な社内ツールでは「テスト」運用＋テストユーザー登録で十分）。管理者のGoogleアカウントをテストユーザーとして追加
-4. 発行された`クライアントID`/`クライアントシークレット`をVercelの環境変数`GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET`に設定
-5. 管理画面の「発行済み支払通知書」ページ（`/admin/issued-notices`）で「Google Driveと連携」ボタンから接続
-
-関連ファイル: `src/lib/google-drive.ts`（OAuth/Drive APIラッパー）、`src/app/api/google-drive/*`（connect/callback/disconnect）、`src/app/api/rewards/notices/drive-upload/route.ts`（アップロード本体）、`supabase/migrations/20260823010000_google_drive_notice_upload.sql`（トークン保存テーブル）。
-
-## 8. 既知の課題・未完了タスク
-
-優先度の高いものから:
-
-1. **クライアント環境のVercel Hobbyプランのデプロイブロック問題**（3節参照）。恒久対応が未確定
-2. エラー監視（Sentry等）が未導入。本番のJS/API/DBエラーを追う手段が現状ない（[`SECURITY.md`](SECURITY.md) #1）
-3. `real_name`/`phone`のキャスト自己編集がRLS/トリガーで禁止されていない（UI導線はないがAPIレベルでは制限なし）
-4. 認証・シフト提出・報酬計算などの主要フローの自動テストが薄い（RLS観点のテストのみ）
-5. `reward_calculations`テーブルが未使用のまま残っている（5.2節）。削除するか実装に組み込むか要判断
-6. Google Drive連携（7節）はコードのみ完了。Google Cloud側の設定が必要
-
-## 9. 最近の変更履歴
-
-- キャスト作成失敗時のエラーメッセージを詳細化（原因不明の汎用メッセージから実際のエラー内容表示へ）
-- owner専用画面にログアウトボタンを追加
-- 支払通知書PDFのファイル名統一・法的文言追加・ブラウザ印刷経由の廃止
-- 売上の為替レート一括変更機能、日払いの一括変更・報酬率テンプレ機能を追加
-- Google Drive連携機能を実装。関連マイグレーションは自社・クライアント両方の本番Supabaseに適用済み
-
-正確な変更内容は`git log`とコミットメッセージを参照。
