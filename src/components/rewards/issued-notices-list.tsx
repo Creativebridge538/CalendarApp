@@ -106,21 +106,31 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
     if (targets.length === 0) { toast.error('保存する通知書を選択してください'); return }
 
     setDriveUploading(true)
-    const res = await fetch('/api/rewards/notices/drive-upload', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        notices: targets.map(n => ({ cast_id: n.castId, from: n.from, to: n.to, issued_at: n.createdAt })),
-      }),
-    })
-    const json = await res.json()
-    setDriveUploading(false)
-    if (!res.ok) { toast.error(json.error ?? 'Google Driveへの保存に失敗しました'); return }
-
-    if (json.failed > 0) {
-      toast.error(`${json.uploaded}件を保存しました（${json.failed}件は失敗）`)
-    } else {
-      toast.success(`${json.uploaded}件をGoogle Driveに保存しました`)
+    try {
+      const res = await fetch('/api/rewards/notices/drive-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notices: targets.map(n => ({ cast_id: n.castId, from: n.from, to: n.to, issued_at: n.createdAt })),
+        }),
+      })
+      // サーバー関数がタイムアウトするとJSONではなくエラーページが返ってくることがあるため、
+      // res.json()の失敗もまとめて捕捉する
+      const json = await res.json().catch(() => null)
+      if (!res.ok || !json) {
+        toast.error(json?.error ?? `Google Driveへの保存に失敗しました（サーバーエラー: ${res.status}）`)
+        return
+      }
+      if (json.failed > 0) {
+        toast.error(`${json.uploaded}件を保存しました（${json.failed}件は失敗）`)
+      } else {
+        toast.success(`${json.uploaded}件をGoogle Driveに保存しました`)
+      }
+    } catch (e) {
+      console.error('[drive-upload] request failed', e)
+      toast.error('Google Driveへの保存に失敗しました（通信エラー）')
+    } finally {
+      setDriveUploading(false)
     }
   }
 
