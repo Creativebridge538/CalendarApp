@@ -684,6 +684,8 @@ export type Database = {
           store_id: string
           theme: string
           updated_at: string
+          usd_jpy_adjustment: number
+          usd_jpy_auto_fetch: boolean
           usd_jpy_rate: number | null
         }
         Insert: {
@@ -701,6 +703,8 @@ export type Database = {
           store_id: string
           theme?: string
           updated_at?: string
+          usd_jpy_adjustment?: number
+          usd_jpy_auto_fetch?: boolean
           usd_jpy_rate?: number | null
         }
         Update: {
@@ -718,6 +722,8 @@ export type Database = {
           store_id?: string
           theme?: string
           updated_at?: string
+          usd_jpy_adjustment?: number
+          usd_jpy_auto_fetch?: boolean
           usd_jpy_rate?: number | null
         }
         Relationships: [

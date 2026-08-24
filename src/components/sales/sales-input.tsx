@@ -46,7 +46,12 @@ interface Props {
   sales: Sale[]
   storeId: string
   userId: string
-  storeSettings: { usd_jpy_rate: number | null; platform_settings: unknown } | null
+  storeSettings: {
+    usd_jpy_rate: number | null
+    usd_jpy_auto_fetch: boolean
+    usd_jpy_adjustment: number
+    platform_settings: unknown
+  } | null
   year: number
   month: number
 }
@@ -142,7 +147,22 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const supabase = createClient()
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
-  const usdJpyRate = storeSettings?.usd_jpy_rate ?? null
+  const autoFetchFx = storeSettings?.usd_jpy_auto_fetch ?? false
+  const [liveFxRate, setLiveFxRate] = useState<number | null>(null)
+
+  useEffect(() => {
+    if (!autoFetchFx) return
+    fetch('https://api.frankfurter.dev/v1/latest?from=USD&to=JPY')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => { if (typeof data?.rates?.JPY === 'number') setLiveFxRate(data.rates.JPY) })
+      .catch(() => {})
+  }, [autoFetchFx])
+
+  // 自動取得がオンで取得に成功していればその場のレート＋調整額を使い、
+  // 失敗時やオフの場合は店舗設定の手動レートにフォールバックする
+  const usdJpyRate = autoFetchFx && liveFxRate != null
+    ? liveFxRate + (storeSettings?.usd_jpy_adjustment ?? 0)
+    : storeSettings?.usd_jpy_rate ?? null
 
   const castRewardRateById = useMemo(() => {
     const map: Record<string, number> = {}

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
@@ -57,6 +57,8 @@ interface Props {
     theme: string
     logo_url: string | null
     usd_jpy_rate: number | null
+    usd_jpy_auto_fetch: boolean
+    usd_jpy_adjustment: number
     platform_settings: unknown
   } | null
   storeId: string
@@ -76,9 +78,20 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [usdJpyRate, setUsdJpyRate] = useState(String(initialSettings?.usd_jpy_rate ?? ''))
   const [fetchingRate, setFetchingRate] = useState(false)
+  const [usdJpyAutoFetch, setUsdJpyAutoFetch] = useState(initialSettings?.usd_jpy_auto_fetch ?? true)
+  const [usdJpyAdjustment, setUsdJpyAdjustment] = useState(String(initialSettings?.usd_jpy_adjustment ?? 0))
+  const [liveRate, setLiveRate] = useState<number | null>(null)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(parsePlatformSettings(initialSettings?.platform_settings))
   const supabase = createClient()
   const router = useRouter()
+
+  useEffect(() => {
+    if (!usdJpyAutoFetch) return
+    fetch('https://api.frankfurter.dev/v1/latest?from=USD&to=JPY')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => { if (typeof data?.rates?.JPY === 'number') setLiveRate(data.rates.JPY) })
+      .catch(() => {})
+  }, [usdJpyAutoFetch])
 
   async function fetchLatestRate() {
     setFetchingRate(true)
@@ -161,6 +174,8 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   async function savePlatformSettings() {
     const payload = {
       usd_jpy_rate: usdJpyRate ? parseFloat(usdJpyRate) : null,
+      usd_jpy_auto_fetch: usdJpyAutoFetch,
+      usd_jpy_adjustment: usdJpyAdjustment ? parseFloat(usdJpyAdjustment) : 0,
       platform_settings: platformSettings,
     }
     if (initialSettings) {
@@ -388,20 +403,45 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
         <CardHeader><CardTitle>プラットフォーム連携・為替設定</CardTitle></CardHeader>
         <CardContent className="space-y-5">
           <div className="space-y-1.5">
-            <Label>USD → JPY 参考レート</Label>
-            <div className="flex gap-2">
-              <Input
-                type="number" step="0.01" min="0" placeholder="例: 150.25"
-                value={usdJpyRate} onChange={e => setUsdJpyRate(e.target.value)}
-              />
-              <Button type="button" variant="outline" onClick={fetchLatestRate} disabled={fetchingRate} className="shrink-0">
-                {fetchingRate ? '取得中...' : '自動取得'}
-              </Button>
+            <div className="flex items-center justify-between">
+              <Label>為替レートを自動取得する</Label>
+              <Switch checked={usdJpyAutoFetch} onCheckedChange={setUsdJpyAutoFetch} />
             </div>
             <p className="text-xs text-muted-foreground">
-              「自動取得」で当日の参考レートを取得できます（手入力での上書きも可能）。STRIPCHAT・DXライブの売上入力時、この時点のレートがスナップショットとして記録されます
+              オンにすると、売上入力のたびに実勢レートを自動取得し、下の調整額を加えた値をその場で使用します（手動での更新は不要になります）。オフにすると、下の「USD → JPY 参考レート」を手動で管理する従来の方式に戻ります
             </p>
           </div>
+
+          {usdJpyAutoFetch ? (
+            <div className="space-y-1.5">
+              <Label>為替調整（円）</Label>
+              <Input
+                type="number" step="0.01" placeholder="例: 2（マイナスも可）"
+                value={usdJpyAdjustment} onChange={e => setUsdJpyAdjustment(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">
+                {liveRate != null
+                  ? `現在の実勢レート ¥${liveRate.toFixed(2)} ＋ 調整額 ＝ ¥${(liveRate + (parseFloat(usdJpyAdjustment) || 0)).toFixed(2)}（売上入力で使用される値）`
+                  : '実勢レートを取得中...'}
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-1.5">
+              <Label>USD → JPY 参考レート</Label>
+              <div className="flex gap-2">
+                <Input
+                  type="number" step="0.01" min="0" placeholder="例: 150.25"
+                  value={usdJpyRate} onChange={e => setUsdJpyRate(e.target.value)}
+                />
+                <Button type="button" variant="outline" onClick={fetchLatestRate} disabled={fetchingRate} className="shrink-0">
+                  {fetchingRate ? '取得中...' : '自動取得'}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                「自動取得」で当日の参考レートを取得できます（手入力での上書きも可能）。STRIPCHAT・DXライブの売上入力時、この時点のレートがスナップショットとして記録されます
+              </p>
+            </div>
+          )}
 
           {(Object.keys(PLATFORM_LABEL) as PlatformKey[]).map(key => (
             <div key={key} className="space-y-1.5 pt-3 border-t first:border-t-0 first:pt-0">

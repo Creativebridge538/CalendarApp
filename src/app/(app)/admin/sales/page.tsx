@@ -27,7 +27,7 @@ export default async function SalesPage({
     supabase.from('users').select('id, display_name, reward_rate').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true).order('display_name'),
     supabase.from('sales').select('*, cast:users!sales_cast_id_fkey(display_name)').eq('store_id', storeId)
       .gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false }),
-    supabase.from('store_settings').select('usd_jpy_rate, platform_settings').eq('store_id', storeId).single(),
+    supabase.from('store_settings').select('usd_jpy_rate, usd_jpy_auto_fetch, usd_jpy_adjustment, platform_settings').eq('store_id', storeId).single(),
   ])
 
   return (
