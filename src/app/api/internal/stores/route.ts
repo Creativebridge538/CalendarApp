@@ -10,9 +10,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '権限がありません' }, { status: 403 })
   }
 
-  const { store_name, contact_name, contact_email } = await request.json().catch(() => ({}))
-  if (!store_name || !contact_name || !contact_email) {
-    return NextResponse.json({ error: '店舗名・管理者氏名・管理者メールアドレスは必須です' }, { status: 400 })
+  const { store_name, contact_name, contact_email, login_id, password } = await request.json().catch(() => ({}))
+  if (!store_name || !contact_name || !contact_email || !login_id || !password) {
+    return NextResponse.json({ error: '店舗名・管理者氏名・管理者メールアドレス・ユーザーID・パスワードは必須です' }, { status: 400 })
   }
 
   const admin = createAdminClient()
@@ -34,13 +34,17 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '店舗設定の作成に失敗しました' }, { status: 500 })
   }
 
-  const { data: invited, error: inviteError } = await admin.auth.admin.inviteUserByEmail(contact_email)
-  if (inviteError || !invited.user) {
+  const { data: created, error: createError } = await admin.auth.admin.createUser({
+    email: contact_email,
+    password,
+    email_confirm: true,
+  })
+  if (createError || !created.user) {
     await admin.from('store_settings').delete().eq('store_id', store.id)
     await admin.from('stores').delete().eq('id', store.id)
-    const message = inviteError?.message.includes('already registered')
+    const message = createError?.message.includes('already registered') || createError?.message.includes('already been registered')
       ? 'このメールアドレスは既に登録されています'
-      : '招待メールの送信に失敗しました'
+      : `管理者アカウントの作成に失敗しました: ${createError?.message}`
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
@@ -48,13 +52,17 @@ export async function POST(request: Request) {
     role: 'admin',
     store_id: store.id,
     display_name: contact_name,
-  }).eq('id', invited.user.id)
+    login_id,
+  }).eq('id', created.user.id)
 
   if (updateError) {
-    await admin.auth.admin.deleteUser(invited.user.id)
+    await admin.auth.admin.deleteUser(created.user.id)
     await admin.from('store_settings').delete().eq('store_id', store.id)
     await admin.from('stores').delete().eq('id', store.id)
-    return NextResponse.json({ error: '管理者アカウントの設定に失敗しました' }, { status: 500 })
+    const message = updateError.message.includes('duplicate') || updateError.code === '23505'
+      ? 'このユーザーIDは既に使用されています'
+      : `管理者アカウントの設定に失敗しました: ${updateError.message}`
+    return NextResponse.json({ error: message }, { status: 400 })
   }
 
   return NextResponse.json({ ok: true, store })

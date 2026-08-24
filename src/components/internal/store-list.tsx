@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Ban, Play, Pencil, Plus } from 'lucide-react'
+import { PasswordInput } from '@/components/ui/password-input'
+import { Ban, Play, Pencil, Plus, Copy } from 'lucide-react'
 
 interface StoreAdmin {
   email: string
@@ -32,7 +33,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
   const [renameTarget, setRenameTarget] = useState<StoreRow | null>(null)
   const [renameValue, setRenameValue] = useState('')
   const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState({ store_name: '', contact_name: '', contact_email: '' })
+  const [createForm, setCreateForm] = useState({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
   const [creating, setCreating] = useState(false)
 
   async function toggleActive(store: StoreRow) {
@@ -74,7 +75,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
   }
 
   async function submitCreate() {
-    if (!createForm.store_name || !createForm.contact_name || !createForm.contact_email) {
+    if (!createForm.store_name || !createForm.contact_name || !createForm.contact_email || !createForm.login_id || !createForm.password) {
       toast.error('すべての項目を入力してください')
       return
     }
@@ -92,9 +93,17 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
       id: data.store.id, name: data.store.name, created_at: data.store.created_at, is_active: true,
       admins: [{ email: createForm.contact_email, display_name: createForm.contact_name }], castCount: 0,
     }, ...stores])
-    toast.success(`${createForm.store_name} を作成しました。招待メールを送信しました`)
+    await navigator.clipboard.writeText(
+      [
+        `店舗: ${createForm.store_name}`,
+        `ログインURL: ${window.location.origin}/login`,
+        `ユーザーID: ${createForm.login_id}`,
+        `パスワード: ${createForm.password}`,
+      ].join('\n')
+    )
+    toast.success(`${createForm.store_name} を作成しました。ログイン情報をコピーしました`)
     setCreateOpen(false)
-    setCreateForm({ store_name: '', contact_name: '', contact_email: '' })
+    setCreateForm({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
   }
 
   return (
@@ -185,11 +194,21 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
             <div className="space-y-1.5">
               <Label>管理者メールアドレス</Label>
               <Input type="email" value={createForm.contact_email} onChange={e => setCreateForm({ ...createForm, contact_email: e.target.value })} />
-              <p className="text-xs text-muted-foreground">このメールアドレスに招待メールが送信されます</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>ユーザーID</Label>
+              <Input value={createForm.login_id} onChange={e => setCreateForm({ ...createForm, login_id: e.target.value.trim() })} placeholder="user_id" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>パスワード</Label>
+              <PasswordInput value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} placeholder="8文字以上" autoComplete="new-password" />
+              <p className="text-xs text-muted-foreground">作成すると、このユーザーID・パスワードがクリップボードにコピーされます</p>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)}>キャンセル</Button>
-              <Button onClick={submitCreate} disabled={creating}>作成する</Button>
+              <Button onClick={submitCreate} disabled={creating}>
+                <Copy className="h-3.5 w-3.5 mr-1" />作成してコピー
+              </Button>
             </div>
           </div>
         </DialogContent>
