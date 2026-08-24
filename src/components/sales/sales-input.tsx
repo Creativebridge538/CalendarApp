@@ -265,9 +265,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return (config?.mode ?? 'formula') !== 'fixed'
   }
   const fxTargets = useMemo(
-    () => filteredSales.filter(s => usesFxRate(s.platform) && s.raw_units != null && s.rate_override == null),
+    () => filteredSales.filter(s => selected.has(s.id) && usesFxRate(s.platform) && s.raw_units != null && s.rate_override == null),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [filteredSales, platformSettings]
+    [filteredSales, selected, platformSettings]
   )
 
   async function handleFxBulkChange() {
@@ -537,7 +537,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <Link href={`/admin/sales?year=${next.year}&month=${next.month}`} className={buttonVariants({ size: 'sm', variant: 'outline' })}>
                 翌月<ChevronRight className="h-3.5 w-3.5 ml-0.5" />
               </Link>
-              <Button size="sm" variant="outline" onClick={() => setFxDialogOpen(true)}><RefreshCw className="h-3.5 w-3.5 mr-1" />為替を一括変更</Button>
+              <Button size="sm" variant="outline" disabled={selected.size === 0} onClick={() => setFxDialogOpen(true)}><RefreshCw className="h-3.5 w-3.5 mr-1" />為替を一括変更</Button>
               <Button size="sm" variant="outline" disabled={selected.size === 0} onClick={() => setDailyDialogOpen(true)}>
                 選択した{selected.size}件を日払いに変更
               </Button>
@@ -973,14 +973,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           </DialogHeader>
           <div className="space-y-4">
             <p className="text-sm text-muted-foreground">
-              現在の絞り込み条件（{filterFrom || '指定なし'}〜{filterTo || '指定なし'}・
-              {filterCast === 'all' ? '全キャスト' : (casts.find(c => c.id === filterCast)?.display_name ?? '')}・
-              {filterPlatform === 'all' ? '全プラットフォーム' : PLATFORM_LABEL[filterPlatform]}）に一致する、
-              為替レートを使用しているプラットフォーム売上の金額を、新しいレートで再計算します。
+              選択した{selected.size}件のうち、為替レートを使用しているプラットフォーム売上の金額を、新しいレートで再計算します。
             </p>
             <div className="rounded-md border px-3 py-2 text-sm">
               対象件数: <span className="font-medium">{fxTargets.length}件</span>
-              {fxTargets.length === 0 && <span className="text-muted-foreground">（絞り込み条件を調整してください）</span>}
+              {fxTargets.length === 0 && <span className="text-muted-foreground">（対象となる売上を選択してください）</span>}
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">新しい為替レート（USD/JPY）</Label>
