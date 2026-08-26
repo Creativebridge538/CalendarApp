@@ -11,18 +11,25 @@ export default async function VacantSlotsPage() {
 
   const storeId = profile.store_id!
 
-  const [{ data: slots }, { data: rooms }] = await Promise.all([
+  const [{ data: slots }, { data: rooms }, { data: areas }, { data: settings }] = await Promise.all([
+    // 過去の履歴も一覧・確認できるよう、日付での絞り込みは行わない
     supabase.from('vacant_slots')
-      .select('*, rooms(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))')
+      .select('*, rooms(name), areas(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))')
       .eq('store_id', storeId)
-      .gte('date', new Date().toISOString().split('T')[0])
-      .order('date', { ascending: false }).limit(50),
-    supabase.from('rooms').select('id, name').eq('store_id', storeId).eq('is_active', true),
+      .order('date', { ascending: false }).limit(200),
+    supabase.from('rooms').select('id, name, area_id, capacity').eq('store_id', storeId).eq('is_active', true),
+    supabase.from('areas').select('id, name').eq('store_id', storeId).eq('is_active', true).order('sort_order'),
+    supabase.from('store_settings').select('location_mode, area_label, room_label').eq('store_id', storeId).single(),
   ])
 
   return (
     <div className="p-6">
-      <VacantSlotManager slots={slots ?? []} rooms={rooms ?? []} storeId={storeId} userId={user.id} />
+      <VacantSlotManager
+        slots={slots ?? []} rooms={rooms ?? []} areas={areas ?? []} storeId={storeId} userId={user.id}
+        locationMode={settings?.location_mode ?? 'room'}
+        areaLabel={settings?.area_label ?? 'エリア'}
+        roomLabel={settings?.room_label ?? 'ルーム'}
+      />
     </div>
   )
 }

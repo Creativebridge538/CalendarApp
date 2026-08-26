@@ -11,7 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Pencil, Trash2 } from 'lucide-react'
+import { Plus, Pencil, Trash2, Loader2 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { usePagination } from '@/hooks/use-pagination'
 
@@ -31,6 +31,8 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<Room | null>(null)
   const [form, setForm] = useState({ name: '', capacity: '', notes: '', area_id: '' })
+  const [saving, setSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const supabase = createClient()
   const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(rooms)
 
@@ -62,23 +64,30 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
       store_id: storeId,
       area_id: form.area_id,
     }
-    if (editing) {
-      const { error } = await supabase.from('rooms').update(payload).eq('id', editing.id)
-      if (error) { toast.error('更新に失敗しました'); return }
-      setRooms(rooms.map(r => r.id === editing.id ? { ...r, ...payload } : r))
-      toast.success(`${roomLabel}を更新しました`)
-    } else {
-      const { data, error } = await supabase.from('rooms').insert(payload).select().single()
-      if (error) { toast.error('登録に失敗しました'); return }
-      setRooms([...rooms, data])
-      toast.success(`${roomLabel}を登録しました`)
+    setSaving(true)
+    try {
+      if (editing) {
+        const { error } = await supabase.from('rooms').update(payload).eq('id', editing.id)
+        if (error) { toast.error('更新に失敗しました'); return }
+        setRooms(rooms.map(r => r.id === editing.id ? { ...r, ...payload } : r))
+        toast.success(`${roomLabel}を更新しました`)
+      } else {
+        const { data, error } = await supabase.from('rooms').insert(payload).select().single()
+        if (error) { toast.error('登録に失敗しました'); return }
+        setRooms([...rooms, data])
+        toast.success(`${roomLabel}を登録しました`)
+      }
+      setOpen(false)
+    } finally {
+      setSaving(false)
     }
-    setOpen(false)
   }
 
   async function handleDelete(room: Room) {
     if (!confirm(`「${room.name}」を削除しますか？`)) return
+    setDeletingId(room.id)
     const { error } = await supabase.from('rooms').delete().eq('id', room.id)
+    setDeletingId(null)
     if (error) { toast.error('削除に失敗しました'); return }
     setRooms(rooms.filter(r => r.id !== room.id))
     toast.success('削除しました')
@@ -126,8 +135,10 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
                 <TableCell className="text-right">{room.capacity ?? '—'}</TableCell>
                 <TableCell>{room.notes ?? '—'}</TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button size="icon" variant="ghost" onClick={() => openEdit(room)}><Pencil className="h-3.5 w-3.5" /></Button>
-                  <Button size="icon" variant="ghost" onClick={() => handleDelete(room)}><Trash2 className="h-3.5 w-3.5 text-destructive" /></Button>
+                  <Button size="icon" variant="ghost" disabled={deletingId === room.id} onClick={() => openEdit(room)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button size="icon" variant="ghost" disabled={deletingId === room.id} onClick={() => handleDelete(room)}>
+                    {deletingId === room.id ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
+                  </Button>
                 </TableCell>
               </TableRow>
             ))}
@@ -146,11 +157,11 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>{roomLabel}名 *</Label>
+              <Label required>{roomLabel}名</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>{areaLabel} *</Label>
+              <Label required>{areaLabel}</Label>
               <Select value={form.area_id} onValueChange={v => setForm({ ...form, area_id: v ?? '' })}>
                 <SelectTrigger>
                   <SelectValue placeholder={`${areaLabel}を選択`}>
@@ -173,8 +184,10 @@ export function RoomList({ rooms: initialRooms, storeId, areas, areaLabel, roomL
               <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
             </div>
             <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-              <Button onClick={handleSave} disabled={!form.name || !form.area_id}>保存</Button>
+              <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>キャンセル</Button>
+              <Button onClick={handleSave} disabled={saving || !form.name || !form.area_id}>
+                {saving ? '保存中...' : '保存'}
+              </Button>
             </div>
           </div>
         </DialogContent>

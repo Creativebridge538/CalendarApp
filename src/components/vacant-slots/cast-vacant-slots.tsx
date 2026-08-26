@@ -12,7 +12,12 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { sendPushNotification } from '@/lib/push'
 import type { Database } from '@/lib/supabase/database.types'
 
-interface Slot { id: string; date: string; start_time: string; end_time: string; notes: string | null; room_id: string | null; capacity: number; rooms: { name: string } | null }
+interface Slot {
+  id: string; date: string; start_time: string; end_time: string; notes: string | null
+  room_id: string | null; area_id: string | null; capacity: number
+  rooms: { name: string } | null; areas: { name: string } | null
+  vacant_slot_applications: { status: string }[]
+}
 interface Application { vacant_slot_id: string; status: string; shift_id: string | null }
 
 interface Props {
@@ -20,9 +25,12 @@ interface Props {
   myApplications: Application[]
   castId: string
   storeId: string
+  locationMode: string
+  areaLabel: string
+  roomLabel: string
 }
 
-export function CastVacantSlots({ slots: initialSlots, myApplications: initial, castId, storeId }: Props) {
+export function CastVacantSlots({ slots: initialSlots, myApplications: initial, castId, storeId, locationMode, areaLabel, roomLabel }: Props) {
   const [slots, setSlots] = useState(initialSlots)
   const [applications, setApplications] = useState(initial)
   const supabase = createClient()
@@ -51,7 +59,8 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
             if (!existing) {
               return [...prev, {
                 id: row.id, date: row.date, start_time: row.start_time, end_time: row.end_time,
-                notes: row.notes, room_id: row.room_id, capacity: row.capacity, rooms: null,
+                notes: row.notes, room_id: row.room_id, area_id: row.area_id, capacity: row.capacity,
+                rooms: null, areas: null, vacant_slot_applications: [],
               }]
             }
             return prev.map(s => s.id === row.id ? {
@@ -83,6 +92,7 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
   async function apply(slotId: string) {
     const slot = slots.find(s => s.id === slotId)
     if (!slot) return
+    if (isFull(slot)) { toast.error('この空き枠は満員です'); return }
 
     // 申請した時点でキャストのカレンダーにも仮予定（提出済み扱い）として反映する
     const { data: shift, error: shiftError } = await supabase.from('shifts').insert({
@@ -107,22 +117,36 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
     }
   }
 
-  function StatusControl({ slotId, block }: { slotId: string; block?: boolean }) {
-    const status = getStatus(slotId)
+  function isFull(slot: Slot): boolean {
+    return slot.vacant_slot_applications.filter(a => a.status === 'approved').length >= slot.capacity
+  }
+
+  function locationText(slot: Slot): string {
+    if (locationMode === 'area_only') return slot.areas?.name ?? `${areaLabel}未指定`
+    if (locationMode === 'area_and_room') return [slot.areas?.name, slot.rooms?.name].filter(Boolean).join(' / ') || `${roomLabel}未指定`
+    return slot.rooms?.name ?? `${roomLabel}未指定`
+  }
+
+  // 定員に達した空き枠は、既に自分が申請済みのもの以外は一覧から除外する
+  const visibleSlots = slots.filter(slot => !isFull(slot) || getStatus(slot.id) !== null)
+
+  function StatusControl({ slot, block }: { slot: Slot; block?: boolean }) {
+    const status = getStatus(slot.id)
     if (status === 'approved') return <Badge>承認済み</Badge>
-    if (status === 'rejected') return <Badge variant="destructive">却下</Badge>
+    if (status === 'rejected') return <Badge variant="destructive">不承認</Badge>
     if (status === 'pending') {
       return (
         <div className={`flex items-center gap-2 ${block ? 'w-full' : 'justify-end'}`}>
           <Badge variant="secondary">申請中</Badge>
-          <Button size="sm" variant="outline" className="text-destructive" onClick={() => cancelApplication(slotId)}>
+          <Button size="sm" variant="outline" className="text-destructive" onClick={() => cancelApplication(slot.id)}>
             取消
           </Button>
         </div>
       )
     }
+    if (isFull(slot)) return <Badge variant="outline">満員</Badge>
     return (
-      <Button size="sm" variant="tonal" className={block ? 'w-full' : undefined} onClick={() => apply(slotId)}>
+      <Button size="sm" variant="tonal" className={block ? 'w-full' : undefined} onClick={() => apply(slot.id)}>
         申請する
       </Button>
     )
@@ -132,21 +156,21 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
     <Card elevated className="rounded-none border-x-0 md:rounded-lg md:border-x">
       <CardHeader className="px-4 md:px-6"><CardTitle>空き枠一覧</CardTitle></CardHeader>
       <CardContent className="px-0 md:px-6">
-        {slots.length === 0 && (
+        {visibleSlots.length === 0 && (
           <p className="text-center text-muted-foreground py-8 text-sm">公開中の空き枠はありません</p>
         )}
 
         {/* モバイル: カードレイアウト */}
-        {slots.length > 0 && (
+        {visibleSlots.length > 0 && (
           <div className="md:hidden space-y-2 px-4">
-            {slots.map(slot => (
+            {visibleSlots.map(slot => (
               <div key={slot.id} className="rounded-lg border p-3 space-y-2">
                 <div className="flex items-center justify-between gap-2">
                   <span className="font-semibold text-sm">{format(new Date(slot.date), 'M月d日(E)', { locale: ja })}</span>
                   <span className="text-sm text-muted-foreground">{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</span>
                 </div>
                 <div className="text-sm text-muted-foreground flex items-center gap-1 flex-wrap">
-                  <span>{slot.rooms?.name ?? 'ルーム未指定'}</span>
+                  <span>{locationText(slot)}</span>
                   {slot.capacity > 1 && (
                     <>
                       <span>・</span>
@@ -161,7 +185,7 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
                   )}
                 </div>
                 <div className="pt-1">
-                  <StatusControl slotId={slot.id} block />
+                  <StatusControl slot={slot} block />
                 </div>
               </div>
             ))}
@@ -169,27 +193,27 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
         )}
 
         {/* デスクトップ: テーブル */}
-        {slots.length > 0 && (
+        {visibleSlots.length > 0 && (
           <Table className="hidden md:table">
             <TableHeader>
               <TableRow>
                 <TableHead>日付</TableHead>
                 <TableHead>時間</TableHead>
-                <TableHead>ルーム</TableHead>
+                <TableHead>{locationMode === 'area_only' ? areaLabel : locationMode === 'area_and_room' ? `${areaLabel}/${roomLabel}` : roomLabel}</TableHead>
                 <TableHead>募集人数</TableHead>
                 <TableHead>備考</TableHead>
                 <TableHead className="text-right">申請</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {slots.map(slot => (
+              {visibleSlots.map(slot => (
                 <TableRow key={slot.id}>
                   <TableCell>{format(new Date(slot.date), 'M/d(E)', { locale: ja })}</TableCell>
                   <TableCell>{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</TableCell>
-                  <TableCell>{slot.rooms?.name ?? '—'}</TableCell>
+                  <TableCell>{locationText(slot)}</TableCell>
                   <TableCell>{slot.capacity}人</TableCell>
                   <TableCell>{slot.notes ?? '—'}</TableCell>
-                  <TableCell className="text-right"><StatusControl slotId={slot.id} /></TableCell>
+                  <TableCell className="text-right"><StatusControl slot={slot} /></TableCell>
                 </TableRow>
               ))}
             </TableBody>

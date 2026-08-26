@@ -325,6 +325,16 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     }
   }
 
+  // 一覧のクイック差し戻しボタンは詳細モーダルを開かずに済む分、理由の入力欄がない。
+  // 理由なしで差し戻すとキャストが「何を直せばいいか分からない」状態になるため、
+  // ここで理由の入力を必須にしてからchangeStatusを呼ぶ
+  function quickReject(shift: Shift) {
+    const reason = prompt('差し戻し理由を入力してください（キャストに表示されます）', shift.admin_note ?? '')
+    if (reason === null) return
+    if (!reason.trim()) { toast.error('差し戻し理由を入力してください'); return }
+    changeStatus(shift, 'rejected', reason.trim())
+  }
+
   return (
     <Card className="rounded-none border-x-0 md:rounded-lg md:border-x">
       <CardHeader className="px-4 md:px-6">
@@ -490,7 +500,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                           <Check className="h-3.5 w-3.5 mr-1" /> 確定
                         </Button>
                         <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
-                          onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
+                          onClick={e => { e.stopPropagation(); quickReject(shift) }}>
                           <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
                         </Button>
                       </>
@@ -558,7 +568,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                             <Check className="h-3.5 w-3.5 mr-1" /> 確定
                           </Button>
                           <Button size="sm" variant="outline" className="text-destructive border-destructive/30" disabled={shift.status === 'rejected'}
-                            onClick={e => { e.stopPropagation(); changeStatus(shift, 'rejected', shift.admin_note ?? '') }}>
+                            onClick={e => { e.stopPropagation(); quickReject(shift) }}>
                             <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
                           </Button>
                         </>

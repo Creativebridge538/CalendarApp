@@ -12,9 +12,9 @@ export default async function CastVacantSlotsPage() {
     return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
   }
 
-  const [{ data: slots }, { data: myApplications }] = await Promise.all([
+  const [{ data: slots }, { data: myApplications }, { data: settings }] = await Promise.all([
     supabase.from('vacant_slots')
-      .select('*, rooms(name)')
+      .select('*, rooms(name), areas(name), vacant_slot_applications(status)')
       .eq('store_id', profile.store_id)
       .eq('is_published', true)
       .gte('date', new Date().toISOString().split('T')[0])
@@ -22,11 +22,17 @@ export default async function CastVacantSlotsPage() {
     supabase.from('vacant_slot_applications')
       .select('vacant_slot_id, status, shift_id')
       .eq('cast_id', user.id),
+    supabase.from('store_settings').select('location_mode, area_label, room_label').eq('store_id', profile.store_id).single(),
   ])
 
   return (
     <div className="px-0 py-4 md:p-6">
-      <CastVacantSlots slots={slots ?? []} myApplications={myApplications ?? []} castId={user.id} storeId={profile.store_id} />
+      <CastVacantSlots
+        slots={slots ?? []} myApplications={myApplications ?? []} castId={user.id} storeId={profile.store_id}
+        locationMode={settings?.location_mode ?? 'room'}
+        areaLabel={settings?.area_label ?? 'エリア'}
+        roomLabel={settings?.room_label ?? 'ルーム'}
+      />
     </div>
   )
 }

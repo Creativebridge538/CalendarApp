@@ -979,6 +979,7 @@ export type Database = {
       }
       vacant_slots: {
         Row: {
+          area_id: string | null
           capacity: number
           created_at: string
           created_by: string
@@ -992,6 +993,7 @@ export type Database = {
           store_id: string
         }
         Insert: {
+          area_id?: string | null
           capacity?: number
           created_at?: string
           created_by: string
@@ -1005,6 +1007,7 @@ export type Database = {
           store_id: string
         }
         Update: {
+          area_id?: string | null
           capacity?: number
           created_at?: string
           created_by?: string
@@ -1018,6 +1021,13 @@ export type Database = {
           store_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "vacant_slots_area_id_fkey"
+            columns: ["area_id"]
+            isOneToOne: false
+            referencedRelation: "areas"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "vacant_slots_created_by_fkey"
             columns: ["created_by"]

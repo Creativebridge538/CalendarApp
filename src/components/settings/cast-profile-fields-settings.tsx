@@ -144,7 +144,7 @@ export function CastProfileFieldsSettings({ fields: initialFields, storeId }: Pr
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>項目名 *</Label>
+              <Label required>項目名</Label>
               <Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="例: 身長" />
             </div>
             <div className="space-y-1.5">

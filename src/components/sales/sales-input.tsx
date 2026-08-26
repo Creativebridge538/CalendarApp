@@ -688,7 +688,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>キャスト *</Label>
+                  <Label required>キャスト</Label>
                   <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
                     <SelectTrigger>
                       <SelectValue placeholder="選択">
@@ -701,7 +701,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>日付 *</Label>
+                  <Label required>日付</Label>
                   <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
@@ -718,12 +718,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 </div>
                 {form.platform === 'manual' ? (
                   <div className="space-y-1.5">
-                    <Label>売上金額（円）*</Label>
+                    <Label required>売上金額（円）</Label>
                     <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
                   </div>
                 ) : (
                   <div className="space-y-1.5">
-                    <Label>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'} *</Label>
+                    <Label required>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'}</Label>
                     <Input type="number" min="0" value={form.raw_units} onChange={e => setForm({ ...form, raw_units: e.target.value })} placeholder="0" />
                   </div>
                 )}

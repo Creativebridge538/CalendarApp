@@ -17,7 +17,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { Switch } from '@/components/ui/switch'
 import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
-import { Plus, Check, X, ChevronDown, Trash2 } from 'lucide-react'
+import { Plus, Check, X, ChevronDown, Trash2, Loader2 } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { shiftConflictMessage } from '@/lib/shift-conflict'
 import { usePagination } from '@/hooks/use-pagination'
@@ -25,51 +25,112 @@ import { usePagination } from '@/hooks/use-pagination'
 interface Application { id: string; status: string; cast_id: string; shift_id: string | null; cast: { display_name: string | null } | null }
 interface Slot {
   id: string; date: string; start_time: string; end_time: string; notes: string | null; is_published: boolean
-  room_id: string | null; capacity: number
+  room_id: string | null; area_id: string | null; capacity: number
   rooms: { name: string } | null
+  areas: { name: string } | null
   vacant_slot_applications: Application[]
 }
 
 interface Props {
   slots: Slot[]
-  rooms: { id: string; name: string }[]
+  rooms: { id: string; name: string; area_id: string | null; capacity: number | null }[]
+  areas: { id: string; name: string }[]
   storeId: string
   userId: string
+  locationMode: string
+  areaLabel: string
+  roomLabel: string
 }
 
-export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId }: Props) {
+export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, userId, locationMode, areaLabel, roomLabel }: Props) {
   const [slots, setSlots] = useState(initialSlots)
   const [open, setOpen] = useState(false)
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
-  const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '', capacity: '1' })
+  const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', capacity: '1' })
+  const [creating, setCreating] = useState(false)
+  const [savingSlotId, setSavingSlotId] = useState<string | null>(null)
+  const [savingAppId, setSavingAppId] = useState<string | null>(null)
   const supabase = createClient()
   const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(slots)
 
+  const filteredRooms = locationMode === 'area_and_room' && form.area_id
+    ? rooms.filter(r => r.area_id === form.area_id)
+    : rooms
+  const selectedRoom = rooms.find(r => r.id === form.room_id)
+
+  function locationText(slot: Slot): string {
+    if (locationMode === 'area_only') return slot.areas?.name ?? '—'
+    if (locationMode === 'area_and_room') return [slot.areas?.name, slot.rooms?.name].filter(Boolean).join(' / ') || '—'
+    return slot.rooms?.name ?? '—'
+  }
+
+  // 同じルーム・日時に既に提出済み/確定シフトがある場合、空き枠作成前に確認する
+  async function hasExistingShift(roomId: string, date: string, startTime: string, endTime: string) {
+    const prevDay = format(addDays(new Date(`${date}T00:00:00`), -1), 'yyyy-MM-dd')
+    const nextDay = format(addDays(new Date(`${date}T00:00:00`), 1), 'yyyy-MM-dd')
+    const { data } = await supabase.from('shifts').select('id, date, start_time, end_time')
+      .eq('store_id', storeId).eq('room_id', roomId).in('status', ['submitted', 'confirmed'])
+      .gte('date', prevDay).lte('date', nextDay)
+    if (!data) return false
+
+    const toRange = (d: string, s: string, e: string) => {
+      const start = new Date(`${d}T${s}`)
+      let end = new Date(`${d}T${e}`)
+      if (end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000)
+      return [start.getTime(), end.getTime()] as const
+    }
+    const [newStart, newEnd] = toRange(date, startTime, endTime)
+    return data.some(s => {
+      const [start, end] = toRange(s.date, s.start_time.slice(0, 5), s.end_time.slice(0, 5))
+      return newStart < end && start < newEnd
+    })
+  }
+
   async function handleCreate() {
     const capacity = Math.max(1, parseInt(form.capacity) || 1)
+    if (selectedRoom?.capacity != null && capacity > selectedRoom.capacity) {
+      toast.error(`このルームの定員は${selectedRoom.capacity}人です`)
+      return
+    }
+    if (form.room_id) {
+      const conflict = await hasExistingShift(form.room_id, form.date, form.start_time, form.end_time)
+      if (conflict && !confirm('この時間帯には既に提出済み・確定済みのシフトがあります。シフトが提出されていますが、空き枠を追加しますか？')) return
+    }
+
+    setCreating(true)
     const { data, error } = await supabase.from('vacant_slots').insert({
       store_id: storeId, created_by: userId,
       date: form.date, start_time: form.start_time, end_time: form.end_time,
+      area_id: (locationMode === 'area_only' || locationMode === 'area_and_room') ? (form.area_id || null) : null,
       room_id: form.room_id || null, notes: form.notes || null, is_published: true, capacity,
-    }).select('*, rooms(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
+    }).select('*, rooms(name), areas(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
+    setCreating(false)
     if (error) { toast.error('登録に失敗しました'); return }
     setSlots([data, ...slots])
     toast.success('空き枠を登録しました')
     setOpen(false)
-    setForm({ date: '', start_time: '18:00', end_time: '23:00', room_id: '', notes: '', capacity: '1' })
+    setForm({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', capacity: '1' })
   }
 
   async function updateCapacity(slot: Slot, capacity: number) {
     if (capacity === slot.capacity || capacity < 1) return
+    const room = rooms.find(r => r.id === slot.room_id)
+    if (room?.capacity != null && capacity > room.capacity) {
+      toast.error(`このルームの定員は${room.capacity}人です`)
+      return
+    }
+    setSavingSlotId(slot.id)
     const { error } = await supabase.from('vacant_slots').update({ capacity }).eq('id', slot.id)
+    setSavingSlotId(null)
     if (error) { toast.error('募集人数の更新に失敗しました'); return }
     setSlots(slots.map(s => s.id === slot.id ? { ...s, capacity } : s))
   }
 
   async function togglePublish(slot: Slot) {
     const nextPublished = !slot.is_published
+    setSavingSlotId(slot.id)
     const { error } = await supabase.from('vacant_slots').update({ is_published: nextPublished }).eq('id', slot.id)
-    if (error) { toast.error('更新に失敗しました'); return }
+    if (error) { setSavingSlotId(null); toast.error('更新に失敗しました'); return }
 
     let apps = slot.vacant_slot_applications
     if (!nextPublished) {
@@ -99,11 +160,13 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
     }
 
     setSlots(slots.map(s => s.id === slot.id ? { ...s, is_published: nextPublished, vacant_slot_applications: apps } : s))
+    setSavingSlotId(null)
     toast.success(nextPublished ? '公開しました' : '非公開にしました')
   }
 
   async function deleteSlot(slot: Slot) {
     if (!confirm('この空き枠を削除しますか？申請中の仮予定もあわせて削除されます。')) return
+    setSavingSlotId(slot.id)
     // 承認待ちの申請に紐づく仮予定（提出済みシフト）は空き枠と一緒に消す
     const pendingShiftIds = slot.vacant_slot_applications
       .filter(a => a.status === 'pending' && a.shift_id)
@@ -112,6 +175,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
       await supabase.from('shifts').delete().in('id', pendingShiftIds)
     }
     const { error } = await supabase.from('vacant_slots').delete().eq('id', slot.id)
+    setSavingSlotId(null)
     if (error) { toast.error('削除に失敗しました'); return }
     setSlots(slots.filter(s => s.id !== slot.id))
     toast.success('空き枠を削除しました')
@@ -155,10 +219,11 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
       }
     }
 
+    setSavingAppId(appId)
     const updates: { status: 'approved' | 'rejected' | 'pending'; reviewed_at: string | null } =
       { status: nextStatus, reviewed_at: nextStatus === 'pending' ? null : new Date().toISOString() }
     const { error: e1 } = await supabase.from('vacant_slot_applications').update(updates).eq('id', appId)
-    if (e1) { toast.error('処理に失敗しました'); return }
+    if (e1) { setSavingAppId(null); toast.error('処理に失敗しました'); return }
 
     if (nextStatus === 'approved') {
       const { error: e2 } = app?.shift_id
@@ -171,6 +236,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
           })
         : { error: null }
       if (e2) {
+        setSavingAppId(null)
         toast.error(shiftConflictMessage(e2, '承認に失敗しました'))
         return
       }
@@ -184,10 +250,11 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
       ...s,
       vacant_slot_applications: s.vacant_slot_applications.map(a => a.id === appId ? { ...a, status: nextStatus } : a),
     } : s))
-    toast.success(nextStatus === 'approved' ? '承認しました' : nextStatus === 'rejected' ? '却下しました' : '承認を取り消しました')
+    setSavingAppId(null)
+    toast.success(nextStatus === 'approved' ? '承認しました' : nextStatus === 'rejected' ? '不承認にしました' : '承認を取り消しました')
 
     if (slot && nextStatus !== 'pending') {
-      const title = nextStatus === 'approved' ? '空き枠申請が承認されました' : '空き枠申請が却下されました'
+      const title = nextStatus === 'approved' ? '空き枠申請が承認されました' : '空き枠申請が不承認になりました'
       const body = `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} の空き枠`
       await supabase.from('notifications').insert({ user_id: castId, title, body, link: '/cast/vacant-slots' })
       sendPushNotification(castId, title, body, '/cast/vacant-slots')
@@ -206,7 +273,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
             <TableRow>
               <TableHead>日付</TableHead>
               <TableHead>時間</TableHead>
-              <TableHead>ルーム</TableHead>
+              <TableHead>{locationMode === 'area_only' ? areaLabel : locationMode === 'area_and_room' ? `${areaLabel}/${roomLabel}` : roomLabel}</TableHead>
               <TableHead>定員</TableHead>
               <TableHead>公開</TableHead>
               <TableHead>申請</TableHead>
@@ -220,21 +287,22 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
             {paged.map(slot => {
               const approvedCount = slot.vacant_slot_applications.filter(a => a.status === 'approved').length
               const isFull = approvedCount >= slot.capacity
+              const slotSaving = savingSlotId === slot.id
               return (
               <Fragment key={slot.id}>
                 <TableRow>
                   <TableCell>{format(new Date(slot.date), 'M/d(E)', { locale: ja })}</TableCell>
                   <TableCell>{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</TableCell>
-                  <TableCell>{slot.rooms?.name ?? '—'}</TableCell>
+                  <TableCell>{locationText(slot)}</TableCell>
                   <TableCell>
                     <Input
                       key={slot.capacity} type="number" min="1" defaultValue={slot.capacity}
-                      className="w-16 h-8"
+                      className="w-16 h-8" disabled={slotSaving}
                       onBlur={e => updateCapacity(slot, Math.max(1, parseInt(e.target.value) || 1))}
                     />
                   </TableCell>
                   <TableCell>
-                    <Switch checked={slot.is_published} onCheckedChange={() => togglePublish(slot)} />
+                    <Switch checked={slot.is_published} disabled={slotSaving} onCheckedChange={() => togglePublish(slot)} />
                   </TableCell>
                   <TableCell className="space-x-1">
                     <Badge variant={isFull ? 'default' : 'outline'}>承認 {approvedCount}/{slot.capacity}</Badge>
@@ -243,43 +311,46 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
                     )}
                   </TableCell>
                   <TableCell className="text-right">
-                    <Button size="icon" variant="ghost" onClick={() => deleteSlot(slot)} aria-label="削除">
-                      <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                    <Button size="icon" variant="ghost" onClick={() => deleteSlot(slot)} disabled={slotSaving} aria-label="削除">
+                      {slotSaving ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Trash2 className="h-3.5 w-3.5 text-destructive" />}
                     </Button>
                   </TableCell>
                 </TableRow>
-                {slot.vacant_slot_applications.map(app => (
+                {slot.vacant_slot_applications.map(app => {
+                  const appSaving = savingAppId === app.id
+                  return (
                   <TableRow key={app.id} className={app.status === 'pending' ? 'bg-primary/10' : ''}>
                     <TableCell colSpan={3} className="pl-8 text-sm">
                       申請: {app.cast?.display_name ?? '—'}
                     </TableCell>
                     <TableCell>
                       <Badge variant={app.status === 'approved' ? 'default' : app.status === 'rejected' ? 'destructive' : 'outline'}>
-                        {app.status === 'approved' ? '承認済み' : app.status === 'rejected' ? '却下' : '保留中'}
+                        {app.status === 'approved' ? '承認済み' : app.status === 'rejected' ? '不承認' : '保留中'}
                       </Badge>
                     </TableCell>
                     <TableCell colSpan={2} className="text-right space-x-1">
                       {app.status !== 'approved' && (
-                        <Button size="sm" variant="outline" className="text-positive h-7" disabled={app.status === 'pending' && isFull}
+                        <Button size="sm" variant="outline" className="text-positive h-7" disabled={appSaving || (app.status === 'pending' && isFull)}
                           onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'approved')}>
-                          <Check className="h-3 w-3 mr-1" />承認
+                          {appSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}承認
                         </Button>
                       )}
                       {app.status === 'approved' && (
-                        <Button size="sm" variant="outline" className="h-7"
+                        <Button size="sm" variant="outline" className="h-7" disabled={appSaving}
                           onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'pending')}>
-                          承認を取消
+                          {appSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}承認を取消
                         </Button>
                       )}
                       {app.status !== 'rejected' && (
-                        <Button size="sm" variant="destructive" className="h-7"
+                        <Button size="sm" variant="destructive" className="h-7" disabled={appSaving}
                           onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'rejected')}>
-                          <X className="h-3 w-3 mr-1" />却下
+                          {appSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <X className="h-3 w-3 mr-1" />}不承認
                         </Button>
                       )}
                     </TableCell>
                   </TableRow>
-                ))}
+                  )
+                })}
               </Fragment>
               )
             })}
@@ -296,7 +367,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
           <DialogHeader><DialogTitle>空き枠追加</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>日付 *</Label>
+              <Label required>日付</Label>
               <button
                 type="button"
                 onClick={() => setDateCalendarOpen(o => !o)}
@@ -322,24 +393,48 @@ export function VacantSlotManager({ slots: initialSlots, rooms, storeId, userId 
             <div className="space-y-1.5">
               <Label>募集人数</Label>
               <Input type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
+              {selectedRoom?.capacity != null && (
+                <p className="text-xs text-muted-foreground">このルームの定員は{selectedRoom.capacity}人です</p>
+              )}
             </div>
-            {rooms.length > 0 && (
+            {(locationMode === 'area_only' || locationMode === 'area_and_room') && areas.length > 0 && (
               <div className="space-y-1.5">
-                <Label>ルーム</Label>
-                <Select value={form.room_id} onValueChange={v => setForm({ ...form, room_id: v ?? '' })}>
+                <Label>{areaLabel}</Label>
+                <Select value={form.area_id || 'none'} onValueChange={v => setForm({ ...form, area_id: v === 'none' ? '' : (v ?? ''), room_id: '' })}>
                   <SelectTrigger>
-                    <SelectValue placeholder="選択（任意）">
-                      {form.room_id ? rooms.find(r => r.id === form.room_id)?.name : undefined}
+                    <SelectValue placeholder={areaLabel}>
+                      {form.area_id ? (areas.find(a => a.id === form.area_id)?.name ?? '未選択') : '未選択'}
                     </SelectValue>
                   </SelectTrigger>
-                  <SelectContent>{rooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}</SelectContent>
+                  <SelectContent>
+                    <SelectItem value="none">未選択</SelectItem>
+                    {areas.map(a => <SelectItem key={a.id} value={a.id}>{a.name}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {(locationMode === 'room' || (locationMode === 'area_and_room' && form.area_id)) && filteredRooms.length > 0 && (
+              <div className="space-y-1.5">
+                <Label>{roomLabel}</Label>
+                <Select value={form.room_id || 'none'} onValueChange={v => setForm({ ...form, room_id: v === 'none' ? '' : (v ?? '') })}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="選択（任意）">
+                      {form.room_id ? filteredRooms.find(r => r.id === form.room_id)?.name : '未選択'}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">未選択</SelectItem>
+                    {filteredRooms.map(r => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
+                  </SelectContent>
                 </Select>
               </div>
             )}
             <div className="space-y-1.5"><Label>備考</Label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-              <Button onClick={handleCreate} disabled={!form.date}>登録</Button>
+              <Button onClick={handleCreate} disabled={!form.date || creating}>
+                {creating && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}登録
+              </Button>
             </div>
           </div>
         </DialogContent>

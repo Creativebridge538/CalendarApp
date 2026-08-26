@@ -17,7 +17,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
-import { Check, X, ChevronDown, Pencil, Ban } from 'lucide-react'
+import { Check, X, ChevronDown, Pencil, Ban, Loader2 } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { usePagination } from '@/hooks/use-pagination'
 
@@ -46,6 +46,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
   const [approveTarget, setApproveTarget] = useState<Request | null>(null)
   const [approveForm, setApproveForm] = useState({ date: '', start_time: '18:00', end_time: '23:00' })
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
+  const [processingId, setProcessingId] = useState<string | null>(null)
   const supabase = createClient()
   const searchParams = useSearchParams()
   const highlightShiftId = searchParams.get('shift')
@@ -76,6 +77,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
       date: approveForm.date, start_time: approveForm.start_time, end_time: approveForm.end_time,
     }
 
+    setProcessingId(req.id)
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
       supabase.from('shift_modification_requests').update({
         status: 'approved', reviewed_at: new Date().toISOString(),
@@ -83,11 +85,13 @@ export function ModificationRequestList({ requests: initialRequests }: { request
       supabase.from('shifts').update(updateShift).eq('id', req.shift_id),
     ])
     if (e1 || e2) {
+      setProcessingId(null)
       // 23P01 = exclusion_violation。変更後の時間帯に別の確定シフトが割り込んでいた場合
       toast.error((e2 as { code?: string } | null)?.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '承認に失敗しました')
       return
     }
     setRequests(requests.filter(r => r.id !== req.id))
+    setProcessingId(null)
     toast.success('承認して確定しました')
     setApproveTarget(null)
     const title = 'シフト修正申請が承認されました'
@@ -98,14 +102,16 @@ export function ModificationRequestList({ requests: initialRequests }: { request
 
   async function handleApproveAndCancel(req: Request) {
     if (!confirm('この申請を承認し、シフトをキャンセル（削除）しますか？この操作は元に戻せません。')) return
+    setProcessingId(req.id)
     const [{ error: e1 }, { error: e2 }] = await Promise.all([
       supabase.from('shift_modification_requests').update({
         status: 'approved', reviewed_at: new Date().toISOString(),
       }).eq('id', req.id),
       supabase.from('shifts').delete().eq('id', req.shift_id),
     ])
-    if (e1 || e2) { toast.error('処理に失敗しました'); return }
+    if (e1 || e2) { setProcessingId(null); toast.error('処理に失敗しました'); return }
     setRequests(requests.filter(r => r.id !== req.id))
+    setProcessingId(null)
     toast.success('承認してシフトをキャンセルしました')
     const title = 'シフトがキャンセルされました'
     const body = req.shifts
@@ -117,6 +123,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
 
   async function handleReject() {
     if (!rejectTarget || !rejectReason.trim()) return
+    setProcessingId(rejectTarget.id)
     const [{ error }, { error: statusError }] = await Promise.all([
       supabase.from('shift_modification_requests').update({
         status: 'rejected', reject_reason: rejectReason, reviewed_at: new Date().toISOString(),
@@ -124,11 +131,13 @@ export function ModificationRequestList({ requests: initialRequests }: { request
       supabase.from('shifts').update({ status: 'confirmed' }).eq('id', rejectTarget.shift_id),
     ])
     if (error || statusError) {
+      setProcessingId(null)
       // 23P01 = exclusion_violation。元の時間帯に別の確定シフトが割り込んでいた場合
       toast.error(statusError?.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '却下に失敗しました')
       return
     }
     setRequests(requests.filter(r => r.id !== rejectTarget.id))
+    setProcessingId(null)
     toast.success('却下しました')
     const title = 'シフト修正申請が却下されました'
     const body = `却下理由: ${rejectReason}`
@@ -188,13 +197,13 @@ export function ModificationRequestList({ requests: initialRequests }: { request
                   <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
                   <TableCell>{format(new Date(req.created_at), 'M/d', { locale: ja })}</TableCell>
                   <TableCell className="text-right space-x-1 whitespace-nowrap">
-                    <Button size="sm" variant="outline" className="text-positive" onClick={() => openApprove(req)}>
+                    <Button size="sm" variant="outline" className="text-positive" disabled={processingId === req.id} onClick={() => openApprove(req)}>
                       <Check className="h-3.5 w-3.5 mr-1" />承認して確定
                     </Button>
-                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30" onClick={() => handleApproveAndCancel(req)}>
-                      <Ban className="h-3.5 w-3.5 mr-1" />承認してキャンセル
+                    <Button size="sm" variant="outline" className="text-destructive border-destructive/30" disabled={processingId === req.id} onClick={() => handleApproveAndCancel(req)}>
+                      {processingId === req.id ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Ban className="h-3.5 w-3.5 mr-1" />}承認してキャンセル
                     </Button>
-                    <Button size="sm" variant="destructive" onClick={() => { setRejectTarget(req); setRejectReason('') }}>
+                    <Button size="sm" variant="destructive" disabled={processingId === req.id} onClick={() => { setRejectTarget(req); setRejectReason('') }}>
                       <X className="h-3.5 w-3.5 mr-1" />却下
                     </Button>
                   </TableCell>
@@ -250,8 +259,8 @@ export function ModificationRequestList({ requests: initialRequests }: { request
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setApproveTarget(null)}>キャンセル</Button>
-              <Button onClick={handleApprove} disabled={!approveForm.date}>
-                <Pencil className="h-3.5 w-3.5 mr-1" />この内容で承認して確定
+              <Button onClick={handleApprove} disabled={!approveForm.date || processingId === approveTarget?.id}>
+                {processingId === approveTarget?.id ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" /> : <Pencil className="h-3.5 w-3.5 mr-1" />}この内容で承認して確定
               </Button>
             </div>
           </div>
@@ -263,12 +272,14 @@ export function ModificationRequestList({ requests: initialRequests }: { request
           <DialogHeader><DialogTitle>却下理由</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>理由 *</Label>
+              <Label required>理由</Label>
               <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} placeholder="却下理由を入力してください" />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setRejectTarget(null)}>キャンセル</Button>
-              <Button variant="destructive" onClick={handleReject} disabled={!rejectReason.trim()}>却下する</Button>
+              <Button variant="destructive" onClick={handleReject} disabled={!rejectReason.trim() || processingId === rejectTarget?.id}>
+                {processingId === rejectTarget?.id && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}却下する
+              </Button>
             </div>
           </div>
         </DialogContent>

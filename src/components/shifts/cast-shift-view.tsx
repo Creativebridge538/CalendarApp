@@ -1365,7 +1365,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 シフト提出の締切を過ぎています。このまま提出はできません。管理者にお問い合わせください
               </div>
             )}
-            <div className="space-y-1.5"><Label>日付 *</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+            <div className="space-y-1.5"><Label required>日付</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5 min-w-0"><Label>開始時間</Label><Input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></div>
               <div className="space-y-1.5 min-w-0"><Label>終了時間</Label><Input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></div>
@@ -1684,7 +1684,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
               <div className="space-y-1.5 min-w-0"><Label>終了時間</Label><Input type="time" value={modForm.new_end_time} onChange={e => setModForm({ ...modForm, new_end_time: e.target.value })} /></div>
             </div>
             <div className="space-y-1.5">
-              <Label>申請理由 *</Label>
+              <Label required>申請理由</Label>
               <Textarea
                 value={modForm.reason}
                 onChange={e => setModForm({ ...modForm, reason: e.target.value })}

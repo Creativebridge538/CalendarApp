@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User, Copy } from 'lucide-react'
+import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User, Copy, Loader2 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { toHalfWidthDigits } from '@/lib/zenkaku'
@@ -48,6 +48,8 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
+  const [bulkToggling, setBulkToggling] = useState(false)
   const supabase = createClient()
   const { page, setPage, pageSize, setPageSize, totalPages, paged: pagedCasts, totalItems } = usePagination(casts)
 
@@ -63,7 +65,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   async function bulkSetActive(isActive: boolean) {
     const ids = Array.from(selected)
     if (ids.length === 0) return
+    setBulkToggling(true)
     const { error } = await supabase.from('users').update({ is_active: isActive }).in('id', ids)
+    setBulkToggling(false)
     if (error) { toast.error('更新に失敗しました'); return }
     setCasts(casts.map(c => ids.includes(c.id) ? { ...c, is_active: isActive } : c))
     setSelected(new Set())
@@ -193,7 +197,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   async function toggleActive(cast: CastUser) {
     // 無効化は影響が大きい（ログイン不可・一覧から外れる）ので確認を挟む。再有効化は即実行してよい
     if (cast.is_active) { setDeactivateTarget(cast); return }
+    setTogglingId(cast.id)
     const { error } = await supabase.from('users').update({ is_active: true }).eq('id', cast.id)
+    setTogglingId(null)
     if (error) { toast.error('更新に失敗しました'); return }
     setCasts(casts.map(c => c.id === cast.id ? { ...c, is_active: true } : c))
     toast.success('有効にしました')
@@ -202,7 +208,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   async function confirmDeactivate() {
     if (!deactivateTarget) return
     const cast = deactivateTarget
+    setTogglingId(cast.id)
     const { error } = await supabase.from('users').update({ is_active: false }).eq('id', cast.id)
+    setTogglingId(null)
     setDeactivateTarget(null)
     if (error) { toast.error('更新に失敗しました'); return }
     setCasts(casts.map(c => c.id === cast.id ? { ...c, is_active: false } : c))
@@ -240,9 +248,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           <div className="flex items-center gap-2 mb-3 px-3 py-2 rounded-md bg-muted text-sm">
             <span className="font-medium">{selected.size}件選択中</span>
             <div className="ml-auto flex gap-1.5">
-              <Button size="sm" variant="outline" onClick={() => bulkSetActive(true)}>有効にする</Button>
-              <Button size="sm" variant="outline" onClick={() => bulkSetActive(false)}>無効にする</Button>
-              <Button size="sm" variant="ghost" onClick={() => setSelected(new Set())}>選択解除</Button>
+              <Button size="sm" variant="outline" disabled={bulkToggling} onClick={() => bulkSetActive(true)}>有効にする</Button>
+              <Button size="sm" variant="outline" disabled={bulkToggling} onClick={() => bulkSetActive(false)}>無効にする</Button>
+              <Button size="sm" variant="ghost" disabled={bulkToggling} onClick={() => setSelected(new Set())}>選択解除</Button>
             </div>
           </div>
         )}
@@ -290,9 +298,12 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                     <Button
                       size="sm" variant="outline"
                       className={cast.is_active ? 'text-destructive' : 'text-positive'}
+                      disabled={togglingId === cast.id}
                       onClick={() => toggleActive(cast)}
                     >
-                      {cast.is_active ? <UserX className="h-3.5 w-3.5 mr-1" /> : <UserCheck className="h-3.5 w-3.5 mr-1" />}
+                      {togglingId === cast.id
+                        ? <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />
+                        : cast.is_active ? <UserX className="h-3.5 w-3.5 mr-1" /> : <UserCheck className="h-3.5 w-3.5 mr-1" />}
                       {cast.is_active ? '無効化' : '有効化'}
                     </Button>
                   </TableCell>
@@ -334,14 +345,16 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                       role="button"
                       tabIndex={0}
                       title={cast.is_active ? '無効化' : '有効化'}
-                      onClick={e => { e.stopPropagation(); toggleActive(cast) }}
-                      onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); toggleActive(cast) } }}
+                      onClick={e => { e.stopPropagation(); if (togglingId !== cast.id) toggleActive(cast) }}
+                      onKeyDown={e => { if ((e.key === 'Enter' || e.key === ' ') && togglingId !== cast.id) { e.preventDefault(); e.stopPropagation(); toggleActive(cast) } }}
                       className={cn(
                         'absolute top-2 right-2 flex h-6 w-6 items-center justify-center rounded-full border bg-background hover:bg-accent',
                         cast.is_active ? 'text-destructive' : 'text-positive'
                       )}
                     >
-                      {cast.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
+                      {togglingId === cast.id
+                        ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                        : cast.is_active ? <UserX className="h-3.5 w-3.5" /> : <UserCheck className="h-3.5 w-3.5" />}
                     </span>
                     <div className="h-14 w-14 rounded-full overflow-hidden bg-muted flex items-center justify-center mt-1">
                       {cast.photo_url ? (
@@ -371,12 +384,12 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>メールアドレス *</Label>
+              <Label required>メールアドレス</Label>
               <Input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} placeholder="cast@example.com" />
             </div>
             {!editing ? (
               <div className="space-y-1.5">
-                <Label>パスワード *</Label>
+                <Label required>パスワード</Label>
                 <PasswordInput value={form.password} onChange={e => setForm({ ...form, password: e.target.value })} placeholder="8文字以上" autoComplete="new-password" />
               </div>
             ) : (
@@ -386,7 +399,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               </div>
             )}
             <div className="space-y-1.5">
-              <Label>ユーザーID *</Label>
+              <Label required>ユーザーID</Label>
               <div className="flex gap-2">
                 <Input
                   value={form.login_id}
@@ -401,11 +414,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <p className="text-xs text-muted-foreground">ログインURL・ユーザーID・パスワード（入力済みの場合）をコピーします</p>
             </div>
             <div className="space-y-1.5">
-              <Label>源氏名 *</Label>
+              <Label required>源氏名</Label>
               <Input value={form.display_name} onChange={e => setForm({ ...form, display_name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>本名 *</Label>
+              <Label required>本名</Label>
               <Input value={form.real_name} onChange={e => setForm({ ...form, real_name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
@@ -431,15 +444,15 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               <p className="text-sm font-medium">振込先口座</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label>銀行名 *</Label>
+                  <Label required>銀行名</Label>
                   <Input value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} placeholder="例: 三菱UFJ銀行" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>支店名 *</Label>
+                  <Label required>支店名</Label>
                   <Input value={form.bank_branch} onChange={e => setForm({ ...form, bank_branch: e.target.value })} placeholder="例: 青葉台支店" />
                 </div>
                 <div className="space-y-1.5">
-                  <Label>口座番号 *</Label>
+                  <Label required>口座番号</Label>
                   <Input
                     value={form.bank_account_number}
                     maxLength={7}
@@ -452,7 +465,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                   )}
                 </div>
                 <div className="space-y-1.5">
-                  <Label>名義人（カナ）*</Label>
+                  <Label required>名義人（カナ）</Label>
                   <Input value={form.bank_account_holder} onChange={e => setForm({ ...form, bank_account_holder: e.target.value })} placeholder="例: ヨコタ マナミ" />
                 </div>
               </div>
@@ -491,8 +504,10 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
               「{deactivateTarget?.display_name ?? '—'}」がログインできなくなり、一覧では「無効」表示になります。後からいつでも再度有効化できます。
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setDeactivateTarget(null)}>キャンセル</Button>
-              <Button variant="destructive" onClick={confirmDeactivate}>無効化する</Button>
+              <Button variant="outline" onClick={() => setDeactivateTarget(null)} disabled={togglingId === deactivateTarget?.id}>キャンセル</Button>
+              <Button variant="destructive" onClick={confirmDeactivate} disabled={togglingId === deactivateTarget?.id}>
+                {togglingId === deactivateTarget?.id && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}無効化する
+              </Button>
             </div>
           </div>
         </DialogContent>

@@ -168,12 +168,12 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
           <DialogHeader><DialogTitle>店舗名を編集</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>店舗名</Label>
+              <Label required>店舗名</Label>
               <Input value={renameValue} onChange={e => setRenameValue(e.target.value)} />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setRenameTarget(null)}>キャンセル</Button>
-              <Button onClick={submitRename} disabled={processing === renameTarget?.id}>保存</Button>
+              <Button onClick={submitRename} disabled={processing === renameTarget?.id || !renameValue.trim()}>保存</Button>
             </div>
           </div>
         </DialogContent>
@@ -184,23 +184,23 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
           <DialogHeader><DialogTitle>新規店舗を作成</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>店舗名</Label>
+              <Label required>店舗名</Label>
               <Input value={createForm.store_name} onChange={e => setCreateForm({ ...createForm, store_name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>管理者氏名</Label>
+              <Label required>管理者氏名</Label>
               <Input value={createForm.contact_name} onChange={e => setCreateForm({ ...createForm, contact_name: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>管理者メールアドレス</Label>
+              <Label required>管理者メールアドレス</Label>
               <Input type="email" value={createForm.contact_email} onChange={e => setCreateForm({ ...createForm, contact_email: e.target.value })} />
             </div>
             <div className="space-y-1.5">
-              <Label>ユーザーID</Label>
+              <Label required>ユーザーID</Label>
               <Input value={createForm.login_id} onChange={e => setCreateForm({ ...createForm, login_id: e.target.value.trim() })} placeholder="user_id" />
             </div>
             <div className="space-y-1.5">
-              <Label>パスワード</Label>
+              <Label required>パスワード</Label>
               <PasswordInput value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} placeholder="8文字以上" autoComplete="new-password" />
               <p className="text-xs text-muted-foreground">作成すると、このユーザーID・パスワードがクリップボードにコピーされます</p>
             </div>

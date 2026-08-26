@@ -11,7 +11,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Pencil, ToggleLeft, ToggleRight, GripVertical } from 'lucide-react'
+import { Plus, Pencil, ToggleLeft, ToggleRight, GripVertical, Loader2 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { usePagination } from '@/hooks/use-pagination'
 
@@ -29,6 +29,7 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
   const [editing, setEditing] = useState<Area | null>(null)
   const [form, setForm] = useState({ name: '', sort_order: '0' })
   const [saving, setSaving] = useState(false)
+  const [togglingId, setTogglingId] = useState<string | null>(null)
   const supabase = createClient()
 
   function openNew() {
@@ -67,7 +68,9 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
   }
 
   async function toggleActive(area: Area) {
+    setTogglingId(area.id)
     const { error } = await supabase.from('areas').update({ is_active: !area.is_active }).eq('id', area.id)
+    setTogglingId(null)
     if (error) { toast.error('更新に失敗しました'); return }
     setAreas(areas.map(a => a.id === area.id ? { ...a, is_active: !area.is_active } : a))
     toast.success(area.is_active ? '無効にしました' : '有効にしました')
@@ -117,10 +120,12 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
                   <Button size="icon" variant="ghost" onClick={() => openEdit(area)}>
                     <Pencil className="h-3.5 w-3.5" />
                   </Button>
-                  <Button size="icon" variant="ghost" onClick={() => toggleActive(area)}>
-                    {area.is_active
-                      ? <ToggleRight className="h-3.5 w-3.5" />
-                      : <ToggleLeft className="h-3.5 w-3.5" />}
+                  <Button size="icon" variant="ghost" disabled={togglingId === area.id} onClick={() => toggleActive(area)}>
+                    {togglingId === area.id
+                      ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      : area.is_active
+                        ? <ToggleRight className="h-3.5 w-3.5" />
+                        : <ToggleLeft className="h-3.5 w-3.5" />}
                   </Button>
                 </TableCell>
               </TableRow>
@@ -140,7 +145,7 @@ export function AreaList({ areas: initialAreas, storeId, areaLabel }: Props) {
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>{areaLabel}名 *</Label>
+              <Label required>{areaLabel}名</Label>
               <Input value={form.name} onChange={e => setForm({ ...form, name: e.target.value })} placeholder="例: VIPフロア" />
             </div>
             <div className="space-y-1.5">

@@ -172,7 +172,7 @@ export function ShiftChecklistSettings({ items: initialItems, storeId }: Props) 
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
-              <Label>項目名 *</Label>
+              <Label required>項目名</Label>
               <Input value={form.label} onChange={e => setForm({ ...form, label: e.target.value })} placeholder="例: 本指名あり" />
             </div>
             <div className="space-y-1.5">
@@ -189,7 +189,7 @@ export function ShiftChecklistSettings({ items: initialItems, storeId }: Props) 
             </div>
             {form.item_type === 'select' && (
               <div className="space-y-1.5">
-                <Label>選択肢（1行に1つ）*</Label>
+                <Label required>選択肢（1行に1つ）</Label>
                 <Textarea
                   value={form.optionsText}
                   onChange={e => setForm({ ...form, optionsText: e.target.value })}
