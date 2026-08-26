@@ -2,7 +2,6 @@
 
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format, startOfMonth, endOfMonth, addMonths, subMonths } from 'date-fns'
 import { ja } from 'date-fns/locale'
@@ -45,7 +44,6 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
   const [toInput, setToInput] = useState(to)
   const [filterCastId, setFilterCastId] = useState('all')
   const [issuedAt, setIssuedAt] = useState(initialIssuedAt)
-  const supabase = createClient()
   const router = useRouter()
 
   const salesByCast = useMemo(() => {
@@ -114,19 +112,23 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     if (targets.length === 0) { toast.error('キャストを選択してください'); return }
     setSending(true)
 
-    const title = '支払通知書が届きました'
-    const periodLabel = `${format(new Date(`${from}T00:00:00`), 'M/d', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M/d', { locale: ja })}`
-    const notifications = targets.map(t => ({
-      user_id: t.cast.id, title,
-      body: `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`,
-      link: `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}`,
-    }))
-    const { error } = await supabase.from('notifications').insert(notifications)
+    // 発行はサーバー側で行う（発行の瞬間の内容をスナップショットとして保存し、
+    // 後からキャストの氏名・口座情報を変更しても過去の通知書に影響しないようにするため）
+    const res = await fetch('/api/rewards/notices/issue', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targets: targets.map(t => ({ cast_id: t.cast.id })), from, to }),
+    })
+    const json = await res.json().catch(() => null)
     setSending(false)
-    if (error) { toast.error('通知の送信に失敗しました'); return }
+    if (!res.ok || !json) { toast.error(json?.error ?? '発行に失敗しました'); return }
 
-    for (const t of targets) {
-      sendPushNotification(t.cast.id, title, `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`, `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}`)
+    const succeededIds = new Set<string>((json.results as { cast_id: string; ok: boolean }[]).filter(r => r.ok).map(r => r.cast_id))
+    const succeededTargets = targets.filter(t => succeededIds.has(t.cast.id))
+
+    const periodLabel = `${format(new Date(`${from}T00:00:00`), 'M/d', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M/d', { locale: ja })}`
+    for (const t of succeededTargets) {
+      sendPushNotification(t.cast.id, '支払通知書が届きました', `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`, `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}`)
       // メール通知は任意送信。失敗しても発行処理自体はすでに成功しているので握りつぶす
       fetch('/api/rewards/notify', {
         method: 'POST',
@@ -135,11 +137,15 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
       }).catch(() => {})
     }
 
-    toast.success(`${targets.length}人に支払通知書を発行しました`)
+    if (json.failed > 0) {
+      toast.error(`${json.issued}人に発行しました（${json.failed}人は失敗）`)
+    } else {
+      toast.success(`${succeededTargets.length}人に支払通知書を発行しました`)
+    }
     const now = new Date().toISOString()
     setIssuedAt(prev => {
       const next = { ...prev }
-      for (const t of targets) next[t.cast.id] = now
+      for (const t of succeededTargets) next[t.cast.id] = now
       return next
     })
     setSelected(new Set())

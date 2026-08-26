@@ -13,7 +13,7 @@ export default async function AdminShiftsPage() {
 
   const [{ data: shifts }, { data: casts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems }] = await Promise.all([
     supabase.from('shifts')
-      .select('*, cast:users!shifts_cast_id_fkey(display_name), rooms(name)')
+      .select('*, cast:users!shifts_cast_id_fkey(display_name), rooms(name), areas(name)')
       .eq('store_id', storeId)
       .order('date', { ascending: false })
       .order('start_time')

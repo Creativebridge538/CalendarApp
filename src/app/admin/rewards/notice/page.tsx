@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { DownloadPdfButton } from './download-button'
-import { fetchNoticeContent } from '@/lib/payment-notice-data'
+import { getNoticeContent } from '@/lib/payment-notice-data'
 
 export default async function PaymentNoticePage({
   searchParams,
@@ -26,7 +26,7 @@ export default async function PaymentNoticePage({
     return <div className="p-6 text-sm text-muted-foreground">対象キャスト・対象期間が指定されていません。</div>
   }
 
-  const content = await fetchNoticeContent(supabase, storeId, cast_id, from, to)
+  const content = await getNoticeContent(supabase, storeId, cast_id, from, to)
 
   if (!content) {
     return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>

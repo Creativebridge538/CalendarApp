@@ -43,6 +43,7 @@ interface Shift {
   checklist_answers: Record<string, boolean | string>
   cast: { display_name: string | null } | null
   rooms: { name: string } | null
+  areas: { name: string } | null
 }
 
 interface Props {
@@ -109,6 +110,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
           }
           const row = payload.new as Database['public']['Tables']['shifts']['Row']
           const room = rooms.find(r => r.id === row.room_id)
+          const area = areas.find(a => a.id === row.area_id)
           const cast = casts.find(c => c.id === row.cast_id)
           const joined: Shift = {
             id: row.id, date: row.date, start_time: row.start_time, end_time: row.end_time,
@@ -117,6 +119,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
             checklist_answers: (row.checklist_answers ?? {}) as Record<string, boolean | string>,
             room_id: row.room_id, area_id: row.area_id,
             rooms: room ? { name: room.name } : null,
+            areas: area ? { name: area.name } : null,
             cast: cast ? { display_name: cast.display_name } : null,
           }
           setShifts(prev => {
@@ -131,6 +134,12 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeId])
+
+  function locationText(shift: Shift): string {
+    if (locationMode === 'area_only') return shift.areas?.name ?? '—'
+    if (locationMode === 'area_and_room') return [shift.areas?.name, shift.rooms?.name].filter(Boolean).join(' / ') || '—'
+    return shift.rooms?.name ?? '—'
+  }
 
   function checklistBadges(answers: Record<string, boolean | string>) {
     return Object.entries(answers).map(([id, value]) => {
@@ -466,7 +475,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     <span>{shift.start_time.slice(0, 5)}〜{shift.end_time.slice(0, 5)}</span>
                     <span>·</span>
                     <span className="flex items-center gap-0.5">
-                      {shift.rooms?.name ?? 'ルームなし'}
+                      {locationText(shift)}
                       {conflicts.has(shift.id) && <AlertCircle className="h-3 w-3 text-destructive" />}
                     </span>
                   </div>
@@ -517,7 +526,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   <TableHead>日付</TableHead>
                   <TableHead>キャスト</TableHead>
                   <TableHead>時間</TableHead>
-                  <TableHead>ルーム</TableHead>
+                  <TableHead>{locationMode === 'area_only' ? areaLabel : locationMode === 'area_and_room' ? `${areaLabel}/${roomLabel}` : roomLabel}</TableHead>
                   <TableHead>備考</TableHead>
                   <TableHead>確認項目</TableHead>
                   <TableHead>ステータス</TableHead>
@@ -533,7 +542,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     <TableCell>{shift.cast?.display_name ?? '—'}</TableCell>
                     <TableCell>{shift.start_time.slice(0, 5)} 〜 {shift.end_time.slice(0, 5)}</TableCell>
                     <TableCell>
-                      {shift.rooms?.name ?? '—'}
+                      {locationText(shift)}
                       {conflicts.has(shift.id) && <AlertCircle className="h-3.5 w-3.5 text-destructive inline ml-1" />}
                     </TableCell>
                     <TableCell className="max-w-40 truncate text-xs text-muted-foreground" title={shift.notes ?? undefined}>
@@ -610,7 +619,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                   <span className="block text-sm font-medium truncate">{shift.cast?.display_name ?? '—'}</span>
                   <span className="block text-xs text-muted-foreground truncate">
                     {shift.start_time.slice(0, 5)}〜{shift.end_time.slice(0, 5)}
-                    {shift.rooms?.name && ` ・ ${shift.rooms.name}`}
+                    {locationText(shift) !== '—' && ` ・ ${locationText(shift)}`}
                   </span>
                 </span>
                 <Badge variant={STATUS_VARIANT[shift.status]} className="shrink-0" style={STATUS_STYLE[shift.status]}>{STATUS_LABEL[shift.status]}</Badge>

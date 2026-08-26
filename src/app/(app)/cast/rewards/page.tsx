@@ -28,7 +28,7 @@ export default async function CastRewardsPage() {
 
   const [{ data: sales }, { data: shifts }, { data: paymentNoticeRows }, { data: checklistItems }] =
     await Promise.all([
-      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours')
+      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours, reward_rate_override, bonus, deduction')
         .eq('cast_id', user.id).gte('date', sixtyDaysAgo).lte('date', today).order('date'),
       supabase.from('shifts').select('date, start_time, end_time, admin_note, checklist_answers, status')
         .eq('cast_id', user.id).gte('date', monthStart).lte('date', monthEnd),
@@ -54,12 +54,22 @@ export default async function CastRewardsPage() {
   const salesList = sales ?? []
   const shiftsList = shifts ?? []
 
-  // 日付ごとの売上合計（当月カレンダー用）
+  // このページは「収益(女子給)ダッシュボード」なので、売上(amount)そのものではなく、
+  // 報酬率（日払い時は個別上書きもあり得る）とボーナス・控除を反映した実際の受取額を使う
+  const castRewardRate = Number(profile.reward_rate ?? 0)
+  function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction'>): number {
+    const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : castRewardRate
+    const baseReward = Math.floor(Number(s.amount) * rate)
+    return baseReward + Number(s.bonus ?? 0) - Number(s.deduction ?? 0)
+  }
+
+  // 日付ごとの収益合計（当月カレンダー用）
   const salesByDate = new Map<string, { total: number; rows: { platform: string; amount: number; is_daily_payment: boolean }[] }>()
   for (const s of salesList) {
     const entry = salesByDate.get(s.date) ?? { total: 0, rows: [] }
-    entry.total += Number(s.amount)
-    entry.rows.push({ platform: s.platform, amount: Number(s.amount), is_daily_payment: s.is_daily_payment })
+    const reward = rewardOf(s)
+    entry.total += reward
+    entry.rows.push({ platform: s.platform, amount: reward, is_daily_payment: s.is_daily_payment })
     salesByDate.set(s.date, entry)
   }
 
@@ -103,7 +113,7 @@ export default async function CastRewardsPage() {
   const prevMonthCutoff = format(new Date(prevMonthDate.getFullYear(), prevMonthDate.getMonth(), prevMonthCutoffDay), 'yyyy-MM-dd')
   const prevMonthToDateTotal = salesList
     .filter(s => s.date >= prevMonthStart && s.date <= prevMonthCutoff)
-    .reduce((sum, s) => sum + Number(s.amount), 0)
+    .reduce((sum, s) => sum + rewardOf(s), 0)
 
   const workedDaysThisMonth = [...salesByDate.keys()].filter(d => d >= monthStart && d <= monthEnd).length
   const avgPerWorkedDay = workedDaysThisMonth > 0 ? Math.round(thisMonthTotal / workedDaysThisMonth) : 0
@@ -113,10 +123,10 @@ export default async function CastRewardsPage() {
     .filter(([date]) => date >= monthStart && date <= monthEnd)
     .reduce((sum, [, hours]) => sum + hours, 0)
 
-  // 時給は「稼働時間が登録されている売上」だけを対象に計算する（未登録の売上はここに含めない）
+  // 時給換算は「稼働時間が登録されている売上」に対応する収益(女子給)だけを対象にする（未登録の売上はここに含めない）
   const salesWithHoursThisMonth = salesList.filter(s => s.date >= monthStart && s.date <= monthEnd && s.worked_hours != null)
-  const amountWithHoursThisMonth = salesWithHoursThisMonth.reduce((sum, s) => sum + Number(s.amount), 0)
-  const hourlyWage = totalHoursThisMonth > 0 ? Math.round(amountWithHoursThisMonth / totalHoursThisMonth) : null
+  const rewardWithHoursThisMonth = salesWithHoursThisMonth.reduce((sum, s) => sum + rewardOf(s), 0)
+  const hourlyWage = totalHoursThisMonth > 0 ? Math.round(rewardWithHoursThisMonth / totalHoursThisMonth) : null
 
   // 今月のプラットフォーム別内訳
   const platformBreakdownMap = new Map<string, number>()

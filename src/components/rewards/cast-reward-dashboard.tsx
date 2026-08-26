@@ -222,7 +222,7 @@ export function CastRewardDashboard({
                 ))}
               </div>
               <p className="text-[11px] text-muted-foreground text-center mt-2.5">
-                数字=売上（円）・下段=勤務時間。タップで明細
+                数字=収益（円）・下段=勤務時間。タップで明細
               </p>
             </CardContent>
           </Card>
@@ -306,7 +306,7 @@ export function CastRewardDashboard({
           <DialogHeader><DialogTitle>{month}月の内訳</DialogTitle></DialogHeader>
           <div className="space-y-3 mt-2">
             {platformBreakdown.length === 0 ? (
-              <p className="text-sm text-muted-foreground text-center py-4">まだ売上データがありません</p>
+              <p className="text-sm text-muted-foreground text-center py-4">まだ収益データがありません</p>
             ) : (
               <div className="space-y-1.5">
                 {platformBreakdown.map(row => (
@@ -380,7 +380,7 @@ function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
   return (
     <Card elevated>
       <CardContent className="pt-4 pb-4" style={{ position: 'relative' }}>
-        <p className="text-sm font-semibold mb-0.5">売上推移</p>
+        <p className="text-sm font-semibold mb-0.5">収益推移</p>
         <p className="text-xs text-muted-foreground mb-2">直近30日</p>
         <svg
           ref={svgRef} viewBox={`0 0 ${width} ${height}`}
@@ -421,7 +421,7 @@ function WeekdayChart({ data }: { data: { label: string; amount: number }[] }) {
   return (
     <Card elevated>
       <CardContent className="pt-4 pb-4">
-        <p className="text-sm font-semibold mb-0.5">曜日別 平均売上</p>
+        <p className="text-sm font-semibold mb-0.5">曜日別 平均収益</p>
         <p className="text-xs text-muted-foreground mb-3">直近60日の平均</p>
         <div className="flex items-end gap-2" style={{ height: 90 }}>
           {data.map(d => {

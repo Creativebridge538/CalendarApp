@@ -152,6 +152,103 @@ export type Database = {
           },
         ]
       }
+      payment_notices: {
+        Row: {
+          bank_account_holder: string
+          bank_account_number: string
+          bank_branch: string
+          bank_name: string
+          base_reward: number
+          bonus: number
+          cast_id: string
+          cast_name: string
+          cast_real_name: string
+          deduction: number
+          id: string
+          issued_at: string
+          issued_by: string | null
+          logo_url: string | null
+          period_from: string
+          period_to: string
+          reward_rate: number
+          sales_rows: Json
+          sales_total: number
+          store_id: string
+          store_name: string
+          total_reward: number
+        }
+        Insert: {
+          bank_account_holder: string
+          bank_account_number: string
+          bank_branch: string
+          bank_name: string
+          base_reward: number
+          bonus: number
+          cast_id: string
+          cast_name: string
+          cast_real_name: string
+          deduction: number
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          logo_url?: string | null
+          period_from: string
+          period_to: string
+          reward_rate: number
+          sales_rows: Json
+          sales_total: number
+          store_id: string
+          store_name: string
+          total_reward: number
+        }
+        Update: {
+          bank_account_holder?: string
+          bank_account_number?: string
+          bank_branch?: string
+          bank_name?: string
+          base_reward?: number
+          bonus?: number
+          cast_id?: string
+          cast_name?: string
+          cast_real_name?: string
+          deduction?: number
+          id?: string
+          issued_at?: string
+          issued_by?: string | null
+          logo_url?: string | null
+          period_from?: string
+          period_to?: string
+          reward_rate?: number
+          sales_rows?: Json
+          sales_total?: number
+          store_id?: string
+          store_name?: string
+          total_reward?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payment_notices_cast_id_fkey"
+            columns: ["cast_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notices_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payment_notices_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       push_subscriptions: {
         Row: {
           auth: string
