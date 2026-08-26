@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
-import { getNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, getNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 
 // ブラウザの印刷機能(window.print)経由のPDF保存は、共有時にレイアウトが崩れることがあるため、
@@ -25,7 +25,11 @@ export async function GET(request: Request) {
   if (!isAdmin && !isSelf) return NextResponse.json({ error: '権限がありません' }, { status: 403 })
 
   const storeId = profile!.store_id!
-  const content = await getNoticeContent(supabase, storeId, castId, from, to)
+  // 管理画面からのダウンロードは常に最新の内容にし、キャスト自身のダウンロード分だけ
+  // 発行時点のスナップショット（あれば）を優先する
+  const content = isAdmin
+    ? await fetchNoticeContent(supabase, storeId, castId, from, to)
+    : await getNoticeContent(supabase, storeId, castId, from, to)
   if (!content) return NextResponse.json({ error: '対象のキャストが見つかりません' }, { status: 404 })
 
   const buffer = await renderToBuffer(NoticeDocument({ content, issuedAt: new Date().toISOString() }))

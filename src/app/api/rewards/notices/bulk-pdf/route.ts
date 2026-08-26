@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
-import { getNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 
 interface NoticeRequest { cast_id: string; from: string; to: string; issued_at: string }
@@ -23,7 +23,8 @@ export async function POST(request: Request) {
 
   // 通知ごとにDB取得→PDF描画を直列で待つと件数分だけ遅くなるため、並列に処理する
   const rendered = await Promise.all(notices.map(async n => {
-    const content = await getNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
+    // 管理画面からの一括ダウンロードは常に最新の内容を反映する（発行時点のスナップショットは使わない）
+    const content = await fetchNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
     if (!content) { console.error('[bulk-pdf] cast not found in store', { cast_id: n.cast_id }); return null }
     const buffer = await renderToBuffer(NoticeDocument({ content, issuedAt: n.issued_at }))
     const filename = noticeFileName(content)

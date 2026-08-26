@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 import { getAccessToken, ensureFolder, uploadFileToDrive } from '@/lib/google-drive'
 
@@ -59,7 +59,8 @@ export async function POST(request: Request) {
 
     const results = await Promise.all(notices.map(async n => {
       try {
-        const content = await getNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
+        // 管理画面からのDrive保存は常に最新の内容を反映する（発行時点のスナップショットは使わない）
+        const content = await fetchNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
         if (!content) return { ok: false, error: '対象のキャストが見つかりません' }
 
         const folderId = folderCache.get(n.to.slice(0, 7))!
