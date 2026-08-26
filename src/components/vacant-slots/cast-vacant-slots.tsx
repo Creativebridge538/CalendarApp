@@ -96,7 +96,7 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
 
     // 申請した時点でキャストのカレンダーにも仮予定（提出済み扱い）として反映する
     const { data: shift, error: shiftError } = await supabase.from('shifts').insert({
-      cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
+      cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null, area_id: slot.area_id ?? null,
       date: slot.date, start_time: slot.start_time, end_time: slot.end_time,
       status: 'submitted', notes: '空き枠への応募',
     }).select('id').single()

@@ -147,7 +147,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
       let restoreFailed = false
       for (const a of appsNeedingShift) {
         const { data: newShift, error: shiftErr } = await supabase.from('shifts').insert({
-          cast_id: a.cast_id, store_id: storeId, room_id: slot.room_id ?? null,
+          cast_id: a.cast_id, store_id: storeId, room_id: slot.room_id ?? null, area_id: slot.area_id ?? null,
           date: slot.date, start_time: slot.start_time, end_time: slot.end_time,
           status: a.status === 'approved' ? 'confirmed' : 'submitted',
         }).select('id').single()
@@ -231,7 +231,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
         ? await supabase.from('shifts').update({ status: 'confirmed' }).eq('id', app.shift_id)
         : slot
         ? await supabase.from('shifts').insert({
-            cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null,
+            cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null, area_id: slot.area_id ?? null,
             date: slot.date, start_time: slot.start_time, end_time: slot.end_time, status: 'confirmed',
           })
         : { error: null }
