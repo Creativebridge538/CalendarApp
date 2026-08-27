@@ -102,8 +102,8 @@ export async function getNoticeContent(supabase: SupabaseClient<any>, storeId: s
   return fetchNoticeContent(supabase, storeId, castId, from, to)
 }
 
-// 発行時点の内容をスナップショットとして保存する（既に存在する場合は上書きしない：
-// 同じ期間を誤って再発行しても、最初に発行した時点の内容を保ち続ける）
+// 発行時点の内容をスナップショットとして保存する（同じ期間に再発行した場合は、
+// その時点の最新内容で上書きする）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, issuedBy: string, content: NoticeContent) {
   return supabase.from('payment_notices').upsert({
@@ -116,7 +116,7 @@ export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId:
     reward_rate: content.rewardRate, sales_rows: content.salesRows,
     sales_total: content.salesTotal, base_reward: content.baseReward,
     bonus: content.bonus, deduction: content.deduction, total_reward: content.totalReward,
-  }, { onConflict: 'store_id,cast_id,period_from,period_to', ignoreDuplicates: true })
+  }, { onConflict: 'store_id,cast_id,period_from,period_to' })
 }
 
 // 例: 20260801-20260815_55000_山田太郎_支払通知書.pdf（対象期間(開始日-終了日)_支払額_本名(または源氏名)）

@@ -12,8 +12,9 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Pagination } from '@/components/ui/pagination'
-import { Download, HardDriveUpload, Link2Off } from 'lucide-react'
+import { Download, HardDriveUpload, Link2Off, Pencil } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 
@@ -44,6 +45,47 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   const [downloading, setDownloading] = useState(false)
   const [driveUploading, setDriveUploading] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [editTarget, setEditTarget] = useState<Notice | null>(null)
+  const [editLoading, setEditLoading] = useState(false)
+  const [editSaving, setEditSaving] = useState(false)
+  const [editForm, setEditForm] = useState({
+    cast_name: '', cast_real_name: '', bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
+    bonus: '', deduction: '',
+  })
+
+  async function openEdit(notice: Notice) {
+    setEditTarget(notice)
+    setEditLoading(true)
+    const res = await fetch(`/api/rewards/notices/snapshot?cast_id=${notice.castId}&from=${notice.from}&to=${notice.to}`)
+    const json = await res.json()
+    setEditLoading(false)
+    if (!res.ok) { toast.error(json.error ?? '内容の取得に失敗しました'); setEditTarget(null); return }
+    const c = json.content
+    setEditForm({
+      cast_name: c.castName, cast_real_name: c.castRealName,
+      bank_name: c.bankName, bank_branch: c.bankBranch,
+      bank_account_number: c.bankAccountNumber, bank_account_holder: c.bankAccountHolder,
+      bonus: String(c.bonus), deduction: String(c.deduction),
+    })
+  }
+
+  async function saveEdit() {
+    if (!editTarget) return
+    setEditSaving(true)
+    const res = await fetch('/api/rewards/notices/snapshot', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        cast_id: editTarget.castId, from: editTarget.from, to: editTarget.to,
+        ...editForm, bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
+      }),
+    })
+    const json = await res.json()
+    setEditSaving(false)
+    if (!res.ok) { toast.error(json.error ?? '更新に失敗しました'); return }
+    toast.success('通知書の内容を更新しました')
+    setEditTarget(null)
+  }
 
   useEffect(() => {
     const status = searchParams.get('google_drive')
@@ -231,7 +273,10 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                   {format(new Date(n.createdAt), 'yyyy/M/d', { locale: ja })}
                 </TableCell>
-                <TableCell className="text-right">
+                <TableCell className="text-right space-x-1">
+                  <Button size="sm" variant="outline" onClick={() => openEdit(n)}>
+                    <Pencil className="h-3.5 w-3.5 mr-1" />編集
+                  </Button>
                   <PaymentNoticeButton castId={n.castId} from={n.from} to={n.to} label="開く" />
                 </TableCell>
               </TableRow>
@@ -243,6 +288,67 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
           onPageChange={setPage} onPageSizeChange={setPageSize}
         />
       </CardContent>
+
+      <Dialog open={!!editTarget} onOpenChange={o => { if (!o) setEditTarget(null) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>発行済み通知書を編集</DialogTitle>
+          </DialogHeader>
+          {editLoading ? (
+            <p className="text-sm text-muted-foreground py-4">読み込み中...</p>
+          ) : (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                ここで編集した内容は、キャストに表示される発行済み通知書に反映されます。
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">源氏名</Label>
+                  <Input value={editForm.cast_name} onChange={e => setEditForm({ ...editForm, cast_name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">本名</Label>
+                  <Input value={editForm.cast_real_name} onChange={e => setEditForm({ ...editForm, cast_real_name: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">銀行名</Label>
+                  <Input value={editForm.bank_name} onChange={e => setEditForm({ ...editForm, bank_name: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">支店名</Label>
+                  <Input value={editForm.bank_branch} onChange={e => setEditForm({ ...editForm, bank_branch: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">口座番号</Label>
+                  <Input value={editForm.bank_account_number} onChange={e => setEditForm({ ...editForm, bank_account_number: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">口座名義</Label>
+                  <Input value={editForm.bank_account_holder} onChange={e => setEditForm({ ...editForm, bank_account_holder: e.target.value })} />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">ボーナス</Label>
+                  <Input type="number" value={editForm.bonus} onChange={e => setEditForm({ ...editForm, bonus: e.target.value })} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs text-muted-foreground font-normal">控除</Label>
+                  <Input type="number" value={editForm.deduction} onChange={e => setEditForm({ ...editForm, deduction: e.target.value })} />
+                </div>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button variant="outline" onClick={() => setEditTarget(null)}>キャンセル</Button>
+                <Button onClick={saveEdit} disabled={editSaving}>{editSaving ? '保存中...' : '保存'}</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </Card>
   )
 }

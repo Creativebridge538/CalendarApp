@@ -83,7 +83,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
   const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(filteredRows)
   const allSelected = filteredRows.length > 0 && filteredRows.every(r => selected.has(r.cast.id))
   const unissuedRows = useMemo(() => filteredRows.filter(r => !issuedAt[r.cast.id]), [filteredRows, issuedAt])
-  const unissuedAllSelected = unissuedRows.length > 0 && unissuedRows.every(r => selected.has(r.cast.id))
+  const unissuedAllSelected = unissuedRows.length > 0 && selected.size === unissuedRows.length && unissuedRows.every(r => selected.has(r.cast.id))
 
   function toggleAll() {
     setSelected(allSelected ? new Set() : new Set(filteredRows.map(r => r.cast.id)))
