@@ -32,6 +32,7 @@ interface Sale {
   daily_payment_at: string | null
   worked_hours: number | string | null
   bonus: number | string; deduction: number | string
+  usd_amount: number | string | null; fx_rate_snapshot: number | string | null
   cast: { display_name: string | null } | null
 }
 
@@ -601,6 +602,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 <TableHead>キャスト</TableHead>
                 <TableHead>稼働時間</TableHead>
                 <TableHead>プラットフォーム</TableHead>
+                <TableHead className="text-right">為替</TableHead>
                 <TableHead className="text-right">売上</TableHead>
                 <TableHead className="text-right">女子給</TableHead>
                 <TableHead>備考</TableHead>
@@ -609,7 +611,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             </TableHeader>
             <TableBody>
               {filteredSales.length === 0 && (
-                <TableRow><TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">
                   {filtersActive ? '絞り込み条件に一致する売上がありません' : '売上データがありません'}
                 </TableCell></TableRow>
               )}
@@ -635,6 +637,16 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                           </Badge>
                         )}
                       </div>
+                    </TableCell>
+                    <TableCell className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                      {sale.fx_rate_snapshot != null ? (
+                        <>
+                          ¥{Number(sale.fx_rate_snapshot).toFixed(2)}/$
+                          {sale.usd_amount != null && (
+                            <span className="block">(${Number(sale.usd_amount).toFixed(2)})</span>
+                          )}
+                        </>
+                      ) : '—'}
                     </TableCell>
                     <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
