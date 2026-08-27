@@ -50,7 +50,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   const [editSaving, setEditSaving] = useState(false)
   const [editForm, setEditForm] = useState({
     cast_name: '', cast_real_name: '', bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
-    bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
+    base_reward: '', bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
   })
   const [editCustomItems, setEditCustomItems] = useState<{ label: string; amount: string }[]>([])
 
@@ -66,7 +66,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       cast_name: c.castName, cast_real_name: c.castRealName,
       bank_name: c.bankName, bank_branch: c.bankBranch,
       bank_account_number: c.bankAccountNumber, bank_account_holder: c.bankAccountHolder,
-      bonus: String(c.bonus), deduction: String(c.deduction),
+      base_reward: String(c.baseReward), bonus: String(c.bonus), deduction: String(c.deduction),
       show_sales_total: c.showSalesTotal, show_reward_rate: c.showRewardRate,
     })
     setEditCustomItems((c.customItems ?? []).map((i: { label: string; amount: number }) => ({ label: i.label, amount: String(i.amount) })))
@@ -80,7 +80,9 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         cast_id: editTarget.castId, from: editTarget.from, to: editTarget.to,
-        ...editForm, bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
+        ...editForm,
+        base_reward: parseFloat(editForm.base_reward) || 0,
+        bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
         custom_items: editCustomItems
           .filter(i => i.label.trim() !== '')
           .map(i => ({ label: i.label, amount: parseFloat(i.amount) || 0 })),
@@ -336,6 +338,10 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                   <Label className="text-xs text-muted-foreground font-normal">口座名義</Label>
                   <Input value={editForm.bank_account_holder} onChange={e => setEditForm({ ...editForm, bank_account_holder: e.target.value })} />
                 </div>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-muted-foreground font-normal">基本報酬</Label>
+                <Input type="number" value={editForm.base_reward} onChange={e => setEditForm({ ...editForm, base_reward: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">

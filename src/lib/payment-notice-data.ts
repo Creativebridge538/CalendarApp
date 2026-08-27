@@ -120,13 +120,12 @@ export async function getNoticeContent(supabase: SupabaseClient<any>, storeId: s
   return fetchNoticeContent(supabase, storeId, castId, from, to)
 }
 
-// 発行時点の内容をスナップショットとして保存する（同じ期間に再発行した場合は、
-// その時点の最新内容で上書きする。ただし追加済みのカスタム項目は再発行で消えないよう引き継ぐ）
+// 発行時点の内容をスナップショットとして保存する。同じ期間に対して既に発行済みの場合は
+// 上書きしない（発行済みの通知書の内容は不変とし、内容を直す場合は「発行済み支払通知書」の
+// 編集機能を使う。新規の期間を発行する場合のみ、その時点の最新内容が保存される）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, issuedBy: string, content: NoticeContent) {
-  const existing = await getNoticeSnapshot(supabase, storeId, castId, content.from, content.to)
-  const customItems = existing?.customItems ?? content.customItems
-  const customItemsTotal = customItems.reduce((sum, i) => sum + i.amount, 0)
+  const customItemsTotal = content.customItems.reduce((sum, i) => sum + i.amount, 0)
   const totalReward = content.baseReward + content.bonus - content.deduction + customItemsTotal
 
   return supabase.from('payment_notices').upsert({
@@ -139,9 +138,9 @@ export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId:
     reward_rate: content.rewardRate, sales_rows: content.salesRows,
     sales_total: content.salesTotal, base_reward: content.baseReward,
     bonus: content.bonus, deduction: content.deduction,
-    custom_items: customItems, total_reward: totalReward,
+    custom_items: content.customItems, total_reward: totalReward,
     show_sales_total: content.showSalesTotal, show_reward_rate: content.showRewardRate,
-  }, { onConflict: 'store_id,cast_id,period_from,period_to' })
+  }, { onConflict: 'store_id,cast_id,period_from,period_to', ignoreDuplicates: true })
 }
 
 // 例: 20260801-20260815_55000_山田太郎_支払通知書.pdf（対象期間(開始日-終了日)_支払額_本名(または源氏名)）

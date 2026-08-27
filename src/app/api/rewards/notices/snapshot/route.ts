@@ -39,7 +39,7 @@ export async function PATCH(request: Request) {
   const {
     cast_id, from, to,
     cast_name, cast_real_name, bank_name, bank_branch, bank_account_number, bank_account_holder,
-    bonus, deduction, custom_items, show_sales_total, show_reward_rate,
+    base_reward, bonus, deduction, custom_items, show_sales_total, show_reward_rate,
   } = body
 
   if (!cast_id || !from || !to) {
@@ -50,6 +50,7 @@ export async function PATCH(request: Request) {
   const existing = await getNoticeSnapshot(supabase, profile.store_id, cast_id, from, to)
   if (!existing) return NextResponse.json({ error: '発行済みの通知書が見つかりません' }, { status: 404 })
 
+  const nextBaseReward = base_reward != null ? Number(base_reward) : existing.baseReward
   const nextBonus = bonus != null ? Number(bonus) : existing.bonus
   const nextDeduction = deduction != null ? Number(deduction) : existing.deduction
   const nextCustomItems = Array.isArray(custom_items)
@@ -58,7 +59,7 @@ export async function PATCH(request: Request) {
         .map((i: { label: string; amount: unknown }) => ({ label: i.label, amount: Number(i.amount) || 0 }))
     : existing.customItems
   const customItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
-  const totalReward = existing.baseReward + nextBonus - nextDeduction + customItemsTotal
+  const totalReward = nextBaseReward + nextBonus - nextDeduction + customItemsTotal
 
   const { error } = await supabase.from('payment_notices').update({
     cast_name: cast_name ?? existing.castName,
@@ -67,7 +68,7 @@ export async function PATCH(request: Request) {
     bank_branch: bank_branch ?? existing.bankBranch,
     bank_account_number: bank_account_number ?? existing.bankAccountNumber,
     bank_account_holder: bank_account_holder ?? existing.bankAccountHolder,
-    bonus: nextBonus, deduction: nextDeduction,
+    base_reward: nextBaseReward, bonus: nextBonus, deduction: nextDeduction,
     custom_items: nextCustomItems as unknown as Json, total_reward: totalReward,
     show_sales_total: show_sales_total ?? existing.showSalesTotal,
     show_reward_rate: show_reward_rate ?? existing.showRewardRate,
