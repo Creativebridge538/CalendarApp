@@ -16,37 +16,39 @@ export default async function IssuedNoticesPage() {
     .limit(300)
 
   const castIds = [...new Set((noticeRows ?? []).map(n => n.user_id))]
-  const [{ data: castRows }, { data: noticeSnapshots }] = await Promise.all([
-    castIds.length > 0
-      ? supabase.from('users').select('id, display_name, real_name').in('id', castIds)
-      : Promise.resolve({ data: [] }),
-    castIds.length > 0
-      ? supabase.from('payment_notices').select('cast_id, period_from, period_to, manually_edited')
-          .eq('store_id', profile.store_id!).in('cast_id', castIds)
-      : Promise.resolve({ data: [] }),
-  ])
+  const { data: castRows } = castIds.length > 0
+    ? await supabase.from('users').select('id, display_name, real_name').in('id', castIds)
+    : { data: [] }
   const castById = new Map((castRows ?? []).map(c => [c.id, c]))
-  const manuallyEditedByKey = new Map(
-    (noticeSnapshots ?? []).map(s => [`${s.cast_id}_${s.period_from}_${s.period_to}`, s.manually_edited])
-  )
 
-  // linkの from/to をここで解析しておく（クライアント側では文字列パースをしない）
-  const notices = (noticeRows ?? []).flatMap(n => {
+  // linkの from/to/notice_id をここで解析しておく（クライアント側では文字列パースをしない）
+  const parsedNotices = (noticeRows ?? []).flatMap(n => {
     try {
       const url = new URL(n.link ?? '', 'http://placeholder')
       const from = url.searchParams.get('from')
       const to = url.searchParams.get('to')
+      const noticeId = url.searchParams.get('notice_id')
       if (!from || !to) return []
       const cast = castById.get(n.user_id)
       return [{
         id: n.id, castId: n.user_id, castName: cast?.display_name ?? '—', castRealName: cast?.real_name ?? null,
-        body: n.body, from, to, createdAt: n.created_at,
-        manuallyEdited: manuallyEditedByKey.get(`${n.user_id}_${from}_${to}`) ?? false,
+        body: n.body, from, to, createdAt: n.created_at, noticeId,
       }]
     } catch {
       return []
     }
   })
+
+  const noticeIds = parsedNotices.flatMap(n => n.noticeId ? [n.noticeId] : [])
+  const { data: noticeSnapshots } = noticeIds.length > 0
+    ? await supabase.from('payment_notices').select('id, manually_edited').in('id', noticeIds)
+    : { data: [] }
+  const manuallyEditedById = new Map((noticeSnapshots ?? []).map(s => [s.id, s.manually_edited]))
+
+  const notices = parsedNotices.map(n => ({
+    ...n,
+    manuallyEdited: n.noticeId ? (manuallyEditedById.get(n.noticeId) ?? false) : false,
+  }))
 
   const casts = (castRows ?? [])
     .map(c => ({ id: c.id, display_name: c.display_name }))

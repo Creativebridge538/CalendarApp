@@ -4,14 +4,14 @@ import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { DownloadPdfButton } from './download-button'
-import { fetchNoticeContent, getNoticeContent } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, getNoticeSnapshotById, getLatestNoticeSnapshot } from '@/lib/payment-notice-data'
 
 export default async function PaymentNoticePage({
   searchParams,
 }: {
-  searchParams: Promise<{ cast_id?: string; from?: string; to?: string }>
+  searchParams: Promise<{ cast_id?: string; from?: string; to?: string; notice_id?: string }>
 }) {
-  const { cast_id, from, to } = await searchParams
+  const { cast_id, from, to, notice_id } = await searchParams
   const supabase = await createClient()
   const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
@@ -26,11 +26,19 @@ export default async function PaymentNoticePage({
     return <div className="p-6 text-sm text-muted-foreground">対象キャスト・対象期間が指定されていません。</div>
   }
 
-  // 管理画面からのプレビューは常に最新の内容を見られるようにし、キャスト自身が見る分だけ
-  // 発行時点のスナップショット（あれば）を優先する
-  const content = isAdmin
-    ? await fetchNoticeContent(supabase, storeId, cast_id, from, to)
-    : await getNoticeContent(supabase, storeId, cast_id, from, to)
+  // notice_id指定時は、発行済みのその1件をそのまま表示する（発行後の内容変更の影響を受けない）。
+  // notice_idなしの場合、管理画面からのプレビューは常に最新の内容を見られるようにし、
+  // キャスト自身が見る分だけ（古いリンク向けの後方互換）最後に発行された内容を優先する
+  let content = notice_id ? await getNoticeSnapshotById(supabase, storeId, notice_id) : null
+  if (!content) {
+    content = isAdmin
+      ? await fetchNoticeContent(supabase, storeId, cast_id, from, to)
+      : (await getLatestNoticeSnapshot(supabase, storeId, cast_id, from, to)) ?? await fetchNoticeContent(supabase, storeId, cast_id, from, to)
+  }
+  // notice_id経由の場合、対象キャスト本人・同店舗管理者以外には見せない
+  if (notice_id && !isAdmin && cast_id !== user.id) {
+    return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>
+  }
 
   if (!content) {
     return <div className="p-6 text-sm text-muted-foreground">対象のキャストが見つかりません。</div>
@@ -95,7 +103,7 @@ export default async function PaymentNoticePage({
       `}</style>
 
       <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <DownloadPdfButton castId={cast_id} from={from} to={to} />
+        <DownloadPdfButton castId={cast_id} from={from} to={to} noticeId={content.id} />
       </div>
 
       <div className="notice-page">

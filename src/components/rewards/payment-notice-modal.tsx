@@ -12,14 +12,17 @@ interface Props {
   from: string
   /** yyyy-MM-dd */
   to: string
+  /** 特定の発行済み通知書を指す場合に指定する。省略時は管理画面では常に最新内容のプレビューになる */
+  noticeId?: string | null
   label: string
   variant?: VariantProps<typeof buttonVariants>['variant']
   size?: VariantProps<typeof buttonVariants>['size']
   className?: string
 }
 
-export function PaymentNoticeButton({ castId, from, to, label, variant = 'ghost', size = 'sm', className }: Props) {
+export function PaymentNoticeButton({ castId, from, to, noticeId, label, variant = 'ghost', size = 'sm', className }: Props) {
   const [open, setOpen] = useState(false)
+  const noticeParam = noticeId ? `&notice_id=${noticeId}` : ''
 
   return (
     <>
@@ -31,7 +34,7 @@ export function PaymentNoticeButton({ castId, from, to, label, variant = 'ghost'
           <DialogTitle className="sr-only">支払通知書</DialogTitle>
           {open && (
             <iframe
-              src={`/admin/rewards/notice?cast_id=${castId}&from=${from}&to=${to}`}
+              src={`/admin/rewards/notice?cast_id=${castId}&from=${from}&to=${to}${noticeParam}`}
               title="支払通知書"
               className="w-full h-full border-0 rounded-xl"
             />

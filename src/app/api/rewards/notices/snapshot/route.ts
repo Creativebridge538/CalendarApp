@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
-import { getNoticeSnapshot } from '@/lib/payment-notice-data'
+import { getNoticeSnapshotById } from '@/lib/payment-notice-data'
 import type { Json } from '@/lib/supabase/database.types'
 
 // 発行済み支払通知書（スナップショット）の内容取得・編集。キャストへの表示内容そのものを
-// 直接補正できるよう、管理者に限定して提供する
+// 直接補正できるよう、管理者に限定して提供する。対象は通知書のIDで一意に特定する
 export async function GET(request: Request) {
   const { user, profile } = await getCurrentUser()
   if (!user) return NextResponse.json({ error: '未認証' }, { status: 401 })
@@ -14,15 +14,11 @@ export async function GET(request: Request) {
   }
 
   const { searchParams } = new URL(request.url)
-  const castId = searchParams.get('cast_id')
-  const from = searchParams.get('from')
-  const to = searchParams.get('to')
-  if (!castId || !from || !to) {
-    return NextResponse.json({ error: 'cast_id, from, to は必須です' }, { status: 400 })
-  }
+  const id = searchParams.get('id')
+  if (!id) return NextResponse.json({ error: 'id は必須です' }, { status: 400 })
 
   const supabase = await createClient()
-  const content = await getNoticeSnapshot(supabase, profile.store_id, castId, from, to)
+  const content = await getNoticeSnapshotById(supabase, profile.store_id, id)
   if (!content) return NextResponse.json({ error: '発行済みの通知書が見つかりません' }, { status: 404 })
 
   return NextResponse.json({ content })
@@ -37,17 +33,15 @@ export async function PATCH(request: Request) {
 
   const body = await request.json()
   const {
-    cast_id, from, to,
+    id,
     cast_name, cast_real_name, bank_name, bank_branch, bank_account_number, bank_account_holder,
     reward_rate, sales_rows, bonus, deduction, custom_items, show_sales_total, show_reward_rate,
   } = body
 
-  if (!cast_id || !from || !to) {
-    return NextResponse.json({ error: 'cast_id, from, to は必須です' }, { status: 400 })
-  }
+  if (!id) return NextResponse.json({ error: 'id は必須です' }, { status: 400 })
 
   const supabase = await createClient()
-  const existing = await getNoticeSnapshot(supabase, profile.store_id, cast_id, from, to)
+  const existing = await getNoticeSnapshotById(supabase, profile.store_id, id)
   if (!existing) return NextResponse.json({ error: '発行済みの通知書が見つかりません' }, { status: 404 })
 
   const nextRewardRate = reward_rate != null ? Number(reward_rate) : existing.rewardRate
@@ -89,7 +83,7 @@ export async function PATCH(request: Request) {
     show_sales_total: show_sales_total ?? existing.showSalesTotal,
     show_reward_rate: show_reward_rate ?? existing.showRewardRate,
     manually_edited: true,
-  }).eq('store_id', profile.store_id).eq('cast_id', cast_id).eq('period_from', from).eq('period_to', to)
+  }).eq('store_id', profile.store_id).eq('id', id)
 
   if (error) {
     console.error('[notices/snapshot] update failed', error)

@@ -9,17 +9,19 @@ interface Props {
   castId: string
   from: string
   to: string
+  noticeId?: string | null
 }
 
 // ブラウザの印刷→PDF保存は共有時にレイアウトが崩れることがあるため、
 // サーバーで生成した崩れないPDFを正しいファイル名で直接ダウンロードする
-export function DownloadPdfButton({ castId, from, to }: Props) {
+export function DownloadPdfButton({ castId, from, to, noticeId }: Props) {
   const [downloading, setDownloading] = useState(false)
 
   async function handleDownload() {
     setDownloading(true)
     try {
-      const res = await fetch(`/api/rewards/notices/pdf?cast_id=${castId}&from=${from}&to=${to}`)
+      const noticeParam = noticeId ? `&notice_id=${noticeId}` : ''
+      const res = await fetch(`/api/rewards/notices/pdf?cast_id=${castId}&from=${from}&to=${to}${noticeParam}`)
       if (!res.ok) { toast.error('PDFの生成に失敗しました'); return }
       const disposition = res.headers.get('Content-Disposition') ?? ''
       const match = disposition.match(/filename\*=UTF-8''([^;]+)/)

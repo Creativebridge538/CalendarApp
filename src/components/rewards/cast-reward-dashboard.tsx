@@ -47,7 +47,7 @@ interface Props {
   trend: { date: string; amount: number }[]
   weekday: { label: string; amount: number }[]
   dayDetails: Record<string, DayDetail>
-  paymentNotices: { id: string; body: string | null; createdAt: string; from: string; to: string }[]
+  paymentNotices: { id: string; body: string | null; createdAt: string; from: string; to: string; noticeId: string | null }[]
 }
 
 function useCountUp(target: number, durationMs = 900) {
@@ -292,7 +292,7 @@ export function CastRewardDashboard({
                 {paymentNotices.map(n => (
                   <div key={n.id} className="flex items-center justify-between gap-2 py-1.5 border-b last:border-b-0">
                     <p className="text-xs text-muted-foreground truncate">{n.body}</p>
-                    <PaymentNoticeButton castId={userId} from={n.from} to={n.to} label="開く" variant="tonal" size="xs" />
+                    <PaymentNoticeButton castId={userId} from={n.from} to={n.to} noticeId={n.noticeId} label="開く" variant="tonal" size="xs" />
                   </div>
                 ))}
               </div>

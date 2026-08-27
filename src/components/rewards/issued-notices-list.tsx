@@ -29,6 +29,8 @@ interface Notice {
   to: string
   createdAt: string
   manuallyEdited: boolean
+  /** この通知が指す発行済み通知書の実体ID。この機能追加より前に発行された古い通知はnull */
+  noticeId: string | null
 }
 
 interface Props {
@@ -61,9 +63,10 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   const editBaseReward = editSalesRows.reduce((sum, r) => sum + (parseFloat(r.reward) || 0), 0)
 
   async function openEdit(notice: Notice) {
+    if (!notice.noticeId) { toast.error('この通知書は古い形式のため編集できません'); return }
     setEditTarget(notice)
     setEditLoading(true)
-    const res = await fetch(`/api/rewards/notices/snapshot?cast_id=${notice.castId}&from=${notice.from}&to=${notice.to}`)
+    const res = await fetch(`/api/rewards/notices/snapshot?id=${notice.noticeId}`)
     const json = await res.json()
     setEditLoading(false)
     if (!res.ok) { toast.error(json.error ?? '内容の取得に失敗しました'); setEditTarget(null); return }
@@ -82,13 +85,13 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   }
 
   async function saveEdit() {
-    if (!editTarget) return
+    if (!editTarget?.noticeId) return
     setEditSaving(true)
     const res = await fetch('/api/rewards/notices/snapshot', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        cast_id: editTarget.castId, from: editTarget.from, to: editTarget.to,
+        id: editTarget.noticeId,
         ...editForm,
         reward_rate: (parseFloat(editForm.reward_rate) || 0) / 100,
         bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
@@ -139,15 +142,15 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   }
 
   async function handleBulkDownload() {
-    const targets = filtered.filter(n => selected.has(n.id))
-    if (targets.length === 0) { toast.error('ダウンロードする通知書を選択してください'); return }
+    const targets = filtered.filter(n => selected.has(n.id) && n.noticeId)
+    if (targets.length === 0) { toast.error('ダウンロードする通知書を選択してください（古い形式の通知書は対象外です）'); return }
 
     setDownloading(true)
     const res = await fetch('/api/rewards/notices/bulk-pdf', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        notices: targets.map(n => ({ cast_id: n.castId, from: n.from, to: n.to, issued_at: n.createdAt })),
+        notices: targets.map(n => ({ notice_id: n.noticeId, issued_at: n.createdAt })),
       }),
     })
     setDownloading(false)
@@ -166,8 +169,8 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   }
 
   async function handleDriveUpload() {
-    const targets = filtered.filter(n => selected.has(n.id))
-    if (targets.length === 0) { toast.error('保存する通知書を選択してください'); return }
+    const targets = filtered.filter(n => selected.has(n.id) && n.noticeId)
+    if (targets.length === 0) { toast.error('保存する通知書を選択してください（古い形式の通知書は対象外です）'); return }
 
     setDriveUploading(true)
     try {
@@ -175,7 +178,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          notices: targets.map(n => ({ cast_id: n.castId, from: n.from, to: n.to, issued_at: n.createdAt })),
+          notices: targets.map(n => ({ notice_id: n.noticeId, to: n.to, issued_at: n.createdAt })),
         }),
       })
       // サーバー関数がタイムアウトするとJSONではなくエラーページが返ってくることがあるため、
@@ -303,10 +306,10 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                   {format(new Date(n.createdAt), 'yyyy/M/d', { locale: ja })}
                 </TableCell>
                 <TableCell className="text-right space-x-1">
-                  <Button size="sm" variant="outline" onClick={() => openEdit(n)}>
+                  <Button size="sm" variant="outline" onClick={() => openEdit(n)} disabled={!n.noticeId} title={n.noticeId ? undefined : '古い形式の通知書は編集できません'}>
                     <Pencil className="h-3.5 w-3.5 mr-1" />編集
                   </Button>
-                  <PaymentNoticeButton castId={n.castId} from={n.from} to={n.to} label="開く" />
+                  <PaymentNoticeButton castId={n.castId} from={n.from} to={n.to} noticeId={n.noticeId} label="開く" />
                 </TableCell>
               </TableRow>
             ))}

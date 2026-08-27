@@ -39,14 +39,15 @@ export default async function CastRewardsPage() {
       supabase.from('shift_checklist_items').select('id, label, item_type').eq('store_id', profile.store_id),
     ])
 
-  // linkの from/to をここで解析しておく（クライアント側では文字列パースをしない）
+  // linkの from/to/notice_id をここで解析しておく（クライアント側では文字列パースをしない）
   const paymentNotices = (paymentNoticeRows ?? []).flatMap(n => {
     try {
       const url = new URL(n.link ?? '', 'http://placeholder')
       const from = url.searchParams.get('from')
       const to = url.searchParams.get('to')
+      const noticeId = url.searchParams.get('notice_id')
       if (!from || !to) return []
-      return [{ id: n.id, body: n.body, createdAt: n.created_at, from, to }]
+      return [{ id: n.id, body: n.body, createdAt: n.created_at, from, to, noticeId }]
     } catch {
       return []
     }

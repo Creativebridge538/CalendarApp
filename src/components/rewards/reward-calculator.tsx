@@ -128,17 +128,19 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     setSending(false)
     if (!res.ok || !json) { toast.error(json?.error ?? '発行に失敗しました'); return }
 
-    const succeededIds = new Set<string>((json.results as { cast_id: string; ok: boolean }[]).filter(r => r.ok).map(r => r.cast_id))
-    const succeededTargets = targets.filter(t => succeededIds.has(t.cast.id))
+    const resultByCastId = new Map((json.results as { cast_id: string; ok: boolean; noticeId?: string }[]).map(r => [r.cast_id, r]))
+    const succeededTargets = targets.filter(t => resultByCastId.get(t.cast.id)?.ok)
 
     const periodLabel = `${format(new Date(`${from}T00:00:00`), 'M/d', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M/d', { locale: ja })}`
     for (const t of succeededTargets) {
-      sendPushNotification(t.cast.id, '支払通知書が届きました', `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`, `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}`)
+      const noticeId = resultByCastId.get(t.cast.id)?.noticeId
+      const link = `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}${noticeId ? `&notice_id=${noticeId}` : ''}`
+      sendPushNotification(t.cast.id, '支払通知書が届きました', `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`, link)
       // メール通知は任意送信。失敗しても発行処理自体はすでに成功しているので握りつぶす
       fetch('/api/rewards/notify', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ cast_id: t.cast.id, from, to, total_reward: t.totalReward }),
+        body: JSON.stringify({ cast_id: t.cast.id, from, to, total_reward: t.totalReward, notice_id: noticeId }),
       }).catch(() => {})
     }
 

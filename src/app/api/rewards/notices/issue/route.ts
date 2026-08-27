@@ -3,12 +3,13 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { fetchNoticeContent, getNoticeSnapshot, saveNoticeSnapshot } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, createNoticeSnapshot } from '@/lib/payment-notice-data'
 
 interface Target { cast_id: string }
 
-// 発行はここでサーバー側から行う。発行の瞬間に内容をスナップショットとして保存し、
-// 以後キャストの氏名・口座情報・報酬率が変わっても、この通知書の内容は変わらないようにするため
+// 発行はここでサーバー側から行う。発行のたびに、その時点の内容を新しい独立した
+// スナップショットとして保存する。同じキャスト・同じ期間で複数回発行しても、
+// 過去に発行済みの通知書の内容には一切影響しない
 export async function POST(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -30,26 +31,23 @@ export async function POST(request: Request) {
     const content = await fetchNoticeContent(admin, storeId, t.cast_id, from, to)
     if (!content) return { cast_id: t.cast_id, ok: false, error: '対象のキャストが見つかりません' }
 
-    const { error: snapshotError } = await saveNoticeSnapshot(admin, storeId, t.cast_id, user.id, content)
-    if (snapshotError) {
+    const { data: created, error: snapshotError } = await createNoticeSnapshot(admin, storeId, t.cast_id, user.id, content)
+    if (snapshotError || !created) {
       console.error('[notices/issue] snapshot failed', t.cast_id, snapshotError)
       return { cast_id: t.cast_id, ok: false, error: 'スナップショットの保存に失敗しました' }
     }
-
-    // 既に発行済み（凍結）だった場合、保存はスキップされて内容は変わっていない。
-    // 通知の文言が実際に表示される内容とズレないよう、保存後の確定内容を読み直す
-    const savedContent = await getNoticeSnapshot(admin, storeId, t.cast_id, from, to) ?? content
+    const noticeId = created.id as string
 
     const title = '支払通知書が届きました'
-    const body = `${periodLabel} の支払通知書: ¥${savedContent.totalReward.toLocaleString()}`
-    const link = `/admin/rewards/notice?cast_id=${t.cast_id}&from=${from}&to=${to}`
+    const body = `${periodLabel} の支払通知書: ¥${content.totalReward.toLocaleString()}`
+    const link = `/admin/rewards/notice?cast_id=${t.cast_id}&from=${from}&to=${to}&notice_id=${noticeId}`
     const { error: notifyError } = await admin.from('notifications').insert({ user_id: t.cast_id, title, body, link })
     if (notifyError) {
       console.error('[notices/issue] notification failed', t.cast_id, notifyError)
       return { cast_id: t.cast_id, ok: false, error: '通知の送信に失敗しました' }
     }
 
-    return { cast_id: t.cast_id, ok: true, totalReward: savedContent.totalReward }
+    return { cast_id: t.cast_id, ok: true, noticeId, totalReward: content.totalReward }
   }))
 
   const issued = results.filter(r => r.ok).length

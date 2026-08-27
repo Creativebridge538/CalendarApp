@@ -11,7 +11,7 @@ export async function POST(request: Request) {
   const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
   if (profile?.role !== 'admin') return NextResponse.json({ error: '権限がありません' }, { status: 403 })
 
-  const { cast_id, from, to, total_reward } = await request.json()
+  const { cast_id, from, to, total_reward, notice_id } = await request.json()
   if (!cast_id || !from || !to) {
     return NextResponse.json({ error: 'cast_id, from, to は必須です' }, { status: 400 })
   }
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
   const periodLabel = `${from}〜${to}`
   const amountLabel = typeof total_reward === 'number' ? `¥${total_reward.toLocaleString()}` : null
   const origin = new URL(request.url).origin
-  const noticeUrl = `${origin}/admin/rewards/notice?cast_id=${cast_id}&from=${from}&to=${to}`
+  const noticeUrl = `${origin}/admin/rewards/notice?cast_id=${cast_id}&from=${from}&to=${to}${notice_id ? `&notice_id=${notice_id}` : ''}`
 
   try {
     await resend.emails.send({

@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { fetchNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
+import { getNoticeSnapshotById, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 import { getAccessToken, ensureFolder, uploadFileToDrive } from '@/lib/google-drive'
 
@@ -10,7 +10,7 @@ import { getAccessToken, ensureFolder, uploadFileToDrive } from '@/lib/google-dr
 // 選択件数が多いと打ち切られる可能性がある
 export const maxDuration = 120
 
-interface NoticeRequest { cast_id: string; from: string; to: string; issued_at: string }
+interface NoticeRequest { notice_id: string; to: string; issued_at: string }
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -59,9 +59,9 @@ export async function POST(request: Request) {
 
     const results = await Promise.all(notices.map(async n => {
       try {
-        // 管理画面からのDrive保存は常に最新の内容を反映する（発行時点のスナップショットは使わない）
-        const content = await fetchNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
-        if (!content) return { ok: false, error: '対象のキャストが見つかりません' }
+        // 一覧に表示されている、実際に発行済みのその1件をそのまま保存する
+        const content = await getNoticeSnapshotById(supabase, storeId, n.notice_id)
+        if (!content) return { ok: false, error: '通知書が見つかりません' }
 
         const folderId = folderCache.get(n.to.slice(0, 7))!
         const buffer = await renderToBuffer(NoticeDocument({ content, issuedAt: n.issued_at }))

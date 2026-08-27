@@ -2,10 +2,10 @@ import { NextResponse } from 'next/server'
 import JSZip from 'jszip'
 import { renderToBuffer } from '@react-pdf/renderer'
 import { createClient } from '@/lib/supabase/server'
-import { fetchNoticeContent, noticeFileName } from '@/lib/payment-notice-data'
+import { getNoticeSnapshotById, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 
-interface NoticeRequest { cast_id: string; from: string; to: string; issued_at: string }
+interface NoticeRequest { notice_id: string; issued_at: string }
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -23,19 +23,28 @@ export async function POST(request: Request) {
 
   // 通知ごとにDB取得→PDF描画を直列で待つと件数分だけ遅くなるため、並列に処理する
   const rendered = await Promise.all(notices.map(async n => {
-    // 管理画面からの一括ダウンロードは常に最新の内容を反映する（発行時点のスナップショットは使わない）
-    const content = await fetchNoticeContent(supabase, storeId, n.cast_id, n.from, n.to)
-    if (!content) { console.error('[bulk-pdf] cast not found in store', { cast_id: n.cast_id }); return null }
+    // 一覧に表示されている、実際に発行済みのその1件をそのままダウンロードする
+    const content = await getNoticeSnapshotById(supabase, storeId, n.notice_id)
+    if (!content) { console.error('[bulk-pdf] notice not found', { notice_id: n.notice_id }); return null }
     const buffer = await renderToBuffer(NoticeDocument({ content, issuedAt: n.issued_at }))
     const filename = noticeFileName(content)
     return { filename, buffer }
   }))
 
   const zip = new JSZip()
+  const usedNames = new Set<string>()
   for (const r of rendered) {
     if (!r) continue
-    // 同じキャスト・同じ期間で複数回発行されている場合はファイル名が衝突し、zip内で上書きされる（意図的な挙動）
-    zip.file(r.filename, r.buffer)
+    // 同じキャスト・同じ期間で複数回発行されている場合はファイル名が衝突しうるため、
+    // 2件目以降には連番を付けて上書きを防ぐ
+    let filename = r.filename
+    let i = 2
+    while (usedNames.has(filename)) {
+      filename = r.filename.replace(/(_支払通知書\.pdf)$/, `_${i}$1`)
+      i++
+    }
+    usedNames.add(filename)
+    zip.file(filename, r.buffer)
   }
 
   const zipBuffer = await zip.generateAsync({ type: 'nodebuffer' })

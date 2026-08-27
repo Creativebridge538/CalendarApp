@@ -8,6 +8,8 @@ const PLATFORM_LABEL: Record<string, string> = {
 export interface CustomItem { label: string; amount: number }
 
 export interface NoticeContent {
+  /** 発行済みスナップショットのID。未発行のプレビュー等ではnull */
+  id: string | null
   castName: string
   castRealName: string
   bankName: string
@@ -30,10 +32,11 @@ export interface NoticeContent {
   totalReward: number
   showSalesTotal: boolean
   showRewardRate: boolean
-  /** 管理者が「編集」機能で内容を補正済みかどうか（trueの場合、再発行しても上書きしない） */
+  /** 管理者が「編集」機能で内容を補正済みかどうか（一覧でのバッジ表示用） */
   manuallyEdited: boolean
 }
 
+// 現時点の売上・キャスト情報からその場で計算する（発行前のプレビューや、新規発行時に使う）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
@@ -72,6 +75,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const totalReward = baseReward + bonus - deduction
 
   return {
+    id: null,
     manuallyEdited: false,
     castName: cast.display_name ?? '',
     castRealName: cast.real_name ?? '',
@@ -89,16 +93,21 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   }
 }
 
-// 発行済みのスナップショットがあればそれを返す（発行後にキャストの氏名・口座等が
-// 変更されても、過去に発行した通知書の内容は変わらないようにするため）
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
-  const { data } = await supabase.from('payment_notices').select('*')
-    .eq('store_id', storeId).eq('cast_id', castId).eq('period_from', from).eq('period_to', to)
-    .maybeSingle()
-  if (!data) return null
+function mapNoticeRow(data: {
+  id: string; cast_name: string; cast_real_name: string
+  bank_name: string; bank_branch: string; bank_account_number: string; bank_account_holder: string
+  store_name: string; logo_url: string | null
+  period_from: string; period_to: string; reward_rate: number
+  sales_rows: unknown
+  sales_total: number; base_reward: number; bonus: number; deduction: number
+  custom_items: unknown
+  total_reward: number
+  show_sales_total: boolean; show_reward_rate: boolean
+  manually_edited: boolean
+}): NoticeContent {
   const salesRows = data.sales_rows as NoticeContent['salesRows']
   return {
+    id: data.id,
     manuallyEdited: data.manually_edited,
     castName: data.cast_name, castRealName: data.cast_real_name,
     bankName: data.bank_name, bankBranch: data.bank_branch,
@@ -116,23 +125,37 @@ export async function getNoticeSnapshot(supabase: SupabaseClient<any>, storeId: 
   }
 }
 
-// 発行済みならスナップショットを、未発行（プレビュー等）ならその場で計算した最新内容を返す
+// 発行済み通知書を特定のID（＝発行1回分そのもの）で取得する。
+// 同じキャスト・同じ期間で何度発行しても、それぞれ別のIDを持つ独立した記録になる
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function getNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
-  const snapshot = await getNoticeSnapshot(supabase, storeId, castId, from, to)
-  if (snapshot) return snapshot
-  return fetchNoticeContent(supabase, storeId, castId, from, to)
+export async function getNoticeSnapshotById(supabase: SupabaseClient<any>, storeId: string, id: string): Promise<NoticeContent | null> {
+  const { data } = await supabase.from('payment_notices').select('*')
+    .eq('store_id', storeId).eq('id', id)
+    .maybeSingle()
+  if (!data) return null
+  return mapNoticeRow(data)
 }
 
-// 発行時点の内容をスナップショットとして保存する。同じ期間に対して既に発行済みの場合は
-// 上書きしない（発行済みの通知書の内容は不変とし、内容を直す場合は「発行済み支払通知書」の
-// 編集機能を使う。新規の期間を発行する場合のみ、その時点の最新内容が保存される）
+// 通知IDが分からない古いリンク向けのフォールバック: その期間・キャストで最後に発行されたものを返す
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, issuedBy: string, content: NoticeContent) {
+export async function getLatestNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
+  const { data } = await supabase.from('payment_notices').select('*')
+    .eq('store_id', storeId).eq('cast_id', castId).eq('period_from', from).eq('period_to', to)
+    .order('issued_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (!data) return null
+  return mapNoticeRow(data)
+}
+
+// 発行時点の内容を新しい独立したスナップショットとして保存する（常にINSERT。
+// 同じキャスト・同じ期間の過去の発行記録には一切影響しない）
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export async function createNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, issuedBy: string, content: NoticeContent) {
   const customItemsTotal = content.customItems.reduce((sum, i) => sum + i.amount, 0)
   const totalReward = content.baseReward + content.bonus - content.deduction + customItemsTotal
 
-  return supabase.from('payment_notices').upsert({
+  return supabase.from('payment_notices').insert({
     store_id: storeId, cast_id: castId, period_from: content.from, period_to: content.to,
     issued_by: issuedBy,
     cast_name: content.castName, cast_real_name: content.castRealName,
@@ -144,7 +167,7 @@ export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId:
     bonus: content.bonus, deduction: content.deduction,
     custom_items: content.customItems, total_reward: totalReward,
     show_sales_total: content.showSalesTotal, show_reward_rate: content.showRewardRate,
-  }, { onConflict: 'store_id,cast_id,period_from,period_to', ignoreDuplicates: true })
+  }).select('id').single()
 }
 
 // 例: 20260801-20260815_55000_山田太郎_支払通知書.pdf（対象期間(開始日-終了日)_支払額_本名(または源氏名)）
