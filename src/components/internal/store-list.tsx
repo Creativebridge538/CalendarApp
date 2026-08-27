@@ -14,8 +14,10 @@ import { PasswordInput } from '@/components/ui/password-input'
 import { Ban, Play, Pencil, Plus, Copy } from 'lucide-react'
 
 interface StoreAdmin {
+  id: string
   email: string
   display_name: string | null
+  login_id: string | null
 }
 
 interface StoreRow {
@@ -33,7 +35,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
   const [stores, setStores] = useState(initialStores)
   const [processing, setProcessing] = useState<string | null>(null)
   const [editTarget, setEditTarget] = useState<StoreRow | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', contact_name: '', contact_email: '' })
+  const [editForm, setEditForm] = useState({ name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
   const [creating, setCreating] = useState(false)
@@ -73,12 +75,32 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
       body: JSON.stringify(payload),
     })
     const data = await res.json().catch(() => ({}))
-    setProcessing(null)
-    if (!res.ok) { toast.error(data.error ?? '更新に失敗しました'); return }
+    if (!res.ok) { setProcessing(null); toast.error(data.error ?? '更新に失敗しました'); return }
+
+    const primaryAdmin = editTarget.admins[0]
+    let adminUpdated: StoreAdmin | null = null
+    if (primaryAdmin && (editForm.login_id.trim() !== (primaryAdmin.login_id ?? '') || editForm.password.trim())) {
+      const adminRes = await fetch(`/api/internal/stores/${editTarget.id}/admin-account`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          admin_user_id: primaryAdmin.id,
+          login_id: editForm.login_id.trim(),
+          password: editForm.password.trim() || undefined,
+        }),
+      })
+      const adminData = await adminRes.json().catch(() => ({}))
+      setProcessing(null)
+      if (!adminRes.ok) { toast.error(adminData.error ?? '管理者アカウントの更新に失敗しました'); return }
+      adminUpdated = { ...primaryAdmin, login_id: editForm.login_id.trim() }
+    } else {
+      setProcessing(null)
+    }
 
     setStores(stores.map(s => s.id === editTarget.id ? {
       ...s, name: payload.name,
       contact_name: payload.contact_name || null, contact_email: payload.contact_email || null,
+      admins: adminUpdated ? s.admins.map(a => a.id === adminUpdated!.id ? adminUpdated! : a) : s.admins,
     } : s))
     toast.success('店舗情報を変更しました')
     setEditTarget(null)
@@ -102,7 +124,8 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
     setStores([{
       id: data.store.id, name: data.store.name, created_at: data.store.created_at, is_active: true,
       contact_name: createForm.contact_name, contact_email: createForm.contact_email,
-      admins: [{ email: createForm.contact_email, display_name: createForm.contact_name }], castCount: 0,
+      admins: [{ id: data.admin_user_id, email: createForm.contact_email, display_name: createForm.contact_name, login_id: createForm.login_id }],
+      castCount: 0,
     }, ...stores])
     await navigator.clipboard.writeText(
       [
@@ -174,6 +197,8 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
                       name: store.name,
                       contact_name: store.contact_name ?? '',
                       contact_email: store.contact_email ?? '',
+                      login_id: store.admins[0]?.login_id ?? '',
+                      password: '',
                     })
                   }}
                   disabled={processing === store.id}
@@ -201,6 +226,14 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
             <div className="space-y-1.5">
               <Label>メールアドレス</Label>
               <Input type="email" value={editForm.contact_email} onChange={e => setEditForm({ ...editForm, contact_email: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ユーザーID</Label>
+              <Input value={editForm.login_id} onChange={e => setEditForm({ ...editForm, login_id: e.target.value.trim() })} placeholder="user_id" />
+            </div>
+            <div className="space-y-1.5">
+              <Label>パスワード</Label>
+              <PasswordInput value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })} placeholder="変更する場合のみ入力" autoComplete="new-password" />
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditTarget(null)}>キャンセル</Button>

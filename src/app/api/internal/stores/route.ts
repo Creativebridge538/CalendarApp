@@ -65,5 +65,5 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: message }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true, store })
+  return NextResponse.json({ ok: true, store, admin_user_id: created.user.id })
 }

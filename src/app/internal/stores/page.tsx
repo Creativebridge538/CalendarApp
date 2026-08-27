@@ -14,7 +14,7 @@ export default async function InternalStoresPage() {
   const admin = createAdminClient()
   const [{ data: stores }, { data: users }] = await Promise.all([
     admin.from('stores').select('id, name, created_at, is_active, contact_name, contact_email').order('created_at', { ascending: false }),
-    admin.from('users').select('store_id, role, email, display_name, is_active'),
+    admin.from('users').select('id, store_id, role, email, display_name, is_active, login_id'),
   ])
 
   const rows = (stores ?? []).map(store => {
