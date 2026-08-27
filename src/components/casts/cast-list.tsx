@@ -26,7 +26,7 @@ import { parsePlatformRewardRates } from '@/lib/reward-rate'
 
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
-  'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'platform_reward_rates' | 'is_active' | 'email' | 'profile_answers'
+  'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'platform_reward_rates' | 'daily_payment_reward_rate' | 'is_active' | 'email' | 'profile_answers'
   | 'photo_url' | 'login_id' | 'bank_name' | 'bank_branch' | 'bank_account_number' | 'bank_account_holder'
 >
 
@@ -50,6 +50,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   const [editing, setEditing] = useState<CastUser | null>(null)
   const [form, setForm] = useState({
     email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40',
+    daily_payment_reward_rate: '',
     bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
     profile_answers: {} as Record<string, string>,
     platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' } as Record<'stripchat' | 'fc2' | 'dxlive', string>,
@@ -86,6 +87,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     setEditing(null)
     setForm({
       email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40',
+      daily_payment_reward_rate: '',
       bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
       profile_answers: {},
       platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' },
@@ -104,6 +106,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
       real_name: cast.real_name ?? '',
       phone: cast.phone ?? '',
       reward_rate: String(Number(cast.reward_rate) * 100),
+      daily_payment_reward_rate: cast.daily_payment_reward_rate != null ? String(Number(cast.daily_payment_reward_rate) * 100) : '',
       bank_name: cast.bank_name ?? '',
       bank_branch: cast.bank_branch ?? '',
       bank_account_number: cast.bank_account_number ?? '',
@@ -140,6 +143,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           body: JSON.stringify({
             ...form,
             reward_rate: form.reward_rate ? String(parseFloat(form.reward_rate) / 100) : form.reward_rate,
+            daily_payment_reward_rate: form.daily_payment_reward_rate.trim() !== '' ? String(parseFloat(form.daily_payment_reward_rate) / 100) : null,
             platform_reward_rates: buildPlatformRewardRates(),
           }),
         })
@@ -153,6 +157,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           real_name: form.real_name || null,
           phone: form.phone || null,
           reward_rate: parseFloat(form.reward_rate) / 100,
+          daily_payment_reward_rate: form.daily_payment_reward_rate.trim() !== '' ? parseFloat(form.daily_payment_reward_rate) / 100 : null,
           platform_reward_rates: buildPlatformRewardRates(),
           bank_name: form.bank_name || null,
           bank_branch: form.bank_branch || null,
@@ -472,6 +477,19 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
               </div>
               <p className="text-xs text-muted-foreground">プラットフォーム別の報酬率を設定していない場合、この率が使われます</p>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label>日払い時の報酬率（任意）</Label>
+              <div className="relative w-32">
+                <Input
+                  type="number" step="1" min="0" max="100" className="pr-8"
+                  value={form.daily_payment_reward_rate}
+                  onChange={e => setForm({ ...form, daily_payment_reward_rate: e.target.value })}
+                  placeholder={form.reward_rate}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">日払いに変更した売上で、個別に率を指定しなかった場合に使われます</p>
             </div>
             <div className="space-y-1.5 pt-2 border-t">
               <Label>プラットフォーム別の報酬率（任意）</Label>

@@ -22,7 +22,7 @@ import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate
 
 interface CastUser {
   id: string; display_name: string | null; real_name: string | null
-  reward_rate: number | string; platform_reward_rates: unknown; is_active: boolean
+  reward_rate: number | string; platform_reward_rates: unknown; daily_payment_reward_rate: number | string | null; is_active: boolean
 }
 interface SaleRow {
   cast_id: string; amount: number | string; platform: string
@@ -67,7 +67,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount), 0)
     // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）
     const baseReward = Math.floor(castSales.reduce((sum, s) => {
-      const rate = effectiveRewardRate(s, rewardRate, platformRates)
+      const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate)
       return sum + Number(s.amount) * rate
     }, 0))
     const bonus = castSales.reduce((sum, s) => sum + Number(s.bonus), 0)

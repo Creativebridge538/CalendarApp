@@ -13,7 +13,7 @@ export async function POST(request: Request) {
   const body = await request.json()
   const {
     email, password, display_name, real_name, phone, reward_rate, login_id,
-    bank_name, bank_branch, bank_account_number, bank_account_holder, platform_reward_rates,
+    bank_name, bank_branch, bank_account_number, bank_account_holder, platform_reward_rates, daily_payment_reward_rate,
   } = body
 
   if (!email || !password || !display_name || !real_name || !login_id || !bank_name || !bank_branch || !bank_account_number || !bank_account_holder) {
@@ -55,6 +55,7 @@ export async function POST(request: Request) {
     real_name: real_name || null,
     phone: phone || null,
     reward_rate: parseFloat(reward_rate) || 0.4,
+    daily_payment_reward_rate: daily_payment_reward_rate != null && daily_payment_reward_rate !== '' ? parseFloat(daily_payment_reward_rate) : null,
     platform_reward_rates: platform_reward_rates && typeof platform_reward_rates === 'object' ? platform_reward_rates : {},
     is_active: true,
     login_id,
@@ -73,7 +74,7 @@ export async function POST(request: Request) {
   }
 
   const { data: cast } = await admin.from('users')
-    .select('id, display_name, real_name, phone, reward_rate, platform_reward_rates, is_active, email, login_id, bank_name, bank_branch, bank_account_number, bank_account_holder')
+    .select('id, display_name, real_name, phone, reward_rate, platform_reward_rates, daily_payment_reward_rate, is_active, email, login_id, bank_name, bank_branch, bank_account_number, bank_account_holder')
     .eq('id', newUser.user.id)
     .single()
 

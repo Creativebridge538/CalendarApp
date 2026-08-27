@@ -35,7 +35,7 @@ export default async function CastShiftsPage() {
   for (const s of sales ?? []) {
     amountByDate[s.date] = (amountByDate[s.date] ?? 0) + Number(s.amount)
     if (s.shift_id) {
-      const rate = effectiveRewardRate(s, rewardRate, platformRates)
+      const rate = effectiveRewardRate(s, rewardRate, platformRates, profile.daily_payment_reward_rate)
       const prev = salesByShiftId[s.shift_id] ?? { amount: 0, reward: 0 }
       salesByShiftId[s.shift_id] = {
         amount: prev.amount + Number(s.amount),

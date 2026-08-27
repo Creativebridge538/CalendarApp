@@ -925,6 +925,7 @@ export type Database = {
           birthdate: string | null
           calendar_token: string | null
           created_at: string
+          daily_payment_reward_rate: number | null
           display_name: string | null
           email: string
           id: string
@@ -955,6 +956,7 @@ export type Database = {
           birthdate?: string | null
           calendar_token?: string | null
           created_at?: string
+          daily_payment_reward_rate?: number | null
           display_name?: string | null
           email: string
           id: string
@@ -985,6 +987,7 @@ export type Database = {
           birthdate?: string | null
           calendar_token?: string | null
           created_at?: string
+          daily_payment_reward_rate?: number | null
           display_name?: string | null
           email?: string
           id?: string

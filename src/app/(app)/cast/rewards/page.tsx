@@ -59,8 +59,9 @@ export default async function CastRewardsPage() {
   // 報酬率（プラットフォーム別・日払い時の個別上書きもあり得る）とボーナス・控除を反映した実際の受取額を使う
   const castRewardRate = Number(profile.reward_rate ?? 0)
   const castPlatformRates = parsePlatformRewardRates(profile.platform_reward_rates)
+  const castDailyPaymentRate = profile.daily_payment_reward_rate
   function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'platform' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction'>): number {
-    const rate = effectiveRewardRate(s, castRewardRate, castPlatformRates)
+    const rate = effectiveRewardRate(s, castRewardRate, castPlatformRates, castDailyPaymentRate)
     const baseReward = Math.floor(Number(s.amount) * rate)
     return baseReward + Number(s.bonus ?? 0) - Number(s.deduction ?? 0)
   }
