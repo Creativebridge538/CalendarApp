@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/current-user'
 import { getNoticeSnapshotById } from '@/lib/payment-notice-data'
 import type { Json } from '@/lib/supabase/database.types'
@@ -69,7 +70,10 @@ export async function PATCH(request: Request) {
   const customItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
   const totalReward = baseReward + nextBonus - nextDeduction + customItemsTotal
 
-  const { error } = await supabase.from('payment_notices').update({
+  // payment_noticesへの書き込みはservice_role専用（RLSでadmin/castともにwriteポリシーがない）
+  // ため、通常のセッションクライアントでupdateすると0件更新のまま成功扱いになってしまう
+  const admin = createAdminClient()
+  const { data: updated, error } = await admin.from('payment_notices').update({
     cast_name: cast_name ?? existing.castName,
     cast_real_name: cast_real_name ?? existing.castRealName,
     bank_name: bank_name ?? existing.bankName,
@@ -83,10 +87,10 @@ export async function PATCH(request: Request) {
     show_sales_total: show_sales_total ?? existing.showSalesTotal,
     show_reward_rate: show_reward_rate ?? existing.showRewardRate,
     manually_edited: true,
-  }).eq('store_id', profile.store_id).eq('id', id)
+  }).eq('store_id', profile.store_id).eq('id', id).select('id')
 
-  if (error) {
-    console.error('[notices/snapshot] update failed', error)
+  if (error || !updated || updated.length === 0) {
+    console.error('[notices/snapshot] update failed', { error, matched: updated?.length ?? 0 })
     return NextResponse.json({ error: '更新に失敗しました' }, { status: 500 })
   }
 
