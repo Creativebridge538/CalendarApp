@@ -23,6 +23,10 @@ interface StoreRow {
   name: string
   created_at: string
   is_active: boolean
+  contact_name: string | null
+  contact_email: string | null
+  phone: string | null
+  notes: string | null
   admins: StoreAdmin[]
   castCount: number
 }
@@ -30,8 +34,8 @@ interface StoreRow {
 export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
   const [stores, setStores] = useState(initialStores)
   const [processing, setProcessing] = useState<string | null>(null)
-  const [renameTarget, setRenameTarget] = useState<StoreRow | null>(null)
-  const [renameValue, setRenameValue] = useState('')
+  const [editTarget, setEditTarget] = useState<StoreRow | null>(null)
+  const [editForm, setEditForm] = useState({ name: '', contact_name: '', contact_email: '', phone: '', notes: '' })
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
   const [creating, setCreating] = useState(false)
@@ -57,21 +61,32 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
     toast.success(nextActive ? `${store.name} の利用を再開しました` : `${store.name} を利用停止しました`)
   }
 
-  async function submitRename() {
-    if (!renameTarget || !renameValue.trim()) return
-    setProcessing(renameTarget.id)
-    const res = await fetch(`/api/internal/stores/${renameTarget.id}`, {
+  async function submitEdit() {
+    if (!editTarget || !editForm.name.trim()) return
+    setProcessing(editTarget.id)
+    const payload = {
+      name: editForm.name.trim(),
+      contact_name: editForm.contact_name.trim(),
+      contact_email: editForm.contact_email.trim(),
+      phone: editForm.phone.trim(),
+      notes: editForm.notes.trim(),
+    }
+    const res = await fetch(`/api/internal/stores/${editTarget.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: renameValue.trim() }),
+      body: JSON.stringify(payload),
     })
     const data = await res.json().catch(() => ({}))
     setProcessing(null)
     if (!res.ok) { toast.error(data.error ?? '更新に失敗しました'); return }
 
-    setStores(stores.map(s => s.id === renameTarget.id ? { ...s, name: renameValue.trim() } : s))
-    toast.success('店舗名を変更しました')
-    setRenameTarget(null)
+    setStores(stores.map(s => s.id === editTarget.id ? {
+      ...s, name: payload.name,
+      contact_name: payload.contact_name || null, contact_email: payload.contact_email || null,
+      phone: payload.phone || null, notes: payload.notes || null,
+    } : s))
+    toast.success('店舗情報を変更しました')
+    setEditTarget(null)
   }
 
   async function submitCreate() {
@@ -91,6 +106,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
 
     setStores([{
       id: data.store.id, name: data.store.name, created_at: data.store.created_at, is_active: true,
+      contact_name: createForm.contact_name, contact_email: createForm.contact_email, phone: null, notes: null,
       admins: [{ email: createForm.contact_email, display_name: createForm.contact_name }], castCount: 0,
     }, ...stores])
     await navigator.clipboard.writeText(
@@ -135,6 +151,14 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
                     {store.admins.map(a => a.display_name ?? a.email).join(', ') || '管理者未登録'}
                     {' ／ '}キャスト {store.castCount} 名
                   </p>
+                  {(store.contact_name || store.contact_email || store.phone) && (
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {[store.contact_name, store.contact_email, store.phone].filter(Boolean).join(' ／ ')}
+                    </p>
+                  )}
+                  {store.notes && (
+                    <p className="text-xs text-muted-foreground mt-0.5 whitespace-pre-wrap">{store.notes}</p>
+                  )}
                 </div>
                 <span className="text-xs text-muted-foreground">
                   {format(new Date(store.created_at), 'yyyy/M/d', { locale: ja })} 登録
@@ -152,10 +176,19 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
                 )}
                 <Button
                   size="sm" variant="outline"
-                  onClick={() => { setRenameTarget(store); setRenameValue(store.name) }}
+                  onClick={() => {
+                    setEditTarget(store)
+                    setEditForm({
+                      name: store.name,
+                      contact_name: store.contact_name ?? '',
+                      contact_email: store.contact_email ?? '',
+                      phone: store.phone ?? '',
+                      notes: store.notes ?? '',
+                    })
+                  }}
                   disabled={processing === store.id}
                 >
-                  <Pencil className="h-3.5 w-3.5 mr-1" />店舗名を編集
+                  <Pencil className="h-3.5 w-3.5 mr-1" />店舗情報を編集
                 </Button>
               </div>
             </div>
@@ -163,17 +196,33 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
         </CardContent>
       </Card>
 
-      <Dialog open={!!renameTarget} onOpenChange={open => { if (!open) setRenameTarget(null) }}>
+      <Dialog open={!!editTarget} onOpenChange={open => { if (!open) setEditTarget(null) }}>
         <DialogContent>
-          <DialogHeader><DialogTitle>店舗名を編集</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle>店舗情報を編集</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="space-y-1.5">
               <Label required>店舗名</Label>
-              <Input value={renameValue} onChange={e => setRenameValue(e.target.value)} />
+              <Input value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>ご担当者名</Label>
+              <Input value={editForm.contact_name} onChange={e => setEditForm({ ...editForm, contact_name: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>メールアドレス</Label>
+              <Input type="email" value={editForm.contact_email} onChange={e => setEditForm({ ...editForm, contact_email: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>電話番号</Label>
+              <Input value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label>備考</Label>
+              <Input value={editForm.notes} onChange={e => setEditForm({ ...editForm, notes: e.target.value })} />
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRenameTarget(null)}>キャンセル</Button>
-              <Button onClick={submitRename} disabled={processing === renameTarget?.id || !renameValue.trim()}>保存</Button>
+              <Button variant="outline" onClick={() => setEditTarget(null)}>キャンセル</Button>
+              <Button onClick={submitEdit} disabled={processing === editTarget?.id || !editForm.name.trim()}>保存</Button>
             </div>
           </div>
         </DialogContent>

@@ -913,22 +913,34 @@ export type Database = {
       }
       stores: {
         Row: {
+          contact_email: string | null
+          contact_name: string | null
           created_at: string
           id: string
           is_active: boolean
           name: string
+          notes: string | null
+          phone: string | null
         }
         Insert: {
+          contact_email?: string | null
+          contact_name?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           name: string
+          notes?: string | null
+          phone?: string | null
         }
         Update: {
+          contact_email?: string | null
+          contact_name?: string | null
           created_at?: string
           id?: string
           is_active?: boolean
           name?: string
+          notes?: string | null
+          phone?: string | null
         }
         Relationships: []
       }
