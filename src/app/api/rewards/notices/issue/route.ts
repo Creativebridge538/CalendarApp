@@ -3,7 +3,7 @@ import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { fetchNoticeContent, saveNoticeSnapshot } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, getNoticeSnapshot, saveNoticeSnapshot } from '@/lib/payment-notice-data'
 
 interface Target { cast_id: string }
 
@@ -36,8 +36,12 @@ export async function POST(request: Request) {
       return { cast_id: t.cast_id, ok: false, error: 'スナップショットの保存に失敗しました' }
     }
 
+    // 既に発行済み（凍結）だった場合、保存はスキップされて内容は変わっていない。
+    // 通知の文言が実際に表示される内容とズレないよう、保存後の確定内容を読み直す
+    const savedContent = await getNoticeSnapshot(admin, storeId, t.cast_id, from, to) ?? content
+
     const title = '支払通知書が届きました'
-    const body = `${periodLabel} の支払通知書: ¥${content.totalReward.toLocaleString()}`
+    const body = `${periodLabel} の支払通知書: ¥${savedContent.totalReward.toLocaleString()}`
     const link = `/admin/rewards/notice?cast_id=${t.cast_id}&from=${from}&to=${to}`
     const { error: notifyError } = await admin.from('notifications').insert({ user_id: t.cast_id, title, body, link })
     if (notifyError) {
@@ -45,7 +49,7 @@ export async function POST(request: Request) {
       return { cast_id: t.cast_id, ok: false, error: '通知の送信に失敗しました' }
     }
 
-    return { cast_id: t.cast_id, ok: true, totalReward: content.totalReward }
+    return { cast_id: t.cast_id, ok: true, totalReward: savedContent.totalReward }
   }))
 
   const issued = results.filter(r => r.ok).length
