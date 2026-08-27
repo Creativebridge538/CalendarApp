@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
@@ -14,7 +13,7 @@ export default async function InternalStoresPage() {
 
   const admin = createAdminClient()
   const [{ data: stores }, { data: users }] = await Promise.all([
-    admin.from('stores').select('id, name, created_at, is_active, contact_name, contact_email, phone, notes').order('created_at', { ascending: false }),
+    admin.from('stores').select('id, name, created_at, is_active, contact_name, contact_email').order('created_at', { ascending: false }),
     admin.from('users').select('store_id, role, email, display_name, is_active'),
   ])
 
@@ -34,9 +33,6 @@ export default async function InternalStoresPage() {
             <p className="text-sm text-muted-foreground mt-0.5">登録済みの全店舗の閲覧・利用停止/再開ができます</p>
           </div>
           <div className="flex items-center gap-3">
-            <Link href="/internal/signups" className="text-sm text-primary underline underline-offset-2">
-              新規店舗の申込レビューへ
-            </Link>
             <InternalLogoutButton />
           </div>
         </div>

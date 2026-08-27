@@ -14,7 +14,7 @@ export async function PATCH(
     return NextResponse.json({ error: '権限がありません' }, { status: 403 })
   }
 
-  const { name, contact_name, contact_email, phone, notes } = await request.json().catch(() => ({}))
+  const { name, contact_name, contact_email } = await request.json().catch(() => ({}))
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: '店舗名は必須です' }, { status: 400 })
   }
@@ -27,8 +27,6 @@ export async function PATCH(
     name,
     contact_name: contact_name || null,
     contact_email: contact_email || null,
-    phone: phone || null,
-    notes: notes || null,
   }).eq('id', id)
   if (error) return NextResponse.json({ error: '更新に失敗しました' }, { status: 500 })
 

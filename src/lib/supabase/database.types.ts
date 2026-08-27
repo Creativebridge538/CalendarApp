@@ -919,8 +919,6 @@ export type Database = {
           id: string
           is_active: boolean
           name: string
-          notes: string | null
-          phone: string | null
         }
         Insert: {
           contact_email?: string | null
@@ -929,8 +927,6 @@ export type Database = {
           id?: string
           is_active?: boolean
           name: string
-          notes?: string | null
-          phone?: string | null
         }
         Update: {
           contact_email?: string | null
@@ -939,8 +935,6 @@ export type Database = {
           id?: string
           is_active?: boolean
           name?: string
-          notes?: string | null
-          phone?: string | null
         }
         Relationships: []
       }

@@ -30,13 +30,8 @@ export async function POST(
   }
 
   const { data: store, error: storeError } = await admin.from('stores')
-    .insert({
-      name: signup.store_name,
-      contact_name: signup.contact_name,
-      contact_email: signup.contact_email,
-      phone: signup.phone,
-      notes: signup.message,
-    }).select().single()
+    .insert({ name: signup.store_name, contact_name: signup.contact_name, contact_email: signup.contact_email })
+    .select().single()
   if (storeError || !store) {
     return NextResponse.json({ error: '店舗の作成に失敗しました' }, { status: 500 })
   }
