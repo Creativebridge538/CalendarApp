@@ -50,9 +50,13 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   const [editSaving, setEditSaving] = useState(false)
   const [editForm, setEditForm] = useState({
     cast_name: '', cast_real_name: '', bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
-    base_reward: '', bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
+    reward_rate: '', bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
   })
   const [editCustomItems, setEditCustomItems] = useState<{ label: string; amount: string }[]>([])
+  const [editSalesRows, setEditSalesRows] = useState<{ date: string; platformLabel: string; amount: string; reward: string; isDailyPayment: boolean }[]>([])
+
+  const editSalesTotal = editSalesRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0)
+  const editBaseReward = editSalesRows.reduce((sum, r) => sum + (parseFloat(r.reward) || 0), 0)
 
   async function openEdit(notice: Notice) {
     setEditTarget(notice)
@@ -66,10 +70,13 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       cast_name: c.castName, cast_real_name: c.castRealName,
       bank_name: c.bankName, bank_branch: c.bankBranch,
       bank_account_number: c.bankAccountNumber, bank_account_holder: c.bankAccountHolder,
-      base_reward: String(c.baseReward), bonus: String(c.bonus), deduction: String(c.deduction),
+      reward_rate: String(Number(c.rewardRate) * 100), bonus: String(c.bonus), deduction: String(c.deduction),
       show_sales_total: c.showSalesTotal, show_reward_rate: c.showRewardRate,
     })
     setEditCustomItems((c.customItems ?? []).map((i: { label: string; amount: number }) => ({ label: i.label, amount: String(i.amount) })))
+    setEditSalesRows((c.salesRows ?? []).map((r: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean }) => ({
+      date: r.date, platformLabel: r.platformLabel, amount: String(r.amount), reward: String(r.reward ?? 0), isDailyPayment: r.isDailyPayment,
+    })))
   }
 
   async function saveEdit() {
@@ -81,11 +88,16 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       body: JSON.stringify({
         cast_id: editTarget.castId, from: editTarget.from, to: editTarget.to,
         ...editForm,
-        base_reward: parseFloat(editForm.base_reward) || 0,
+        reward_rate: (parseFloat(editForm.reward_rate) || 0) / 100,
         bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
         custom_items: editCustomItems
           .filter(i => i.label.trim() !== '')
           .map(i => ({ label: i.label, amount: parseFloat(i.amount) || 0 })),
+        sales_rows: editSalesRows.map(r => ({
+          date: r.date, platformLabel: r.platformLabel,
+          amount: parseFloat(r.amount) || 0, reward: parseFloat(r.reward) || 0,
+          isDailyPayment: r.isDailyPayment, dailyPaymentAt: null,
+        })),
       }),
     })
     const json = await res.json()
@@ -298,7 +310,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       </CardContent>
 
       <Dialog open={!!editTarget} onOpenChange={o => { if (!o) setEditTarget(null) }}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent className="sm:max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>発行済み通知書を編集</DialogTitle>
           </DialogHeader>
@@ -340,8 +352,8 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label className="text-xs text-muted-foreground font-normal">基本報酬</Label>
-                <Input type="number" value={editForm.base_reward} onChange={e => setEditForm({ ...editForm, base_reward: e.target.value })} />
+                <Label className="text-xs text-muted-foreground font-normal">報酬率（%・表示用）</Label>
+                <Input type="number" value={editForm.reward_rate} onChange={e => setEditForm({ ...editForm, reward_rate: e.target.value })} />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -352,6 +364,53 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                   <Label className="text-xs text-muted-foreground font-normal">控除</Label>
                   <Input type="number" value={editForm.deduction} onChange={e => setEditForm({ ...editForm, deduction: e.target.value })} />
                 </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t">
+                <div className="flex items-center justify-between">
+                  <Label className="text-xs text-muted-foreground font-normal">売上内訳（各行を編集・追加・削除できます）</Label>
+                  <p className="text-xs text-muted-foreground">
+                    売上合計: ¥{editSalesTotal.toLocaleString()} ・ 基本報酬: ¥{editBaseReward.toLocaleString()}
+                  </p>
+                </div>
+                <div className="space-y-1.5 max-h-56 overflow-y-auto pr-1">
+                  {editSalesRows.map((row, i) => (
+                    <div key={i} className="flex items-center gap-1.5">
+                      <Input
+                        type="date" className="w-36" value={row.date}
+                        onChange={e => setEditSalesRows(editSalesRows.map((r, idx) => idx === i ? { ...r, date: e.target.value } : r))}
+                      />
+                      <Input
+                        placeholder="プラットフォーム" className="w-28" value={row.platformLabel}
+                        onChange={e => setEditSalesRows(editSalesRows.map((r, idx) => idx === i ? { ...r, platformLabel: e.target.value } : r))}
+                      />
+                      <Input
+                        type="number" placeholder="売上額" className="w-24" value={row.amount}
+                        onChange={e => setEditSalesRows(editSalesRows.map((r, idx) => idx === i ? { ...r, amount: e.target.value } : r))}
+                      />
+                      <Input
+                        type="number" placeholder="女子給" className="w-24" value={row.reward}
+                        onChange={e => setEditSalesRows(editSalesRows.map((r, idx) => idx === i ? { ...r, reward: e.target.value } : r))}
+                      />
+                      <label className="flex items-center gap-1 text-xs text-muted-foreground whitespace-nowrap">
+                        <Checkbox
+                          checked={row.isDailyPayment}
+                          onCheckedChange={v => setEditSalesRows(editSalesRows.map((r, idx) => idx === i ? { ...r, isDailyPayment: !!v } : r))}
+                        />
+                        日払い済み
+                      </label>
+                      <Button size="icon" variant="ghost" onClick={() => setEditSalesRows(editSalesRows.filter((_, idx) => idx !== i))}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button
+                  size="sm" variant="outline"
+                  onClick={() => setEditSalesRows([...editSalesRows, { date: editTarget?.from ?? '', platformLabel: '手入力', amount: '', reward: '', isDailyPayment: false }])}
+                >
+                  <Plus className="h-3.5 w-3.5 mr-1" />行を追加
+                </Button>
               </div>
 
               <div className="space-y-1.5 pt-2 border-t">

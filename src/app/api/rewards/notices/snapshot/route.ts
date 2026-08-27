@@ -39,7 +39,7 @@ export async function PATCH(request: Request) {
   const {
     cast_id, from, to,
     cast_name, cast_real_name, bank_name, bank_branch, bank_account_number, bank_account_holder,
-    base_reward, bonus, deduction, custom_items, show_sales_total, show_reward_rate,
+    reward_rate, sales_rows, bonus, deduction, custom_items, show_sales_total, show_reward_rate,
   } = body
 
   if (!cast_id || !from || !to) {
@@ -50,7 +50,21 @@ export async function PATCH(request: Request) {
   const existing = await getNoticeSnapshot(supabase, profile.store_id, cast_id, from, to)
   if (!existing) return NextResponse.json({ error: '発行済みの通知書が見つかりません' }, { status: 404 })
 
-  const nextBaseReward = base_reward != null ? Number(base_reward) : existing.baseReward
+  const nextRewardRate = reward_rate != null ? Number(reward_rate) : existing.rewardRate
+  const nextSalesRows = Array.isArray(sales_rows)
+    ? sales_rows
+        .filter((r: unknown) => r && typeof r === 'object' && typeof (r as { date?: unknown }).date === 'string')
+        .map((r: { date: string; platformLabel?: unknown; amount: unknown; reward: unknown; isDailyPayment?: unknown; dailyPaymentAt?: unknown }) => ({
+          date: r.date,
+          platformLabel: typeof r.platformLabel === 'string' ? r.platformLabel : '',
+          amount: Number(r.amount) || 0,
+          reward: Number(r.reward) || 0,
+          isDailyPayment: !!r.isDailyPayment,
+          dailyPaymentAt: typeof r.dailyPaymentAt === 'string' ? r.dailyPaymentAt : null,
+        }))
+    : existing.salesRows
+  const salesTotal = nextSalesRows.reduce((sum: number, r: { amount: number }) => sum + r.amount, 0)
+  const baseReward = nextSalesRows.reduce((sum: number, r: { reward: number }) => sum + r.reward, 0)
   const nextBonus = bonus != null ? Number(bonus) : existing.bonus
   const nextDeduction = deduction != null ? Number(deduction) : existing.deduction
   const nextCustomItems = Array.isArray(custom_items)
@@ -59,7 +73,7 @@ export async function PATCH(request: Request) {
         .map((i: { label: string; amount: unknown }) => ({ label: i.label, amount: Number(i.amount) || 0 }))
     : existing.customItems
   const customItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
-  const totalReward = nextBaseReward + nextBonus - nextDeduction + customItemsTotal
+  const totalReward = baseReward + nextBonus - nextDeduction + customItemsTotal
 
   const { error } = await supabase.from('payment_notices').update({
     cast_name: cast_name ?? existing.castName,
@@ -68,7 +82,9 @@ export async function PATCH(request: Request) {
     bank_branch: bank_branch ?? existing.bankBranch,
     bank_account_number: bank_account_number ?? existing.bankAccountNumber,
     bank_account_holder: bank_account_holder ?? existing.bankAccountHolder,
-    base_reward: nextBaseReward, bonus: nextBonus, deduction: nextDeduction,
+    reward_rate: nextRewardRate,
+    sales_rows: nextSalesRows as unknown as Json, sales_total: salesTotal, base_reward: baseReward,
+    bonus: nextBonus, deduction: nextDeduction,
     custom_items: nextCustomItems as unknown as Json, total_reward: totalReward,
     show_sales_total: show_sales_total ?? existing.showSalesTotal,
     show_reward_rate: show_reward_rate ?? existing.showRewardRate,
