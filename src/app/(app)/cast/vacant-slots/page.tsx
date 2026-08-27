@@ -14,7 +14,7 @@ export default async function CastVacantSlotsPage() {
 
   const [{ data: slots }, { data: myApplications }, { data: settings }] = await Promise.all([
     supabase.from('vacant_slots')
-      .select('*, rooms(name), areas(name), vacant_slot_applications(status)')
+      .select('*, rooms(name), areas(name)')
       .eq('store_id', profile.store_id)
       .eq('is_published', true)
       .gte('date', new Date().toISOString().split('T')[0])

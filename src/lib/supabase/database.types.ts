@@ -1082,6 +1082,7 @@ export type Database = {
       }
       vacant_slots: {
         Row: {
+          approved_count: number
           area_id: string | null
           capacity: number
           created_at: string
@@ -1096,6 +1097,7 @@ export type Database = {
           store_id: string
         }
         Insert: {
+          approved_count?: number
           area_id?: string | null
           capacity?: number
           created_at?: string
@@ -1110,6 +1112,7 @@ export type Database = {
           store_id: string
         }
         Update: {
+          approved_count?: number
           area_id?: string | null
           capacity?: number
           created_at?: string
@@ -1164,6 +1167,10 @@ export type Database = {
         Returns: Database["public"]["Enums"]["user_role"]
       }
       my_store_id: { Args: never; Returns: string }
+      sync_vacant_slot_approved_count: {
+        Args: { target_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
       deadline_type: "monthly" | "weekly" | "none"

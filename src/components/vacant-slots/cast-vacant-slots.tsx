@@ -14,9 +14,8 @@ import type { Database } from '@/lib/supabase/database.types'
 
 interface Slot {
   id: string; date: string; start_time: string; end_time: string; notes: string | null
-  room_id: string | null; area_id: string | null; capacity: number
+  room_id: string | null; area_id: string | null; capacity: number; approved_count: number
   rooms: { name: string } | null; areas: { name: string } | null
-  vacant_slot_applications: { status: string }[]
 }
 interface Application { vacant_slot_id: string; status: string; shift_id: string | null }
 
@@ -60,12 +59,12 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
               return [...prev, {
                 id: row.id, date: row.date, start_time: row.start_time, end_time: row.end_time,
                 notes: row.notes, room_id: row.room_id, area_id: row.area_id, capacity: row.capacity,
-                rooms: null, areas: null, vacant_slot_applications: [],
+                approved_count: row.approved_count, rooms: null, areas: null,
               }]
             }
             return prev.map(s => s.id === row.id ? {
               ...s, date: row.date, start_time: row.start_time, end_time: row.end_time,
-              notes: row.notes, room_id: row.room_id, capacity: row.capacity,
+              notes: row.notes, room_id: row.room_id, capacity: row.capacity, approved_count: row.approved_count,
             } : s)
           })
         }
@@ -103,7 +102,11 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
     if (shiftError) { toast.error('申請に失敗しました'); return }
 
     const { error } = await supabase.from('vacant_slot_applications').insert({ vacant_slot_id: slotId, cast_id: castId, shift_id: shift.id })
-    if (error) { toast.error('申請に失敗しました'); await supabase.from('shifts').delete().eq('id', shift.id); return }
+    if (error) {
+      toast.error(error.code === '23514' ? 'この空き枠は満員です' : '申請に失敗しました')
+      await supabase.from('shifts').delete().eq('id', shift.id)
+      return
+    }
     setApplications([...applications, { vacant_slot_id: slotId, status: 'pending', shift_id: shift.id }])
     toast.success('申請しました')
     const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
@@ -118,7 +121,7 @@ export function CastVacantSlots({ slots: initialSlots, myApplications: initial, 
   }
 
   function isFull(slot: Slot): boolean {
-    return slot.vacant_slot_applications.filter(a => a.status === 'approved').length >= slot.capacity
+    return slot.approved_count >= slot.capacity
   }
 
   function locationText(slot: Slot): string {
