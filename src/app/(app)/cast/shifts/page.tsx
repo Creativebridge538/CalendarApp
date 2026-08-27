@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { CastShiftView } from '@/components/shifts/cast-shift-view'
 import { getMonthToDateSummary } from '@/lib/reward-summary'
+import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
 
 export default async function CastShiftsPage() {
   const supabase = await createClient()
@@ -21,7 +22,7 @@ export default async function CastShiftsPage() {
     supabase.from('shift_checklist_items').select('id, label, item_type, options').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
     supabase.from('stores').select('name').eq('id', profile.store_id).single(),
     getMonthToDateSummary(supabase, user.id),
-    supabase.from('sales').select('date, amount, shift_id, is_daily_payment, reward_rate_override').eq('cast_id', user.id),
+    supabase.from('sales').select('date, amount, platform, shift_id, is_daily_payment, reward_rate_override').eq('cast_id', user.id),
   ])
 
   const { count: unreadNotificationCount } = await supabase.from('notifications')
@@ -30,10 +31,11 @@ export default async function CastShiftsPage() {
   const amountByDate: Record<string, number> = {}
   const salesByShiftId: Record<string, { amount: number; reward: number }> = {}
   const rewardRate = Number(profile.reward_rate)
+  const platformRates = parsePlatformRewardRates(profile.platform_reward_rates)
   for (const s of sales ?? []) {
     amountByDate[s.date] = (amountByDate[s.date] ?? 0) + Number(s.amount)
     if (s.shift_id) {
-      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+      const rate = effectiveRewardRate(s, rewardRate, platformRates)
       const prev = salesByShiftId[s.shift_id] ?? { amount: 0, reward: 0 }
       salesByShiftId[s.shift_id] = {
         amount: prev.amount + Number(s.amount),

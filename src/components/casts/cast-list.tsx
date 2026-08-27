@@ -22,12 +22,19 @@ import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { toHalfWidthDigits } from '@/lib/zenkaku'
 import { usePagination } from '@/hooks/use-pagination'
+import { parsePlatformRewardRates } from '@/lib/reward-rate'
 
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
-  'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'is_active' | 'email' | 'profile_answers'
+  'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'platform_reward_rates' | 'is_active' | 'email' | 'profile_answers'
   | 'photo_url' | 'login_id' | 'bank_name' | 'bank_branch' | 'bank_account_number' | 'bank_account_holder'
 >
+
+const PLATFORM_RATE_FIELDS: { key: 'stripchat' | 'fc2' | 'dxlive'; label: string }[] = [
+  { key: 'stripchat', label: 'STRIPCHAT' },
+  { key: 'fc2', label: 'FC2' },
+  { key: 'dxlive', label: 'DXライブ' },
+]
 
 interface CastListProps {
   casts: CastUser[]
@@ -45,6 +52,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40',
     bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
     profile_answers: {} as Record<string, string>,
+    platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' } as Record<'stripchat' | 'fc2' | 'dxlive', string>,
   })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
@@ -80,12 +88,14 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
       email: '', password: '', login_id: '', display_name: '', real_name: '', phone: '', reward_rate: '40',
       bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
       profile_answers: {},
+      platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' },
     })
     setOpen(true)
   }
 
   function openEdit(cast: CastUser) {
     setEditing(cast)
+    const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
     setForm({
       email: cast.email ?? '',
       password: '',
@@ -99,8 +109,25 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
       bank_account_number: cast.bank_account_number ?? '',
       bank_account_holder: cast.bank_account_holder ?? '',
       profile_answers: { ...(cast.profile_answers as Record<string, string> | null ?? {}) },
+      platform_reward_rates: {
+        stripchat: platformRates.stripchat != null ? String(platformRates.stripchat * 100) : '',
+        fc2: platformRates.fc2 != null ? String(platformRates.fc2 * 100) : '',
+        dxlive: platformRates.dxlive != null ? String(platformRates.dxlive * 100) : '',
+      },
     })
     setOpen(true)
+  }
+
+  // 入力欄が空のプラットフォームは「基本報酬率を使う」として保存しない
+  function buildPlatformRewardRates(): Record<string, number> {
+    const result: Record<string, number> = {}
+    for (const { key } of PLATFORM_RATE_FIELDS) {
+      const raw = form.platform_reward_rates[key]
+      if (raw.trim() === '') continue
+      const pct = parseFloat(raw)
+      if (!Number.isNaN(pct)) result[key] = pct / 100
+    }
+    return result
   }
 
   async function handleSave() {
@@ -110,7 +137,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
         const res = await fetch('/api/admin/create-cast', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...form, reward_rate: form.reward_rate ? String(parseFloat(form.reward_rate) / 100) : form.reward_rate }),
+          body: JSON.stringify({
+            ...form,
+            reward_rate: form.reward_rate ? String(parseFloat(form.reward_rate) / 100) : form.reward_rate,
+            platform_reward_rates: buildPlatformRewardRates(),
+          }),
         })
         const json = await res.json()
         if (!res.ok) { toast.error(json.error ?? '作成に失敗しました'); return }
@@ -122,6 +153,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           real_name: form.real_name || null,
           phone: form.phone || null,
           reward_rate: parseFloat(form.reward_rate) / 100,
+          platform_reward_rates: buildPlatformRewardRates(),
           bank_name: form.bank_name || null,
           bank_branch: form.bank_branch || null,
           bank_account_number: form.bank_account_number || null,
@@ -438,6 +470,26 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                   onChange={e => setForm({ ...form, reward_rate: e.target.value })}
                 />
                 <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">%</span>
+              </div>
+              <p className="text-xs text-muted-foreground">プラットフォーム別の報酬率を設定していない場合、この率が使われます</p>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label>プラットフォーム別の報酬率（任意）</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {PLATFORM_RATE_FIELDS.map(({ key, label }) => (
+                  <div key={key} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
+                    <div className="relative">
+                      <Input
+                        type="number" step="1" min="0" max="100" className="pr-6"
+                        value={form.platform_reward_rates[key]}
+                        onChange={e => setForm({ ...form, platform_reward_rates: { ...form.platform_reward_rates, [key]: e.target.value } })}
+                        placeholder={form.reward_rate}
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
             <div className="pt-3 border-t space-y-3">

@@ -18,10 +18,14 @@ import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
+import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
 
-interface CastUser { id: string; display_name: string | null; real_name: string | null; reward_rate: number | string; is_active: boolean }
+interface CastUser {
+  id: string; display_name: string | null; real_name: string | null
+  reward_rate: number | string; platform_reward_rates: unknown; is_active: boolean
+}
 interface SaleRow {
-  cast_id: string; amount: number | string
+  cast_id: string; amount: number | string; platform: string
   is_daily_payment: boolean; reward_rate_override: number | string | null
   bonus: number | string; deduction: number | string
 }
@@ -58,11 +62,12 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
 
   const rows = useMemo(() => casts.map(cast => {
     const rewardRate = Number(cast.reward_rate)
+    const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
     const castSales = salesByCast.get(cast.id) ?? []
     const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount), 0)
-    // 日払いで報酬率が上書きされている行はその行だけ別の率で計算する（それ以外は通常の報酬率）
+    // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）
     const baseReward = Math.floor(castSales.reduce((sum, s) => {
-      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+      const rate = effectiveRewardRate(s, rewardRate, platformRates)
       return sum + Number(s.amount) * rate
     }, 0))
     const bonus = castSales.reduce((sum, s) => sum + Number(s.bonus), 0)

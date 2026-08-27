@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { CastRewardDashboard } from '@/components/rewards/cast-reward-dashboard'
+import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
 
 function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
@@ -55,10 +56,11 @@ export default async function CastRewardsPage() {
   const shiftsList = shifts ?? []
 
   // このページは「収益(女子給)ダッシュボード」なので、売上(amount)そのものではなく、
-  // 報酬率（日払い時は個別上書きもあり得る）とボーナス・控除を反映した実際の受取額を使う
+  // 報酬率（プラットフォーム別・日払い時の個別上書きもあり得る）とボーナス・控除を反映した実際の受取額を使う
   const castRewardRate = Number(profile.reward_rate ?? 0)
-  function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction'>): number {
-    const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : castRewardRate
+  const castPlatformRates = parsePlatformRewardRates(profile.platform_reward_rates)
+  function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'platform' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction'>): number {
+    const rate = effectiveRewardRate(s, castRewardRate, castPlatformRates)
     const baseReward = Math.floor(Number(s.amount) * rate)
     return baseReward + Number(s.bonus ?? 0) - Number(s.deduction ?? 0)
   }

@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { effectiveRewardRate, parsePlatformRewardRates } from './reward-rate'
 
 const PLATFORM_LABEL: Record<string, string> = {
   manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
@@ -29,7 +30,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
-    supabase.from('users').select('display_name, real_name, reward_rate, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
+    supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
     supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction')
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
@@ -39,12 +40,14 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   if (!cast) return null
 
   const rewardRate = Number(cast.reward_rate)
+  const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
   const salesRows = sales ?? []
   const salesTotal = salesRows.reduce((sum, s) => sum + Number(s.amount), 0)
-  // 日払いで報酬率が上書きされている行はその行だけ別の率で計算する（それ以外は通常の報酬率）
+  // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
+  // その行だけ別の率で計算する（それ以外は通常の報酬率）
   const baseReward = Math.floor(
     salesRows.reduce((sum, s) => {
-      const rate = s.is_daily_payment && s.reward_rate_override != null ? Number(s.reward_rate_override) : rewardRate
+      const rate = effectiveRewardRate(s, rewardRate, platformRates)
       return sum + Number(s.amount) * rate
     }, 0)
   )

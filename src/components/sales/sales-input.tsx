@@ -19,6 +19,7 @@ import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit, R
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
+import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
 import { usePagination } from '@/hooks/use-pagination'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -42,7 +43,7 @@ function toDatetimeLocal(iso: string): string {
 }
 
 interface Props {
-  casts: { id: string; display_name: string | null; reward_rate: number | string }[]
+  casts: { id: string; display_name: string | null; reward_rate: number | string; platform_reward_rates: unknown }[]
   sales: Sale[]
   storeId: string
   userId: string
@@ -66,9 +67,6 @@ function defaultDateFor(year: number, month: number): string {
   return isCurrentMonth ? format(now, 'yyyy-MM-dd') : `${year}-${String(month).padStart(2, '0')}-01`
 }
 
-function effectiveRewardRate(sale: Pick<Sale, 'is_daily_payment' | 'reward_rate_override'>, castRewardRate: number): number {
-  return sale.is_daily_payment && sale.reward_rate_override != null ? Number(sale.reward_rate_override) : castRewardRate
-}
 
 // 日払いの報酬率上書き（%）は同じ値を繰り返し使うことが多いため、店舗ごとにブラウザへ保存し次回から選べるようにする
 function rateTemplateKey(storeId: string): string {
@@ -167,6 +165,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const castRewardRateById = useMemo(() => {
     const map: Record<string, number> = {}
     for (const c of casts) map[c.id] = Number(c.reward_rate)
+    return map
+  }, [casts])
+  const castPlatformRatesById = useMemo(() => {
+    const map: Record<string, ReturnType<typeof parsePlatformRewardRates>> = {}
+    for (const c of casts) map[c.id] = parsePlatformRewardRates(c.platform_reward_rates)
     return map
   }, [casts])
 
@@ -318,9 +321,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
-    const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0)
+    const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0, castPlatformRatesById[s.cast_id])
     return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction)
-  }, 0), [filteredSales, castRewardRateById])
+  }, 0), [filteredSales, castRewardRateById, castPlatformRatesById])
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
@@ -611,7 +614,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 </TableCell></TableRow>
               )}
               {pagedSales.map(sale => {
-                const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0))
+                const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0, castPlatformRatesById[sale.cast_id]))
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
                   <TableRow key={sale.id}>

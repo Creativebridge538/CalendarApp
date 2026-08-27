@@ -936,6 +936,7 @@ export type Database = {
           period_start_date: string | null
           phone: string | null
           photo_url: string | null
+          platform_reward_rates: Json
           profile_answers: Json
           real_name: string | null
           reward_rate: number
@@ -965,6 +966,7 @@ export type Database = {
           period_start_date?: string | null
           phone?: string | null
           photo_url?: string | null
+          platform_reward_rates?: Json
           profile_answers?: Json
           real_name?: string | null
           reward_rate?: number
@@ -994,6 +996,7 @@ export type Database = {
           period_start_date?: string | null
           phone?: string | null
           photo_url?: string | null
+          platform_reward_rates?: Json
           profile_answers?: Json
           real_name?: string | null
           reward_rate?: number
