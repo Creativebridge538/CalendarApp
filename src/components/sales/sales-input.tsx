@@ -777,6 +777,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 <p className="text-sm text-muted-foreground">
                   換算金額: <span className="font-medium text-foreground">¥{preview.jpy.toLocaleString()}</span>
                   {preview.usd != null && ` （$${preview.usd.toFixed(2)}）`}
+                  {preview.usd != null && usdJpyRate != null && ` ・ 為替レート: ¥${usdJpyRate.toFixed(2)}/$`}
                 </p>
               )}
 
@@ -838,6 +839,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
                 外部サイトの表をコピーして、セルをクリックしてから貼り付けられます（複数行・複数列まとめてOK）。日付はその月の全日を用意しています。プラットフォームは行ごとに設定できます。
+              </p>
+              <p className="text-xs text-muted-foreground">
+                現在の為替レート: {usdJpyRate != null ? `¥${usdJpyRate.toFixed(2)}/$` : '未設定'}
               </p>
 
               <div className="flex items-end gap-2 flex-wrap p-2.5 rounded-lg border bg-muted/30">
