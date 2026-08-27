@@ -5,6 +5,8 @@ const PLATFORM_LABEL: Record<string, string> = {
   manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
 }
 
+export interface CustomItem { label: string; amount: number }
+
 export interface NoticeContent {
   castName: string
   castRealName: string
@@ -17,19 +19,24 @@ export interface NoticeContent {
   from: string
   to: string
   rewardRate: number
-  salesRows: { date: string; platformLabel: string; amount: number; isDailyPayment: boolean; dailyPaymentAt: string | null }[]
+  salesRows: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean; dailyPaymentAt: string | null }[]
   salesTotal: number
   baseReward: number
   bonus: number
   deduction: number
+  /** 日払いで既に精算済みの分の報酬額（合計お支払額には含まれるが、参考として内訳表示する） */
+  dailySettledAmount: number
+  customItems: CustomItem[]
   totalReward: number
+  showSalesTotal: boolean
+  showRewardRate: boolean
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
-    supabase.from('store_settings').select('logo_url').eq('store_id', storeId).single(),
+    supabase.from('store_settings').select('logo_url, notice_show_sales_total, notice_show_reward_rate').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
     supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction')
       .eq('cast_id', castId).eq('store_id', storeId)
@@ -41,18 +48,25 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
 
   const rewardRate = Number(cast.reward_rate)
   const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
-  const salesRows = sales ?? []
-  const salesTotal = salesRows.reduce((sum, s) => sum + Number(s.amount), 0)
+  const rawSalesRows = sales ?? []
+  const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.amount), 0)
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
-  // その行だけ別の率で計算する（それ以外は通常の報酬率）
-  const baseReward = Math.floor(
-    salesRows.reduce((sum, s) => {
-      const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate)
-      return sum + Number(s.amount) * rate
-    }, 0)
-  )
-  const bonus = salesRows.reduce((sum, s) => sum + Number(s.bonus), 0)
-  const deduction = salesRows.reduce((sum, s) => sum + Number(s.deduction), 0)
+  // その行だけ別の率で計算する（それ以外は通常の報酬率）。後で日払い精算済み分の内訳表示にも
+  // 使えるよう、行ごとの報酬額も保持しておく
+  const salesRows = rawSalesRows.map(s => {
+    const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate)
+    return {
+      date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
+      amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate),
+      isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
+    }
+  })
+  const baseReward = salesRows.reduce((sum, s) => sum + s.reward, 0)
+  const dailySettledAmount = salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + s.reward, 0)
+  const bonus = rawSalesRows.reduce((sum, s) => sum + Number(s.bonus), 0)
+  const deduction = rawSalesRows.reduce((sum, s) => sum + Number(s.deduction), 0)
+  // 発行前（プレビュー等）の時点ではカスタム項目はまだ存在しない。発行後に個別編集で追加する
+  const customItems: CustomItem[] = []
   const totalReward = baseReward + bonus - deduction
 
   return {
@@ -65,11 +79,10 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     storeName: store?.name ?? '',
     logoUrl: settings?.logo_url ?? null,
     from, to, rewardRate,
-    salesRows: salesRows.map(s => ({
-      date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
-      amount: Number(s.amount), isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
-    })),
-    salesTotal, baseReward, bonus, deduction, totalReward,
+    salesRows,
+    salesTotal, baseReward, bonus, deduction, dailySettledAmount, customItems, totalReward,
+    showSalesTotal: settings?.notice_show_sales_total ?? true,
+    showRewardRate: settings?.notice_show_reward_rate ?? true,
   }
 }
 
@@ -81,6 +94,7 @@ export async function getNoticeSnapshot(supabase: SupabaseClient<any>, storeId: 
     .eq('store_id', storeId).eq('cast_id', castId).eq('period_from', from).eq('period_to', to)
     .maybeSingle()
   if (!data) return null
+  const salesRows = data.sales_rows as NoticeContent['salesRows']
   return {
     castName: data.cast_name, castRealName: data.cast_real_name,
     bankName: data.bank_name, bankBranch: data.bank_branch,
@@ -88,9 +102,13 @@ export async function getNoticeSnapshot(supabase: SupabaseClient<any>, storeId: 
     storeName: data.store_name, logoUrl: data.logo_url,
     from: data.period_from, to: data.period_to,
     rewardRate: Number(data.reward_rate),
-    salesRows: data.sales_rows as NoticeContent['salesRows'],
+    salesRows,
     salesTotal: Number(data.sales_total), baseReward: Number(data.base_reward),
-    bonus: Number(data.bonus), deduction: Number(data.deduction), totalReward: Number(data.total_reward),
+    bonus: Number(data.bonus), deduction: Number(data.deduction),
+    dailySettledAmount: salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + (s.reward ?? 0), 0),
+    customItems: (data.custom_items as CustomItem[] | null) ?? [],
+    totalReward: Number(data.total_reward),
+    showSalesTotal: data.show_sales_total, showRewardRate: data.show_reward_rate,
   }
 }
 
@@ -103,9 +121,14 @@ export async function getNoticeContent(supabase: SupabaseClient<any>, storeId: s
 }
 
 // 発行時点の内容をスナップショットとして保存する（同じ期間に再発行した場合は、
-// その時点の最新内容で上書きする）
+// その時点の最新内容で上書きする。ただし追加済みのカスタム項目は再発行で消えないよう引き継ぐ）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, issuedBy: string, content: NoticeContent) {
+  const existing = await getNoticeSnapshot(supabase, storeId, castId, content.from, content.to)
+  const customItems = existing?.customItems ?? content.customItems
+  const customItemsTotal = customItems.reduce((sum, i) => sum + i.amount, 0)
+  const totalReward = content.baseReward + content.bonus - content.deduction + customItemsTotal
+
   return supabase.from('payment_notices').upsert({
     store_id: storeId, cast_id: castId, period_from: content.from, period_to: content.to,
     issued_by: issuedBy,
@@ -115,7 +138,9 @@ export async function saveNoticeSnapshot(supabase: SupabaseClient<any>, storeId:
     store_name: content.storeName, logo_url: content.logoUrl,
     reward_rate: content.rewardRate, sales_rows: content.salesRows,
     sales_total: content.salesTotal, base_reward: content.baseReward,
-    bonus: content.bonus, deduction: content.deduction, total_reward: content.totalReward,
+    bonus: content.bonus, deduction: content.deduction,
+    custom_items: customItems, total_reward: totalReward,
+    show_sales_total: content.showSalesTotal, show_reward_rate: content.showRewardRate,
   }, { onConflict: 'store_id,cast_id,period_from,period_to' })
 }
 

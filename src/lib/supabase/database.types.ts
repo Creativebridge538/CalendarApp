@@ -163,6 +163,7 @@ export type Database = {
           cast_id: string
           cast_name: string
           cast_real_name: string
+          custom_items: Json
           deduction: number
           id: string
           issued_at: string
@@ -173,6 +174,8 @@ export type Database = {
           reward_rate: number
           sales_rows: Json
           sales_total: number
+          show_reward_rate: boolean
+          show_sales_total: boolean
           store_id: string
           store_name: string
           total_reward: number
@@ -187,6 +190,7 @@ export type Database = {
           cast_id: string
           cast_name: string
           cast_real_name: string
+          custom_items?: Json
           deduction: number
           id?: string
           issued_at?: string
@@ -197,6 +201,8 @@ export type Database = {
           reward_rate: number
           sales_rows: Json
           sales_total: number
+          show_reward_rate?: boolean
+          show_sales_total?: boolean
           store_id: string
           store_name: string
           total_reward: number
@@ -211,6 +217,7 @@ export type Database = {
           cast_id?: string
           cast_name?: string
           cast_real_name?: string
+          custom_items?: Json
           deduction?: number
           id?: string
           issued_at?: string
@@ -221,6 +228,8 @@ export type Database = {
           reward_rate?: number
           sales_rows?: Json
           sales_total?: number
+          show_reward_rate?: boolean
+          show_sales_total?: boolean
           store_id?: string
           store_name?: string
           total_reward?: number
@@ -775,6 +784,8 @@ export type Database = {
           id: string
           location_mode: string
           logo_url: string | null
+          notice_show_reward_rate: boolean
+          notice_show_sales_total: boolean
           platform_settings: Json
           require_approval_after_deadline: boolean
           room_label: string
@@ -794,6 +805,8 @@ export type Database = {
           id?: string
           location_mode?: string
           logo_url?: string | null
+          notice_show_reward_rate?: boolean
+          notice_show_sales_total?: boolean
           platform_settings?: Json
           require_approval_after_deadline?: boolean
           room_label?: string
@@ -813,6 +826,8 @@ export type Database = {
           id?: string
           location_mode?: string
           logo_url?: string | null
+          notice_show_reward_rate?: boolean
+          notice_show_sales_total?: boolean
           platform_settings?: Json
           require_approval_after_deadline?: boolean
           room_label?: string

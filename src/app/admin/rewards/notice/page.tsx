@@ -38,7 +38,7 @@ export default async function PaymentNoticePage({
 
   const {
     castName, castRealName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward,
-    bankName, bankBranch, bankAccountNumber, bankAccountHolder,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder, customItems, dailySettledAmount, showSalesTotal, showRewardRate,
   } = content
   const store = { name: content.storeName }
   const settings = { logo_url: logoUrl }
@@ -126,15 +126,26 @@ export default async function PaymentNoticePage({
 
         <table className="summary-table">
           <tbody>
-            <tr><td>売上合計</td><td className="right">¥{salesTotal.toLocaleString()}</td></tr>
-            <tr><td>報酬率</td><td className="right">{(rewardRate * 100).toFixed(1)}%</td></tr>
+            {showSalesTotal && <tr><td>売上合計</td><td className="right">¥{salesTotal.toLocaleString()}</td></tr>}
+            {showRewardRate && <tr><td>報酬率</td><td className="right">{(rewardRate * 100).toFixed(1)}%</td></tr>}
             <tr><td>基本報酬</td><td className="right">¥{baseReward.toLocaleString()}</td></tr>
-            <tr><td>ボーナス</td><td className="right">+¥{bonus.toLocaleString()}</td></tr>
-            <tr><td>控除</td><td className="right">-¥{deduction.toLocaleString()}</td></tr>
+            {bonus !== 0 && <tr><td>ボーナス</td><td className="right">+¥{bonus.toLocaleString()}</td></tr>}
+            {deduction !== 0 && <tr><td>控除</td><td className="right">-¥{deduction.toLocaleString()}</td></tr>}
+            {customItems.map((item, i) => (
+              <tr key={i}>
+                <td>{item.label}</td>
+                <td className="right">{item.amount >= 0 ? '+' : ''}¥{item.amount.toLocaleString()}</td>
+              </tr>
+            ))}
             <tr><td>うち消費税（10%内税）</td><td className="right">¥{taxAmount.toLocaleString()}</td></tr>
             <tr className="final-row"><td>合計お支払額（10%内税）</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
           </tbody>
         </table>
+        {dailySettledAmount > 0 && (
+          <p style={{ fontSize: 11, color: '#555', marginTop: -12, marginBottom: 16 }}>
+            ※上記には日払いで精算済みの ¥{dailySettledAmount.toLocaleString()} を含みます
+          </p>
+        )}
 
         <div style={{ fontSize: 12, fontWeight: 'bold', borderBottom: '1px solid #ccc', paddingBottom: 4, marginBottom: 8 }}>
           売上内訳（{periodLabel}）

@@ -14,7 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Pagination } from '@/components/ui/pagination'
-import { Download, HardDriveUpload, Link2Off, Pencil } from 'lucide-react'
+import { Download, HardDriveUpload, Link2Off, Pencil, Plus, X } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 
@@ -50,8 +50,9 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
   const [editSaving, setEditSaving] = useState(false)
   const [editForm, setEditForm] = useState({
     cast_name: '', cast_real_name: '', bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
-    bonus: '', deduction: '',
+    bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
   })
+  const [editCustomItems, setEditCustomItems] = useState<{ label: string; amount: string }[]>([])
 
   async function openEdit(notice: Notice) {
     setEditTarget(notice)
@@ -66,7 +67,9 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       bank_name: c.bankName, bank_branch: c.bankBranch,
       bank_account_number: c.bankAccountNumber, bank_account_holder: c.bankAccountHolder,
       bonus: String(c.bonus), deduction: String(c.deduction),
+      show_sales_total: c.showSalesTotal, show_reward_rate: c.showRewardRate,
     })
+    setEditCustomItems((c.customItems ?? []).map((i: { label: string; amount: number }) => ({ label: i.label, amount: String(i.amount) })))
   }
 
   async function saveEdit() {
@@ -78,6 +81,9 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       body: JSON.stringify({
         cast_id: editTarget.castId, from: editTarget.from, to: editTarget.to,
         ...editForm, bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
+        custom_items: editCustomItems
+          .filter(i => i.label.trim() !== '')
+          .map(i => ({ label: i.label, amount: parseFloat(i.amount) || 0 })),
       }),
     })
     const json = await res.json()
@@ -341,6 +347,41 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                   <Input type="number" value={editForm.deduction} onChange={e => setEditForm({ ...editForm, deduction: e.target.value })} />
                 </div>
               </div>
+
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="text-xs text-muted-foreground font-normal">追加項目（ドリンクバックなど・マイナス値で控除も可）</Label>
+                {editCustomItems.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      placeholder="項目名（例: ドリンクバック）" value={item.label}
+                      onChange={e => setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? { ...it, label: e.target.value } : it))}
+                    />
+                    <Input
+                      type="number" className="w-28" placeholder="金額" value={item.amount}
+                      onChange={e => setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it))}
+                    />
+                    <Button size="icon" variant="ghost" onClick={() => setEditCustomItems(editCustomItems.filter((_, idx) => idx !== i))}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <Button size="sm" variant="outline" onClick={() => setEditCustomItems([...editCustomItems, { label: '', amount: '' }])}>
+                  <Plus className="h-3.5 w-3.5 mr-1" />項目を追加
+                </Button>
+              </div>
+
+              <div className="space-y-2 pt-2 border-t">
+                <Label className="text-xs text-muted-foreground font-normal">表示設定</Label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={editForm.show_sales_total} onCheckedChange={v => setEditForm({ ...editForm, show_sales_total: !!v })} />
+                  売上合計を通知書に載せる
+                </label>
+                <label className="flex items-center gap-2 text-sm">
+                  <Checkbox checked={editForm.show_reward_rate} onCheckedChange={v => setEditForm({ ...editForm, show_reward_rate: !!v })} />
+                  報酬率を通知書に載せる
+                </label>
+              </div>
+
               <div className="flex justify-end gap-2 pt-2">
                 <Button variant="outline" onClick={() => setEditTarget(null)}>キャンセル</Button>
                 <Button onClick={saveEdit} disabled={editSaving}>{editSaving ? '保存中...' : '保存'}</Button>

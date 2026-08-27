@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { getNoticeSnapshot } from '@/lib/payment-notice-data'
+import type { Json } from '@/lib/supabase/database.types'
 
 // 発行済み支払通知書（スナップショット）の内容取得・編集。キャストへの表示内容そのものを
 // 直接補正できるよう、管理者に限定して提供する
@@ -38,7 +39,7 @@ export async function PATCH(request: Request) {
   const {
     cast_id, from, to,
     cast_name, cast_real_name, bank_name, bank_branch, bank_account_number, bank_account_holder,
-    bonus, deduction,
+    bonus, deduction, custom_items, show_sales_total, show_reward_rate,
   } = body
 
   if (!cast_id || !from || !to) {
@@ -51,7 +52,13 @@ export async function PATCH(request: Request) {
 
   const nextBonus = bonus != null ? Number(bonus) : existing.bonus
   const nextDeduction = deduction != null ? Number(deduction) : existing.deduction
-  const totalReward = existing.baseReward + nextBonus - nextDeduction
+  const nextCustomItems = Array.isArray(custom_items)
+    ? custom_items
+        .filter((i: unknown) => i && typeof i === 'object' && typeof (i as { label?: unknown }).label === 'string')
+        .map((i: { label: string; amount: unknown }) => ({ label: i.label, amount: Number(i.amount) || 0 }))
+    : existing.customItems
+  const customItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
+  const totalReward = existing.baseReward + nextBonus - nextDeduction + customItemsTotal
 
   const { error } = await supabase.from('payment_notices').update({
     cast_name: cast_name ?? existing.castName,
@@ -60,7 +67,10 @@ export async function PATCH(request: Request) {
     bank_branch: bank_branch ?? existing.bankBranch,
     bank_account_number: bank_account_number ?? existing.bankAccountNumber,
     bank_account_holder: bank_account_holder ?? existing.bankAccountHolder,
-    bonus: nextBonus, deduction: nextDeduction, total_reward: totalReward,
+    bonus: nextBonus, deduction: nextDeduction,
+    custom_items: nextCustomItems as unknown as Json, total_reward: totalReward,
+    show_sales_total: show_sales_total ?? existing.showSalesTotal,
+    show_reward_rate: show_reward_rate ?? existing.showRewardRate,
   }).eq('store_id', profile.store_id).eq('cast_id', cast_id).eq('period_from', from).eq('period_to', to)
 
   if (error) {

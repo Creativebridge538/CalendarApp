@@ -60,6 +60,8 @@ interface Props {
     usd_jpy_auto_fetch: boolean
     usd_jpy_adjustment: number
     platform_settings: unknown
+    notice_show_sales_total: boolean
+    notice_show_reward_rate: boolean
   } | null
   storeId: string
 }
@@ -82,6 +84,8 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [usdJpyAdjustment, setUsdJpyAdjustment] = useState(String(initialSettings?.usd_jpy_adjustment ?? 0))
   const [liveRate, setLiveRate] = useState<number | null>(null)
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(parsePlatformSettings(initialSettings?.platform_settings))
+  const [noticeShowSalesTotal, setNoticeShowSalesTotal] = useState(initialSettings?.notice_show_sales_total ?? true)
+  const [noticeShowRewardRate, setNoticeShowRewardRate] = useState(initialSettings?.notice_show_reward_rate ?? true)
   const supabase = createClient()
   const router = useRouter()
 
@@ -186,6 +190,21 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
       if (error) { toast.error('保存に失敗しました'); return }
     }
     toast.success('プラットフォーム設定を保存しました')
+  }
+
+  async function saveNoticeSettings() {
+    const payload = {
+      notice_show_sales_total: noticeShowSalesTotal,
+      notice_show_reward_rate: noticeShowRewardRate,
+    }
+    if (initialSettings) {
+      const { error } = await supabase.from('store_settings').update(payload).eq('id', initialSettings.id)
+      if (error) { toast.error('保存に失敗しました'); return }
+    } else {
+      const { error } = await supabase.from('store_settings').insert({ ...payload, store_id: storeId })
+      if (error) { toast.error('保存に失敗しました'); return }
+    }
+    toast.success('支払通知書設定を保存しました')
   }
 
   async function saveDeadlineSettings() {
@@ -507,6 +526,30 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             </div>
           ))}
           <Button onClick={savePlatformSettings}>保存</Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader><CardTitle>支払通知書設定</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">売上合計を通知書に載せる</p>
+              <p className="text-xs text-muted-foreground">OFFにすると新しく発行する通知書に売上合計の項目が表示されなくなります</p>
+            </div>
+            <Switch checked={noticeShowSalesTotal} onCheckedChange={setNoticeShowSalesTotal} />
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">報酬率を通知書に載せる</p>
+              <p className="text-xs text-muted-foreground">OFFにすると新しく発行する通知書に報酬率の項目が表示されなくなります</p>
+            </div>
+            <Switch checked={noticeShowRewardRate} onCheckedChange={setNoticeShowRewardRate} />
+          </div>
+          <p className="text-xs text-muted-foreground">
+            この設定は今後発行する通知書に適用されます。発行済みの通知書は「発行済み支払通知書」の編集から個別に変更できます。
+          </p>
+          <Button onClick={saveNoticeSettings}>保存</Button>
         </CardContent>
       </Card>
     </div>
