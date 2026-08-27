@@ -16,10 +16,19 @@ export default async function IssuedNoticesPage() {
     .limit(300)
 
   const castIds = [...new Set((noticeRows ?? []).map(n => n.user_id))]
-  const { data: castRows } = castIds.length > 0
-    ? await supabase.from('users').select('id, display_name, real_name').in('id', castIds)
-    : { data: [] }
+  const [{ data: castRows }, { data: noticeSnapshots }] = await Promise.all([
+    castIds.length > 0
+      ? supabase.from('users').select('id, display_name, real_name').in('id', castIds)
+      : Promise.resolve({ data: [] }),
+    castIds.length > 0
+      ? supabase.from('payment_notices').select('cast_id, period_from, period_to, manually_edited')
+          .eq('store_id', profile.store_id!).in('cast_id', castIds)
+      : Promise.resolve({ data: [] }),
+  ])
   const castById = new Map((castRows ?? []).map(c => [c.id, c]))
+  const manuallyEditedByKey = new Map(
+    (noticeSnapshots ?? []).map(s => [`${s.cast_id}_${s.period_from}_${s.period_to}`, s.manually_edited])
+  )
 
   // linkの from/to をここで解析しておく（クライアント側では文字列パースをしない）
   const notices = (noticeRows ?? []).flatMap(n => {
@@ -32,6 +41,7 @@ export default async function IssuedNoticesPage() {
       return [{
         id: n.id, castId: n.user_id, castName: cast?.display_name ?? '—', castRealName: cast?.real_name ?? null,
         body: n.body, from, to, createdAt: n.created_at,
+        manuallyEdited: manuallyEditedByKey.get(`${n.user_id}_${from}_${to}`) ?? false,
       }]
     } catch {
       return []

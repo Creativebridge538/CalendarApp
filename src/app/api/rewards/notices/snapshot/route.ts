@@ -88,6 +88,7 @@ export async function PATCH(request: Request) {
     custom_items: nextCustomItems as unknown as Json, total_reward: totalReward,
     show_sales_total: show_sales_total ?? existing.showSalesTotal,
     show_reward_rate: show_reward_rate ?? existing.showRewardRate,
+    manually_edited: true,
   }).eq('store_id', profile.store_id).eq('cast_id', cast_id).eq('period_from', from).eq('period_to', to)
 
   if (error) {

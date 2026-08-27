@@ -9,6 +9,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -27,6 +28,7 @@ interface Notice {
   from: string
   to: string
   createdAt: string
+  manuallyEdited: boolean
 }
 
 interface Props {
@@ -287,7 +289,14 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
                 <TableCell>
                   <Checkbox checked={selected.has(n.id)} onCheckedChange={() => toggleOne(n.id)} />
                 </TableCell>
-                <TableCell className="font-medium">{n.castName}</TableCell>
+                <TableCell className="font-medium">
+                  {n.castName}
+                  {n.manuallyEdited && (
+                    <Badge variant="outline" className="ml-1.5 text-[10px] font-normal align-middle" title="編集済みのため「発行」を押しても内容は上書きされません">
+                      編集済み
+                    </Badge>
+                  )}
+                </TableCell>
                 <TableCell className="text-muted-foreground">{n.castRealName ?? '—'}</TableCell>
                 <TableCell className="text-sm text-muted-foreground">{n.body}</TableCell>
                 <TableCell className="text-sm text-muted-foreground whitespace-nowrap">

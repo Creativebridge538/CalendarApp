@@ -169,6 +169,7 @@ export type Database = {
           issued_at: string
           issued_by: string | null
           logo_url: string | null
+          manually_edited: boolean
           period_from: string
           period_to: string
           reward_rate: number
@@ -196,6 +197,7 @@ export type Database = {
           issued_at?: string
           issued_by?: string | null
           logo_url?: string | null
+          manually_edited?: boolean
           period_from: string
           period_to: string
           reward_rate: number
@@ -223,6 +225,7 @@ export type Database = {
           issued_at?: string
           issued_by?: string | null
           logo_url?: string | null
+          manually_edited?: boolean
           period_from?: string
           period_to?: string
           reward_rate?: number
