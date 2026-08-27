@@ -41,14 +41,20 @@ export default async function IssuedNoticesPage() {
 
   const noticeIds = parsedNotices.flatMap(n => n.noticeId ? [n.noticeId] : [])
   const { data: noticeSnapshots } = noticeIds.length > 0
-    ? await supabase.from('payment_notices').select('id, manually_edited').in('id', noticeIds)
+    ? await supabase.from('payment_notices').select('id, manually_edited, total_reward').in('id', noticeIds)
     : { data: [] }
-  const manuallyEditedById = new Map((noticeSnapshots ?? []).map(s => [s.id, s.manually_edited]))
+  const snapshotById = new Map((noticeSnapshots ?? []).map(s => [s.id, s]))
 
-  const notices = parsedNotices.map(n => ({
-    ...n,
-    manuallyEdited: n.noticeId ? (manuallyEditedById.get(n.noticeId) ?? false) : false,
-  }))
+  // 一覧の「内容」表示は、発行時点の固定文言ではなく、編集された場合も反映されるよう
+  // 現在のスナップショットの金額から組み立て直す（古い形式の通知は元の文言のまま）
+  const notices = parsedNotices.map(n => {
+    const snapshot = n.noticeId ? snapshotById.get(n.noticeId) : undefined
+    return {
+      ...n,
+      manuallyEdited: snapshot?.manually_edited ?? false,
+      body: snapshot ? `${n.from}〜${n.to} の支払通知書: ¥${Number(snapshot.total_reward).toLocaleString()}` : n.body,
+    }
+  })
 
   const casts = (castRows ?? [])
     .map(c => ({ id: c.id, display_name: c.display_name }))
