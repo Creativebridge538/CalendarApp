@@ -110,6 +110,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
     if (!res.ok) { toast.error(json.error ?? '更新に失敗しました'); return }
     toast.success('通知書の内容を更新しました')
     setEditTarget(null)
+    router.refresh()
   }
 
   useEffect(() => {
