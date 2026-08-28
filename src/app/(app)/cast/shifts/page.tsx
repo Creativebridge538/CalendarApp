@@ -32,10 +32,11 @@ export default async function CastShiftsPage() {
   const salesByShiftId: Record<string, { amount: number; reward: number }> = {}
   const rewardRate = Number(profile.reward_rate)
   const platformRates = parsePlatformRewardRates(profile.platform_reward_rates)
+  const platformDailyRates = parsePlatformRewardRates(profile.platform_daily_payment_reward_rates)
   for (const s of sales ?? []) {
     amountByDate[s.date] = (amountByDate[s.date] ?? 0) + Number(s.amount)
     if (s.shift_id) {
-      const rate = effectiveRewardRate(s, rewardRate, platformRates, profile.daily_payment_reward_rate)
+      const rate = effectiveRewardRate(s, rewardRate, platformRates, profile.daily_payment_reward_rate, platformDailyRates)
       const prev = salesByShiftId[s.shift_id] ?? { amount: 0, reward: 0 }
       salesByShiftId[s.shift_id] = {
         amount: prev.amount + Number(s.amount),

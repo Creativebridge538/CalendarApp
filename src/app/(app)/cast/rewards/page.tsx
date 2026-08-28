@@ -61,8 +61,9 @@ export default async function CastRewardsPage() {
   const castRewardRate = Number(profile.reward_rate ?? 0)
   const castPlatformRates = parsePlatformRewardRates(profile.platform_reward_rates)
   const castDailyPaymentRate = profile.daily_payment_reward_rate
+  const castPlatformDailyRates = parsePlatformRewardRates(profile.platform_daily_payment_reward_rates)
   function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'platform' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction'>): number {
-    const rate = effectiveRewardRate(s, castRewardRate, castPlatformRates, castDailyPaymentRate)
+    const rate = effectiveRewardRate(s, castRewardRate, castPlatformRates, castDailyPaymentRate, castPlatformDailyRates)
     const baseReward = Math.floor(Number(s.amount) * rate)
     return baseReward + Number(s.bonus ?? 0) - Number(s.deduction ?? 0)
   }

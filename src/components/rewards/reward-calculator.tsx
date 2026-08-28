@@ -23,6 +23,7 @@ import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate
 interface CastUser {
   id: string; display_name: string | null; real_name: string | null
   reward_rate: number | string; platform_reward_rates: unknown; daily_payment_reward_rate: number | string | null; is_active: boolean
+  platform_daily_payment_reward_rates: unknown
 }
 interface SaleRow {
   cast_id: string; amount: number | string; platform: string
@@ -63,11 +64,12 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
   const rows = useMemo(() => casts.map(cast => {
     const rewardRate = Number(cast.reward_rate)
     const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
+    const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
     const castSales = salesByCast.get(cast.id) ?? []
     const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount), 0)
     // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）
     const baseReward = Math.floor(castSales.reduce((sum, s) => {
-      const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate)
+      const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
       return sum + Number(s.amount) * rate
     }, 0))
     const bonus = castSales.reduce((sum, s) => sum + Number(s.bonus), 0)

@@ -27,7 +27,7 @@ import { parsePlatformRewardRates } from '@/lib/reward-rate'
 type CastUser = Pick<
   Database['public']['Tables']['users']['Row'],
   'id' | 'display_name' | 'real_name' | 'phone' | 'reward_rate' | 'platform_reward_rates' | 'daily_payment_reward_rate' | 'is_active' | 'email' | 'profile_answers'
-  | 'photo_url' | 'login_id' | 'bank_name' | 'bank_branch' | 'bank_account_number' | 'bank_account_holder'
+  | 'photo_url' | 'login_id' | 'bank_name' | 'bank_branch' | 'bank_account_number' | 'bank_account_holder' | 'platform_daily_payment_reward_rates'
 >
 
 const PLATFORM_RATE_FIELDS: { key: 'stripchat' | 'fc2' | 'dxlive'; label: string }[] = [
@@ -54,6 +54,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
     profile_answers: {} as Record<string, string>,
     platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' } as Record<'stripchat' | 'fc2' | 'dxlive', string>,
+    platform_daily_payment_reward_rates: { stripchat: '', fc2: '', dxlive: '' } as Record<'stripchat' | 'fc2' | 'dxlive', string>,
   })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
@@ -91,6 +92,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
       bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
       profile_answers: {},
       platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' },
+      platform_daily_payment_reward_rates: { stripchat: '', fc2: '', dxlive: '' },
     })
     setOpen(true)
   }
@@ -98,6 +100,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
   function openEdit(cast: CastUser) {
     setEditing(cast)
     const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
+    const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
     setForm({
       email: cast.email ?? '',
       password: '',
@@ -117,6 +120,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
         fc2: platformRates.fc2 != null ? String(platformRates.fc2 * 100) : '',
         dxlive: platformRates.dxlive != null ? String(platformRates.dxlive * 100) : '',
       },
+      platform_daily_payment_reward_rates: {
+        stripchat: platformDailyRates.stripchat != null ? String(platformDailyRates.stripchat * 100) : '',
+        fc2: platformDailyRates.fc2 != null ? String(platformDailyRates.fc2 * 100) : '',
+        dxlive: platformDailyRates.dxlive != null ? String(platformDailyRates.dxlive * 100) : '',
+      },
     })
     setOpen(true)
   }
@@ -126,6 +134,18 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
     const result: Record<string, number> = {}
     for (const { key } of PLATFORM_RATE_FIELDS) {
       const raw = form.platform_reward_rates[key]
+      if (raw.trim() === '') continue
+      const pct = parseFloat(raw)
+      if (!Number.isNaN(pct)) result[key] = pct / 100
+    }
+    return result
+  }
+
+  // 入力欄が空のプラットフォームは「キャスト共通の前払い率（未設定なら基本報酬率）を使う」として保存しない
+  function buildPlatformDailyPaymentRewardRates(): Record<string, number> {
+    const result: Record<string, number> = {}
+    for (const { key } of PLATFORM_RATE_FIELDS) {
+      const raw = form.platform_daily_payment_reward_rates[key]
       if (raw.trim() === '') continue
       const pct = parseFloat(raw)
       if (!Number.isNaN(pct)) result[key] = pct / 100
@@ -145,6 +165,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
             reward_rate: form.reward_rate ? String(parseFloat(form.reward_rate) / 100) : form.reward_rate,
             daily_payment_reward_rate: form.daily_payment_reward_rate.trim() !== '' ? String(parseFloat(form.daily_payment_reward_rate) / 100) : null,
             platform_reward_rates: buildPlatformRewardRates(),
+            platform_daily_payment_reward_rates: buildPlatformDailyPaymentRewardRates(),
           }),
         })
         const json = await res.json()
@@ -159,6 +180,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
           reward_rate: parseFloat(form.reward_rate) / 100,
           daily_payment_reward_rate: form.daily_payment_reward_rate.trim() !== '' ? parseFloat(form.daily_payment_reward_rate) / 100 : null,
           platform_reward_rates: buildPlatformRewardRates(),
+          platform_daily_payment_reward_rates: buildPlatformDailyPaymentRewardRates(),
           bank_name: form.bank_name || null,
           bank_branch: form.bank_branch || null,
           bank_account_number: form.bank_account_number || null,
@@ -509,6 +531,26 @@ export function CastList({ casts: initialCasts, storeId, profileFields }: CastLi
                   </div>
                 ))}
               </div>
+            </div>
+            <div className="space-y-1.5 pt-2 border-t">
+              <Label>プラットフォーム別の前払い時報酬率（任意）</Label>
+              <div className="grid grid-cols-3 gap-2">
+                {PLATFORM_RATE_FIELDS.map(({ key, label }) => (
+                  <div key={key} className="space-y-1">
+                    <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
+                    <div className="relative">
+                      <Input
+                        type="number" step="1" min="0" max="100" className="pr-6"
+                        value={form.platform_daily_payment_reward_rates[key]}
+                        onChange={e => setForm({ ...form, platform_daily_payment_reward_rates: { ...form.platform_daily_payment_reward_rates, [key]: e.target.value } })}
+                        placeholder={form.daily_payment_reward_rate || form.reward_rate}
+                      />
+                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+              <p className="text-xs text-muted-foreground">未設定のプラットフォームは「日払い時の報酬率」（それも未設定ならプラットフォーム別/基本の報酬率）が使われます</p>
             </div>
             <div className="pt-3 border-t space-y-3">
               <p className="text-sm font-medium">振込先口座</p>

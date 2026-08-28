@@ -42,7 +42,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url, notice_show_sales_total, notice_show_reward_rate').eq('store_id', storeId).single(),
-    supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
+    supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
     supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction, fx_rate_snapshot, usd_amount')
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
@@ -53,13 +53,14 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
 
   const rewardRate = Number(cast.reward_rate)
   const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
+  const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
   const rawSalesRows = sales ?? []
   const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.amount), 0)
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
   // その行だけ別の率で計算する（それ以外は通常の報酬率）。後で日払い精算済み分の内訳表示にも
   // 使えるよう、行ごとの報酬額も保持しておく
   const salesRows = rawSalesRows.map(s => {
-    const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate)
+    const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
     return {
       date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
       amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate),

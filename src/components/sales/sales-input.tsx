@@ -44,7 +44,7 @@ function toDatetimeLocal(iso: string): string {
 }
 
 interface Props {
-  casts: { id: string; display_name: string | null; reward_rate: number | string; platform_reward_rates: unknown; daily_payment_reward_rate: number | string | null }[]
+  casts: { id: string; display_name: string | null; reward_rate: number | string; platform_reward_rates: unknown; daily_payment_reward_rate: number | string | null; platform_daily_payment_reward_rates: unknown }[]
   sales: Sale[]
   storeId: string
   userId: string
@@ -176,6 +176,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const castDailyRateById = useMemo(() => {
     const map: Record<string, number | string | null> = {}
     for (const c of casts) map[c.id] = c.daily_payment_reward_rate
+    return map
+  }, [casts])
+  const castPlatformDailyRatesById = useMemo(() => {
+    const map: Record<string, ReturnType<typeof parsePlatformRewardRates>> = {}
+    for (const c of casts) map[c.id] = parsePlatformRewardRates(c.platform_daily_payment_reward_rates)
     return map
   }, [casts])
 
@@ -327,9 +332,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
-    const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0, castPlatformRatesById[s.cast_id], castDailyRateById[s.cast_id])
+    const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0, castPlatformRatesById[s.cast_id], castDailyRateById[s.cast_id], castPlatformDailyRatesById[s.cast_id])
     return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction)
-  }, 0), [filteredSales, castRewardRateById, castPlatformRatesById, castDailyRateById])
+  }, 0), [filteredSales, castRewardRateById, castPlatformRatesById, castDailyRateById, castPlatformDailyRatesById])
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
   const next = month === 12 ? { year: year + 1, month: 1 } : { year, month: month + 1 }
@@ -629,7 +634,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 </TableCell></TableRow>
               )}
               {pagedSales.map(sale => {
-                const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0, castPlatformRatesById[sale.cast_id], castDailyRateById[sale.cast_id]))
+                const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0, castPlatformRatesById[sale.cast_id], castDailyRateById[sale.cast_id], castPlatformDailyRatesById[sale.cast_id]))
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
                 return (
                   <TableRow key={sale.id}>
