@@ -18,6 +18,8 @@ import { Pagination } from '@/components/ui/pagination'
 import { Download, HardDriveUpload, Link2Off, Pencil, Plus, X } from 'lucide-react'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
+import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
+import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
 
 interface Notice {
   id: string
@@ -37,9 +39,16 @@ interface Props {
   notices: Notice[]
   casts: { id: string; display_name: string | null }[]
   googleDriveConnected: boolean
+  itemTemplates: { id: string; label: string; unit: string }[]
+  storeSettings: {
+    platform_settings: unknown
+    usd_jpy_auto_fetch: boolean
+    usd_jpy_adjustment: number
+    usd_jpy_rate: number | null
+  } | null
 }
 
-export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Props) {
+export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTemplates, storeSettings }: Props) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -56,8 +65,28 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
     cast_name: '', cast_real_name: '', bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
     reward_rate: '', bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
   })
-  const [editCustomItems, setEditCustomItems] = useState<{ label: string; amount: string }[]>([])
+  const [editCustomItems, setEditCustomItems] = useState<{ templateId: string; label: string; unit: string; rawUnits: string; amount: string }[]>([])
   const [editSalesRows, setEditSalesRows] = useState<{ date: string; platformLabel: string; amount: string; reward: string; isDailyPayment: boolean }[]>([])
+
+  const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
+  const autoFetchFx = storeSettings?.usd_jpy_auto_fetch ?? false
+  const [liveFxRate, setLiveFxRate] = useState<number | null>(null)
+  useEffect(() => {
+    if (!autoFetchFx) return
+    fetch('https://api.frankfurter.dev/v1/latest?from=USD&to=JPY')
+      .then(res => res.ok ? res.json() : Promise.reject())
+      .then(data => { if (typeof data?.rates?.JPY === 'number') setLiveFxRate(data.rates.JPY) })
+      .catch(() => {})
+  }, [autoFetchFx])
+  const usdJpyRate = autoFetchFx && liveFxRate != null
+    ? liveFxRate + (storeSettings?.usd_jpy_adjustment ?? 0)
+    : storeSettings?.usd_jpy_rate ?? null
+
+  function calcItemAmount(unit: string, rawUnits: string): number {
+    const units = parseFloat(rawUnits) || 0
+    if (unit === 'jpy') return units
+    return calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+  }
 
   const editSalesTotal = editSalesRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0)
   const editBaseReward = editSalesRows.reduce((sum, r) => sum + (parseFloat(r.reward) || 0), 0)
@@ -78,7 +107,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
       reward_rate: String(Number(c.rewardRate) * 100), bonus: String(c.bonus), deduction: String(c.deduction),
       show_sales_total: c.showSalesTotal, show_reward_rate: c.showRewardRate,
     })
-    setEditCustomItems((c.customItems ?? []).map((i: { label: string; amount: number }) => ({ label: i.label, amount: String(i.amount) })))
+    setEditCustomItems((c.customItems ?? []).map((i: { label: string; amount: number }) => ({ templateId: '', label: i.label, unit: 'jpy', rawUnits: '', amount: String(i.amount) })))
     setEditSalesRows((c.salesRows ?? []).map((r: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean }) => ({
       date: r.date, platformLabel: r.platformLabel, amount: String(r.amount), reward: String(r.reward ?? 0), isDailyPayment: r.isDailyPayment,
     })))
@@ -97,7 +126,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
         bonus: parseFloat(editForm.bonus) || 0, deduction: parseFloat(editForm.deduction) || 0,
         custom_items: editCustomItems
           .filter(i => i.label.trim() !== '')
-          .map(i => ({ label: i.label, amount: parseFloat(i.amount) || 0 })),
+          .map(i => ({ label: i.label, amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits) })),
         sales_rows: editSalesRows.map(r => ({
           date: r.date, platformLabel: r.platformLabel,
           amount: parseFloat(r.amount) || 0, reward: parseFloat(r.reward) || 0,
@@ -429,21 +458,55 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected }: Prop
               <div className="space-y-1.5 pt-2 border-t">
                 <Label className="text-xs text-muted-foreground font-normal">追加項目（ドリンクバックなど・マイナス値で控除も可）</Label>
                 {editCustomItems.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 flex-wrap">
+                    <Select
+                      value={item.templateId || '__free__'}
+                      onValueChange={v => {
+                        if (!v) return
+                        const template = itemTemplates.find(t => t.id === v)
+                        setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? (
+                          template
+                            ? { ...it, templateId: template.id, label: template.label, unit: template.unit, rawUnits: '', amount: '' }
+                            : { ...it, templateId: '', unit: 'jpy', rawUnits: '' }
+                        ) : it))
+                      }}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue>{item.templateId ? item.label : '自由入力'}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false}>
+                        <SelectItem value="__free__">自由入力</SelectItem>
+                        {itemTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <Input
-                      placeholder="項目名（例: ドリンクバック）" value={item.label}
+                      placeholder="項目名（例: ドリンクバック）" className="w-40" value={item.label}
+                      disabled={!!item.templateId}
                       onChange={e => setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? { ...it, label: e.target.value } : it))}
                     />
-                    <Input
-                      type="number" className="w-28" placeholder="金額" value={item.amount}
-                      onChange={e => setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it))}
-                    />
+                    {item.unit === 'jpy' ? (
+                      <Input
+                        type="number" className="w-28" placeholder="金額" value={item.amount}
+                        onChange={e => setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it))}
+                      />
+                    ) : (
+                      <>
+                        <Input
+                          type="number" className="w-24" placeholder={`数量（${NOTICE_ITEM_UNIT_LABEL[item.unit] ?? item.unit}）`}
+                          value={item.rawUnits}
+                          onChange={e => setEditCustomItems(editCustomItems.map((it, idx) => idx === i ? { ...it, rawUnits: e.target.value } : it))}
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          → ¥{calcItemAmount(item.unit, item.rawUnits).toLocaleString()}
+                        </span>
+                      </>
+                    )}
                     <Button size="icon" variant="ghost" onClick={() => setEditCustomItems(editCustomItems.filter((_, idx) => idx !== i))}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}
-                <Button size="sm" variant="outline" onClick={() => setEditCustomItems([...editCustomItems, { label: '', amount: '' }])}>
+                <Button size="sm" variant="outline" onClick={() => setEditCustomItems([...editCustomItems, { templateId: '', label: '', unit: 'jpy', rawUnits: '', amount: '' }])}>
                   <Plus className="h-3.5 w-3.5 mr-1" />項目を追加
                 </Button>
               </div>

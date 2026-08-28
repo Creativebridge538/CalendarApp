@@ -63,9 +63,19 @@ export default async function IssuedNoticesPage() {
   const { data: driveToken } = await supabase.from('store_google_drive_tokens')
     .select('store_id').eq('store_id', profile.store_id!).maybeSingle()
 
+  const [{ data: itemTemplates }, { data: storeSettings }] = await Promise.all([
+    supabase.from('notice_item_templates').select('id, label, unit')
+      .eq('store_id', profile.store_id!).eq('is_active', true).order('sort_order'),
+    supabase.from('store_settings').select('platform_settings, usd_jpy_auto_fetch, usd_jpy_adjustment, usd_jpy_rate')
+      .eq('store_id', profile.store_id!).single(),
+  ])
+
   return (
     <div className="p-6">
-      <IssuedNoticesList notices={notices} casts={casts} googleDriveConnected={!!driveToken} />
+      <IssuedNoticesList
+        notices={notices} casts={casts} googleDriveConnected={!!driveToken}
+        itemTemplates={itemTemplates ?? []} storeSettings={storeSettings}
+      />
     </div>
   )
 }
