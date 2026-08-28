@@ -51,6 +51,7 @@ export default async function PaymentNoticePage({
   const store = { name: content.storeName }
   const settings = { logo_url: logoUrl }
 
+  const hasFxRow = salesRows.some(s => s.fxRate != null)
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
   const taxExcluded = Math.floor(totalReward / 1.1)
@@ -164,11 +165,12 @@ export default async function PaymentNoticePage({
               <th>日付</th>
               <th>プラットフォーム</th>
               <th className="right">金額</th>
+              {hasFxRow && <th className="right">為替</th>}
             </tr>
           </thead>
           <tbody>
             {salesRows.length === 0 && (
-              <tr><td colSpan={3} style={{ textAlign: 'center', color: '#888', padding: '16px 0' }}>売上データがありません</td></tr>
+              <tr><td colSpan={hasFxRow ? 4 : 3} style={{ textAlign: 'center', color: '#888', padding: '16px 0' }}>売上データがありません</td></tr>
             )}
             {salesRows.map((s, i) => (
               <tr key={i}>
@@ -180,10 +182,25 @@ export default async function PaymentNoticePage({
                     : '（日払い済み）')}
                 </td>
                 <td className="right">¥{s.amount.toLocaleString()}</td>
+                {hasFxRow && (
+                  <td className="right">
+                    {s.fxRate != null ? (
+                      <>
+                        ¥{s.fxRate.toFixed(2)}/$
+                        {s.usdAmount != null && <span style={{ display: 'block', color: '#888' }}>(${s.usdAmount.toFixed(2)})</span>}
+                      </>
+                    ) : '—'}
+                  </td>
+                )}
               </tr>
             ))}
           </tbody>
         </table>
+        {hasFxRow && (
+          <p style={{ fontSize: 11, color: '#555', marginTop: -12, marginBottom: 16 }}>
+            ※為替レートはあくまで参考値です。実際の精算金額とは異なる場合があります。
+          </p>
+        )}
 
         {(bankName || bankBranch || bankAccountNumber || bankAccountHolder) && (
           <table className="bank-table">

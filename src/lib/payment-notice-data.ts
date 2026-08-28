@@ -21,7 +21,7 @@ export interface NoticeContent {
   from: string
   to: string
   rewardRate: number
-  salesRows: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean; dailyPaymentAt: string | null }[]
+  salesRows: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean; dailyPaymentAt: string | null; fxRate: number | null; usdAmount: number | null }[]
   salesTotal: number
   baseReward: number
   bonus: number
@@ -43,7 +43,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url, notice_show_sales_total, notice_show_reward_rate').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
-    supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction')
+    supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction, fx_rate_snapshot, usd_amount')
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
       .order('date'),
@@ -64,6 +64,8 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
       date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
       amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate),
       isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
+      fxRate: s.fx_rate_snapshot != null ? Number(s.fx_rate_snapshot) : null,
+      usdAmount: s.usd_amount != null ? Number(s.usd_amount) : null,
     }
   })
   const baseReward = salesRows.reduce((sum, s) => sum + s.reward, 0)
@@ -105,7 +107,10 @@ function mapNoticeRow(data: {
   show_sales_total: boolean; show_reward_rate: boolean
   manually_edited: boolean
 }): NoticeContent {
-  const salesRows = data.sales_rows as NoticeContent['salesRows']
+  // 古い発行済み通知書には fxRate/usdAmount が保存されていないため、欠けている場合はnull扱いにする
+  const salesRows = (data.sales_rows as NoticeContent['salesRows']).map(s => ({
+    ...s, fxRate: s.fxRate ?? null, usdAmount: s.usdAmount ?? null,
+  }))
   return {
     id: data.id,
     manuallyEdited: data.manually_edited,

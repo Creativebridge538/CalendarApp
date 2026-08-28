@@ -60,6 +60,10 @@ const styles = StyleSheet.create({
   colDate: { width: '25%' },
   colPlatform: { width: '45%' },
   colAmount: { width: '30%', textAlign: 'right' },
+  colDateWithFx: { width: '20%' },
+  colPlatformWithFx: { width: '35%' },
+  colAmountWithFx: { width: '25%', textAlign: 'right' },
+  colFx: { width: '20%', textAlign: 'right', color: '#666' },
   footer: { fontSize: 9, color: '#555', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#ccc', marginTop: 8 },
   bankBox: { borderWidth: 1.5, borderColor: '#1a1a1a', marginTop: 20 },
   bankHeaderCell: { padding: 6, borderBottomWidth: 1, borderColor: '#1a1a1a', fontSize: 10, fontWeight: 700 },
@@ -77,6 +81,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
     bankName, bankBranch, bankAccountNumber, bankAccountHolder, customItems, dailySettledAmount, showSalesTotal, showRewardRate,
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
+  const hasFxRow = salesRows.some(s => s.fxRate != null)
   // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
   const taxExcluded = Math.floor(totalReward / 1.1)
   const taxAmount = totalReward - taxExcluded
@@ -127,25 +132,34 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
 
         <Text style={styles.breakdownTitle}>売上内訳（{periodLabel}）</Text>
         <View style={styles.tableHeadRow}>
-          <Text style={styles.colDate}>日付</Text>
-          <Text style={styles.colPlatform}>プラットフォーム</Text>
-          <Text style={styles.colAmount}>金額</Text>
+          <Text style={hasFxRow ? styles.colDateWithFx : styles.colDate}>日付</Text>
+          <Text style={hasFxRow ? styles.colPlatformWithFx : styles.colPlatform}>プラットフォーム</Text>
+          <Text style={hasFxRow ? styles.colAmountWithFx : styles.colAmount}>金額</Text>
+          {hasFxRow && <Text style={styles.colFx}>為替</Text>}
         </View>
         {salesRows.length === 0 && (
           <Text style={{ textAlign: 'center', color: '#888', paddingVertical: 16 }}>売上データがありません</Text>
         )}
         {salesRows.map((s, i) => (
           <View key={i} style={styles.tableRow} wrap={false}>
-            <Text style={styles.colDate}>{format(new Date(s.date), 'M/d(E)', { locale: ja })}</Text>
-            <Text style={styles.colPlatform}>
+            <Text style={hasFxRow ? styles.colDateWithFx : styles.colDate}>{format(new Date(s.date), 'M/d(E)', { locale: ja })}</Text>
+            <Text style={hasFxRow ? styles.colPlatformWithFx : styles.colPlatform}>
               {s.platformLabel}
               {s.isDailyPayment && (s.dailyPaymentAt
                 ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
                 : '（日払い済み）')}
             </Text>
-            <Text style={styles.colAmount}>¥{s.amount.toLocaleString()}</Text>
+            <Text style={hasFxRow ? styles.colAmountWithFx : styles.colAmount}>¥{s.amount.toLocaleString()}</Text>
+            {hasFxRow && (
+              <Text style={styles.colFx}>
+                {s.fxRate != null ? `¥${s.fxRate.toFixed(2)}/$${s.usdAmount != null ? ` ($${s.usdAmount.toFixed(2)})` : ''}` : '—'}
+              </Text>
+            )}
           </View>
         ))}
+        {hasFxRow && (
+          <Text style={styles.taxNote}>※為替レートはあくまで参考値です。実際の精算金額とは異なる場合があります。</Text>
+        )}
 
         {(bankName || bankBranch || bankAccountNumber || bankAccountHolder) && (
           <View style={styles.bankBox} wrap={false}>
