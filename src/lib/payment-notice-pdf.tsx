@@ -82,6 +82,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   const hasFxRow = salesRows.some(s => s.fxRate != null)
+  const finalSettlementAmount = totalReward - dailySettledAmount
   // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
   const taxExcluded = Math.floor(totalReward / 1.1)
   const taxAmount = totalReward - taxExcluded
@@ -104,7 +105,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
 
         <View style={styles.totalRow}>
           <Text style={styles.totalLabel}>お支払額</Text>
-          <Text style={styles.totalAmount}>¥{totalReward.toLocaleString()}</Text>
+          <Text style={styles.totalAmount}>¥{finalSettlementAmount.toLocaleString()}</Text>
         </View>
         <Text style={styles.taxNote}>※上記金額は消費税10%を含みます（内税）</Text>
 
@@ -124,11 +125,16 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
             <Text>うち消費税（10%内税）</Text>
             <Text>¥{taxAmount.toLocaleString()}</Text>
           </View>
-          <View style={styles.summaryFinalRow}><Text>合計お支払額（10%内税）</Text><Text>¥{totalReward.toLocaleString()}</Text></View>
+          <View style={dailySettledAmount > 0 ? styles.summaryRow : styles.summaryFinalRow}>
+            <Text>合計報酬（10%内税）</Text><Text>¥{totalReward.toLocaleString()}</Text>
+          </View>
+          {dailySettledAmount > 0 && (
+            <>
+              <View style={styles.summaryRow}><Text>前払い済み金額</Text><Text>-¥{dailySettledAmount.toLocaleString()}</Text></View>
+              <View style={styles.summaryFinalRow}><Text>今回精算する金額</Text><Text>¥{finalSettlementAmount.toLocaleString()}</Text></View>
+            </>
+          )}
         </View>
-        {dailySettledAmount > 0 && (
-          <Text style={styles.taxNote}>※上記には日払いで精算済みの ¥{dailySettledAmount.toLocaleString()} を含みます</Text>
-        )}
 
         <Text style={styles.breakdownTitle}>売上内訳（{periodLabel}）</Text>
         <View style={styles.tableHeadRow}>

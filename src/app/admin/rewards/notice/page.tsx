@@ -52,6 +52,7 @@ export default async function PaymentNoticePage({
   const settings = { logo_url: logoUrl }
 
   const hasFxRow = salesRows.some(s => s.fxRate != null)
+  const finalSettlementAmount = totalReward - dailySettledAmount
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
   const taxExcluded = Math.floor(totalReward / 1.1)
@@ -129,7 +130,7 @@ export default async function PaymentNoticePage({
 
         <div className="notice-total">
           <div style={{ fontSize: 14, fontWeight: 'bold', width: 90 }}>お支払額</div>
-          <div className="notice-total-amount">¥{totalReward.toLocaleString()}</div>
+          <div className="notice-total-amount">¥{finalSettlementAmount.toLocaleString()}</div>
         </div>
         <p style={{ fontSize: 11, color: '#555', marginBottom: 16 }}>※上記金額は消費税10%を含みます（内税）</p>
 
@@ -147,14 +148,15 @@ export default async function PaymentNoticePage({
               </tr>
             ))}
             <tr><td>うち消費税（10%内税）</td><td className="right">¥{taxAmount.toLocaleString()}</td></tr>
-            <tr className="final-row"><td>合計お支払額（10%内税）</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
+            <tr className={dailySettledAmount > 0 ? '' : 'final-row'}><td>合計報酬（10%内税）</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
+            {dailySettledAmount > 0 && (
+              <>
+                <tr><td>前払い済み金額</td><td className="right">-¥{dailySettledAmount.toLocaleString()}</td></tr>
+                <tr className="final-row"><td>今回精算する金額</td><td className="right">¥{finalSettlementAmount.toLocaleString()}</td></tr>
+              </>
+            )}
           </tbody>
         </table>
-        {dailySettledAmount > 0 && (
-          <p style={{ fontSize: 11, color: '#555', marginTop: -12, marginBottom: 16 }}>
-            ※上記には日払いで精算済みの ¥{dailySettledAmount.toLocaleString()} を含みます
-          </p>
-        )}
 
         <div style={{ fontSize: 12, fontWeight: 'bold', borderBottom: '1px solid #ccc', paddingBottom: 4, marginBottom: 8 }}>
           売上内訳（{periodLabel}）
