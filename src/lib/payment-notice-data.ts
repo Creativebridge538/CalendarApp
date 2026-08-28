@@ -39,7 +39,7 @@ export interface NoticeContent {
 // 現時点の売上・キャスト情報からその場で計算する（発行前のプレビューや、新規発行時に使う）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
-  const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
+  const [{ data: store }, { data: settings }, { data: cast }, { data: sales }, { data: platformProfiles }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url, notice_show_sales_total, notice_show_reward_rate').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
@@ -47,6 +47,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
       .order('date'),
+    supabase.from('cast_platform_profiles').select('platform, platform_display_name').eq('cast_id', castId).eq('store_id', storeId),
   ])
 
   if (!cast) return null
@@ -54,6 +55,10 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const rewardRate = Number(cast.reward_rate)
   const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
   const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
+  const platformDisplayNames: Record<string, string> = {}
+  for (const p of platformProfiles ?? []) {
+    if (p.platform_display_name) platformDisplayNames[p.platform] = p.platform_display_name
+  }
   const rawSalesRows = sales ?? []
   const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.amount), 0)
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
@@ -61,8 +66,10 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   // 使えるよう、行ごとの報酬額も保持しておく
   const salesRows = rawSalesRows.map(s => {
     const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
+    const baseLabel = PLATFORM_LABEL[s.platform] ?? s.platform
+    const displayName = platformDisplayNames[s.platform]
     return {
-      date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
+      date: s.date, platformLabel: displayName ? `${baseLabel}（${displayName}）` : baseLabel,
       amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate),
       isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
       fxRate: s.fx_rate_snapshot != null ? Number(s.fx_rate_snapshot) : null,

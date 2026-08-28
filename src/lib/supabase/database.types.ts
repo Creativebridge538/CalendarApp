@@ -69,6 +69,54 @@ export type Database = {
           },
         ]
       }
+      cast_platform_profiles: {
+        Row: {
+          cast_id: string
+          created_at: string
+          id: string
+          platform: string
+          platform_display_name: string | null
+          platform_user_id: string | null
+          store_id: string
+          updated_at: string
+        }
+        Insert: {
+          cast_id: string
+          created_at?: string
+          id?: string
+          platform: string
+          platform_display_name?: string | null
+          platform_user_id?: string | null
+          store_id: string
+          updated_at?: string
+        }
+        Update: {
+          cast_id?: string
+          created_at?: string
+          id?: string
+          platform?: string
+          platform_display_name?: string | null
+          platform_user_id?: string | null
+          store_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cast_platform_profiles_cast_id_fkey"
+            columns: ["cast_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cast_platform_profiles_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       cast_profile_fields: {
         Row: {
           created_at: string
