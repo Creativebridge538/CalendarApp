@@ -911,6 +911,7 @@ export type Database = {
           created_at: string
           deadline_day: number
           deadline_type: Database["public"]["Enums"]["deadline_type"]
+          enabled_platforms: string[]
           id: string
           location_mode: string
           logo_url: string | null
@@ -930,6 +931,7 @@ export type Database = {
           created_at?: string
           deadline_day?: number
           deadline_type?: Database["public"]["Enums"]["deadline_type"]
+          enabled_platforms?: string[]
           id?: string
           location_mode?: string
           logo_url?: string | null
@@ -949,6 +951,7 @@ export type Database = {
           created_at?: string
           deadline_day?: number
           deadline_type?: Database["public"]["Enums"]["deadline_type"]
+          enabled_platforms?: string[]
           id?: string
           location_mode?: string
           logo_url?: string | null

@@ -50,9 +50,10 @@ interface CastListProps {
   profileFields: { id: string; label: string }[]
   platformProfilesByCastId: Record<string, Partial<PlatformProfileForm>>
   stageNamesByCastId: Record<string, string[]>
+  enabledPlatforms: string[]
 }
 
-export function CastList({ casts: initialCasts, storeId, profileFields, platformProfilesByCastId, stageNamesByCastId }: CastListProps) {
+export function CastList({ casts: initialCasts, storeId, profileFields, platformProfilesByCastId, stageNamesByCastId, enabledPlatforms }: CastListProps) {
   const [casts, setCasts] = useState(initialCasts)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -579,7 +580,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
             <div className="space-y-1.5 pt-2 border-t">
               <Label>プラットフォーム別の報酬率（任意）</Label>
               <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_RATE_FIELDS.map(({ key, label }) => (
+                {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
                   <div key={key} className="space-y-1">
                     <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
                     <div className="relative">
@@ -598,7 +599,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
             <div className="space-y-1.5 pt-2 border-t">
               <Label>プラットフォーム別の前払い時報酬率（任意）</Label>
               <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_RATE_FIELDS.map(({ key, label }) => (
+                {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
                   <div key={key} className="space-y-1">
                     <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
                     <div className="relative">
@@ -619,7 +620,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
               <div className="space-y-1.5 pt-2 border-t">
                 <Label>プラットフォーム別のID・源氏名（任意）</Label>
                 <div className="space-y-2">
-                  {PLATFORM_RATE_FIELDS.map(({ key, label }) => (
+                  {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
                     <div key={key} className="grid grid-cols-[80px_1fr_1fr] gap-2 items-center">
                       <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
                       <Input

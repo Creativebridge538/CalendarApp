@@ -14,7 +14,7 @@ export async function PATCH(
     return NextResponse.json({ error: '権限がありません' }, { status: 403 })
   }
 
-  const { name, contact_name, contact_email } = await request.json().catch(() => ({}))
+  const { name, contact_name, contact_email, enabled_platforms } = await request.json().catch(() => ({}))
   if (!name || typeof name !== 'string') {
     return NextResponse.json({ error: '店舗名は必須です' }, { status: 400 })
   }
@@ -29,6 +29,13 @@ export async function PATCH(
     contact_email: contact_email || null,
   }).eq('id', id)
   if (error) return NextResponse.json({ error: '更新に失敗しました' }, { status: 500 })
+
+  if (Array.isArray(enabled_platforms)) {
+    const VALID_PLATFORMS = ['stripchat', 'fc2', 'dxlive']
+    const platforms = enabled_platforms.filter((p): p is string => VALID_PLATFORMS.includes(p))
+    const { error: settingsError } = await admin.from('store_settings').update({ enabled_platforms: platforms }).eq('store_id', id)
+    if (settingsError) return NextResponse.json({ error: 'プラットフォーム設定の更新に失敗しました' }, { status: 500 })
+  }
 
   return NextResponse.json({ ok: true })
 }

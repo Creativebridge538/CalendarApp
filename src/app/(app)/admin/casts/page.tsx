@@ -9,7 +9,7 @@ export default async function CastsPage() {
   if (!user) redirect('/login')
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: casts }, { data: profileFields }, { data: platformProfileRows }, { data: stageNameRows }] = await Promise.all([
+  const [{ data: casts }, { data: profileFields }, { data: platformProfileRows }, { data: stageNameRows }, { data: storeSettings }] = await Promise.all([
     supabase.from('users')
       .select('id, display_name, real_name, phone, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, is_active, email, profile_answers, photo_url, login_id, bank_name, bank_branch, bank_account_number, bank_account_holder')
       .eq('store_id', profile.store_id!)
@@ -26,7 +26,10 @@ export default async function CastsPage() {
     supabase.from('cast_stage_names')
       .select('cast_id, name')
       .eq('store_id', profile.store_id!),
+    supabase.from('store_settings').select('enabled_platforms').eq('store_id', profile.store_id!).single(),
   ])
+
+  const enabledPlatforms = storeSettings?.enabled_platforms ?? ['stripchat', 'fc2', 'dxlive']
 
   const platformProfilesByCastId: Record<string, Record<string, { platformUserId: string; platformDisplayName: string }>> = {}
   for (const row of platformProfileRows ?? []) {
@@ -48,6 +51,7 @@ export default async function CastsPage() {
         casts={casts ?? []} storeId={profile.store_id!} profileFields={profileFields ?? []}
         platformProfilesByCastId={platformProfilesByCastId}
         stageNamesByCastId={stageNamesByCastId}
+        enabledPlatforms={enabledPlatforms}
       />
     </div>
   )

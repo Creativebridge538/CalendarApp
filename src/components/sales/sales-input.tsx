@@ -54,6 +54,7 @@ interface Props {
     usd_jpy_auto_fetch: boolean
     usd_jpy_adjustment: number
     platform_settings: unknown
+    enabled_platforms: string[]
   } | null
   year: number
   month: number
@@ -137,6 +138,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     ...(stageNamesByCastId[c.id] ?? []).map((name, i) => ({ key: `${c.id}#${i}`, castId: c.id, label: name })),
   ]), [casts, stageNamesByCastId])
   const [castOptionKey, setCastOptionKey] = useState('')
+  const enabledPlatforms = storeSettings?.enabled_platforms ?? ['stripchat', 'fc2', 'dxlive']
   const [editing, setEditing] = useState<Sale | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [mode, setMode] = useState<'single' | 'bulk'>('single')
@@ -770,9 +772,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <SelectTrigger><SelectValue>{PLATFORM_LABEL[form.platform]}</SelectValue></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="manual">手入力</SelectItem>
-                      <SelectItem value="stripchat">STRIPCHAT</SelectItem>
-                      <SelectItem value="fc2">FC2</SelectItem>
-                      <SelectItem value="dxlive">DXライブ</SelectItem>
+                      {enabledPlatforms.includes('stripchat') && <SelectItem value="stripchat">STRIPCHAT</SelectItem>}
+                      {enabledPlatforms.includes('fc2') && <SelectItem value="fc2">FC2</SelectItem>}
+                      {enabledPlatforms.includes('dxlive') && <SelectItem value="dxlive">DXライブ</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
@@ -920,9 +922,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <SelectTrigger className="h-8"><SelectValue>{PLATFORM_LABEL[bulkPlatformFill]}</SelectValue></SelectTrigger>
                     <SelectContent>
                       <SelectItem value="manual">手入力</SelectItem>
-                      <SelectItem value="stripchat">STRIPCHAT</SelectItem>
-                      <SelectItem value="fc2">FC2</SelectItem>
-                      <SelectItem value="dxlive">DXライブ</SelectItem>
+                      {enabledPlatforms.includes('stripchat') && <SelectItem value="stripchat">STRIPCHAT</SelectItem>}
+                      {enabledPlatforms.includes('fc2') && <SelectItem value="fc2">FC2</SelectItem>}
+                      {enabledPlatforms.includes('dxlive') && <SelectItem value="dxlive">DXライブ</SelectItem>}
                     </SelectContent>
                   </Select>
                 </div>
@@ -975,9 +977,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           >
                             <option value="manual">手入力</option>
-                            <option value="stripchat">STRIPCHAT</option>
-                            <option value="fc2">FC2</option>
-                            <option value="dxlive">DXライブ</option>
+                            {enabledPlatforms.includes('stripchat') && <option value="stripchat">STRIPCHAT</option>}
+                            {enabledPlatforms.includes('fc2') && <option value="fc2">FC2</option>}
+                            {enabledPlatforms.includes('dxlive') && <option value="dxlive">DXライブ</option>}
                           </select>
                         </td>
                         <td className="p-0.5 border-b">

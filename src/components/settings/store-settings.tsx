@@ -60,6 +60,7 @@ interface Props {
     platform_settings: unknown
     notice_show_sales_total: boolean
     notice_show_reward_rate: boolean
+    enabled_platforms: string[]
   } | null
   storeId: string
 }
@@ -82,6 +83,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [platformSettings, setPlatformSettings] = useState<PlatformSettings>(parsePlatformSettings(initialSettings?.platform_settings))
   const [noticeShowSalesTotal, setNoticeShowSalesTotal] = useState(initialSettings?.notice_show_sales_total ?? true)
   const [noticeShowRewardRate, setNoticeShowRewardRate] = useState(initialSettings?.notice_show_reward_rate ?? true)
+  const enabledPlatforms = initialSettings?.enabled_platforms ?? ['stripchat', 'fc2', 'dxlive']
   const supabase = createClient()
   const router = useRouter()
 
@@ -434,7 +436,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             </div>
           )}
 
-          {(Object.keys(PLATFORM_LABEL) as PlatformKey[]).map(key => (
+          {(Object.keys(PLATFORM_LABEL) as PlatformKey[]).filter(key => enabledPlatforms.includes(key)).map(key => (
             <div key={key} className="space-y-1.5 pt-3 border-t first:border-t-0 first:pt-0">
               <Label>{PLATFORM_LABEL[key]}</Label>
               <Select

@@ -10,10 +10,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '権限がありません' }, { status: 403 })
   }
 
-  const { store_name, contact_name, contact_email, login_id, password } = await request.json().catch(() => ({}))
+  const { store_name, contact_name, contact_email, login_id, password, enabled_platforms } = await request.json().catch(() => ({}))
   if (!store_name || !contact_name || !contact_email || !login_id || !password) {
     return NextResponse.json({ error: '店舗名・管理者氏名・管理者メールアドレス・ユーザーID・パスワードは必須です' }, { status: 400 })
   }
+  const VALID_PLATFORMS = ['stripchat', 'fc2', 'dxlive']
+  const platforms = Array.isArray(enabled_platforms)
+    ? enabled_platforms.filter((p): p is string => VALID_PLATFORMS.includes(p))
+    : VALID_PLATFORMS
 
   const admin = createAdminClient()
 
@@ -28,7 +32,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: '店舗の作成に失敗しました' }, { status: 500 })
   }
 
-  const { error: settingsError } = await admin.from('store_settings').insert({ store_id: store.id })
+  const { error: settingsError } = await admin.from('store_settings').insert({ store_id: store.id, enabled_platforms: platforms })
   if (settingsError) {
     await admin.from('stores').delete().eq('id', store.id)
     return NextResponse.json({ error: '店舗設定の作成に失敗しました' }, { status: 500 })

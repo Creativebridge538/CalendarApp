@@ -8,10 +8,17 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { PasswordInput } from '@/components/ui/password-input'
 import { Ban, Play, Pencil, Plus, Copy } from 'lucide-react'
+
+const PLATFORM_OPTIONS: { key: string; label: string }[] = [
+  { key: 'stripchat', label: 'STRIPCHAT' },
+  { key: 'fc2', label: 'FC2' },
+  { key: 'dxlive', label: 'DXライブ' },
+]
 
 interface StoreAdmin {
   id: string
@@ -29,15 +36,16 @@ interface StoreRow {
   contact_email: string | null
   admins: StoreAdmin[]
   castCount: number
+  enabledPlatforms: string[]
 }
 
 export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
   const [stores, setStores] = useState(initialStores)
   const [processing, setProcessing] = useState<string | null>(null)
   const [editTarget, setEditTarget] = useState<StoreRow | null>(null)
-  const [editForm, setEditForm] = useState({ name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
+  const [editForm, setEditForm] = useState({ name: '', contact_name: '', contact_email: '', login_id: '', password: '', enabled_platforms: [] as string[] })
   const [createOpen, setCreateOpen] = useState(false)
-  const [createForm, setCreateForm] = useState({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
+  const [createForm, setCreateForm] = useState({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '', enabled_platforms: ['stripchat', 'fc2', 'dxlive'] as string[] })
   const [creating, setCreating] = useState(false)
 
   async function toggleActive(store: StoreRow) {
@@ -68,6 +76,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
       name: editForm.name.trim(),
       contact_name: editForm.contact_name.trim(),
       contact_email: editForm.contact_email.trim(),
+      enabled_platforms: editForm.enabled_platforms,
     }
     const res = await fetch(`/api/internal/stores/${editTarget.id}`, {
       method: 'PATCH',
@@ -100,6 +109,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
     setStores(stores.map(s => s.id === editTarget.id ? {
       ...s, name: payload.name,
       contact_name: payload.contact_name || null, contact_email: payload.contact_email || null,
+      enabledPlatforms: payload.enabled_platforms,
       admins: adminUpdated ? s.admins.map(a => a.id === adminUpdated!.id ? adminUpdated! : a) : s.admins,
     } : s))
     toast.success('店舗情報を変更しました')
@@ -126,6 +136,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
       contact_name: createForm.contact_name, contact_email: createForm.contact_email,
       admins: [{ id: data.admin_user_id, email: createForm.contact_email, display_name: createForm.contact_name, login_id: createForm.login_id }],
       castCount: 0,
+      enabledPlatforms: createForm.enabled_platforms,
     }, ...stores])
     await navigator.clipboard.writeText(
       [
@@ -137,7 +148,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
     )
     toast.success(`${createForm.store_name} を作成しました。ログイン情報をコピーしました`)
     setCreateOpen(false)
-    setCreateForm({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '' })
+    setCreateForm({ store_name: '', contact_name: '', contact_email: '', login_id: '', password: '', enabled_platforms: ['stripchat', 'fc2', 'dxlive'] })
   }
 
   return (
@@ -199,6 +210,7 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
                       contact_email: store.contact_email ?? '',
                       login_id: store.admins[0]?.login_id ?? '',
                       password: '',
+                      enabled_platforms: store.enabledPlatforms,
                     })
                   }}
                   disabled={processing === store.id}
@@ -235,6 +247,25 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
               <Label>パスワード</Label>
               <PasswordInput value={editForm.password} onChange={e => setEditForm({ ...editForm, password: e.target.value })} placeholder="変更する場合のみ入力" autoComplete="new-password" />
             </div>
+            <div className="space-y-1.5">
+              <Label>利用するプラットフォーム</Label>
+              <div className="space-y-1.5">
+                {PLATFORM_OPTIONS.map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={editForm.enabled_platforms.includes(key)}
+                      onCheckedChange={checked => setEditForm({
+                        ...editForm,
+                        enabled_platforms: checked
+                          ? [...editForm.enabled_platforms, key]
+                          : editForm.enabled_platforms.filter(p => p !== key),
+                      })}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditTarget(null)}>キャンセル</Button>
               <Button onClick={submitEdit} disabled={processing === editTarget?.id || !editForm.name.trim()}>保存</Button>
@@ -267,6 +298,25 @@ export function StoreList({ stores: initialStores }: { stores: StoreRow[] }) {
               <Label required>パスワード</Label>
               <PasswordInput value={createForm.password} onChange={e => setCreateForm({ ...createForm, password: e.target.value })} placeholder="8文字以上" autoComplete="new-password" />
               <p className="text-xs text-muted-foreground">作成すると、このユーザーID・パスワードがクリップボードにコピーされます</p>
+            </div>
+            <div className="space-y-1.5">
+              <Label>利用するプラットフォーム</Label>
+              <div className="space-y-1.5">
+                {PLATFORM_OPTIONS.map(({ key, label }) => (
+                  <label key={key} className="flex items-center gap-2 text-sm cursor-pointer">
+                    <Checkbox
+                      checked={createForm.enabled_platforms.includes(key)}
+                      onCheckedChange={checked => setCreateForm({
+                        ...createForm,
+                        enabled_platforms: checked
+                          ? [...createForm.enabled_platforms, key]
+                          : createForm.enabled_platforms.filter(p => p !== key),
+                      })}
+                    />
+                    {label}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setCreateOpen(false)}>キャンセル</Button>
