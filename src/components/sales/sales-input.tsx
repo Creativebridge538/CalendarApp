@@ -57,6 +57,7 @@ interface Props {
   } | null
   year: number
   month: number
+  stageNamesByCastId: Record<string, string[]>
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -108,7 +109,7 @@ interface BulkRow {
 const BULK_COLUMNS = ['date', 'castName', 'amount', 'worked_hours', 'bonus', 'deduction', 'notes'] as const
 type BulkColumn = typeof BULK_COLUMNS[number]
 
-export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month }: Props) {
+export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month, stageNamesByCastId }: Props) {
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
@@ -130,6 +131,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   }
   const [sales, setSales] = useState(initialSales)
   const [form, setForm] = useState(emptyForm)
+  // キャストの主な源氏名（display_name）と追加の源氏名、どれを選んでも同じキャストとして登録できるようにする
+  const castOptions = useMemo(() => casts.flatMap(c => [
+    { key: c.id, castId: c.id, label: c.display_name ?? c.id },
+    ...(stageNamesByCastId[c.id] ?? []).map((name, i) => ({ key: `${c.id}#${i}`, castId: c.id, label: name })),
+  ]), [casts, stageNamesByCastId])
+  const [castOptionKey, setCastOptionKey] = useState('')
   const [editing, setEditing] = useState<Sale | null>(null)
   const [dialogOpen, setDialogOpen] = useState(false)
   const [mode, setMode] = useState<'single' | 'bulk'>('single')
@@ -350,6 +357,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
   function openCreate() {
     setForm(emptyForm)
+    setCastOptionKey('')
     setEditing(null)
     setMode('single')
     setBulkRows(daysInMonthRows())
@@ -368,6 +376,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
   function startEdit(sale: Sale) {
     setEditing(sale)
+    setCastOptionKey(sale.cast_id)
     setForm({
       cast_id: sale.cast_id,
       date: sale.date,
@@ -502,7 +511,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     const errorRows: number[] = []
 
     nonEmptyRows.forEach((row, idx) => {
-      const cast = casts.find(c => c.display_name?.trim() === row.castName.trim())
+      const cast = casts.find(c => castOptions.some(o => o.castId === c.id && o.label.trim() === row.castName.trim()))
       const amountVal = parseFloat(row.amount)
       if (!cast || !row.date || row.amount === '' || Number.isNaN(amountVal)) { errorRows.push(idx + 1); return }
       const rowPlatform = row.platform
@@ -731,14 +740,23 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label required>キャスト</Label>
-                  <Select value={form.cast_id} onValueChange={v => { if (v) setForm({ ...form, cast_id: v }) }}>
+                  <Select
+                    value={castOptionKey}
+                    onValueChange={v => {
+                      if (!v) return
+                      const opt = castOptions.find(o => o.key === v)
+                      if (!opt) return
+                      setCastOptionKey(v)
+                      setForm({ ...form, cast_id: opt.castId })
+                    }}
+                  >
                     <SelectTrigger>
                       <SelectValue placeholder="選択">
-                        {form.cast_id ? (casts.find(c => c.id === form.cast_id)?.display_name ?? form.cast_id) : undefined}
+                        {castOptionKey ? castOptions.find(o => o.key === castOptionKey)?.label : undefined}
                       </SelectValue>
                     </SelectTrigger>
                     <SelectContent alignItemWithTrigger={false}>
-                      {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
+                      {castOptions.map(o => <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>)}
                     </SelectContent>
                   </Select>
                 </div>
@@ -912,7 +930,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               </div>
 
               <datalist id="cast-name-options">
-                {casts.map(c => <option key={c.id} value={c.display_name ?? ''} />)}
+                {castOptions.map(o => <option key={o.key} value={o.label} />)}
               </datalist>
 
               <div className="overflow-x-auto border rounded-lg">

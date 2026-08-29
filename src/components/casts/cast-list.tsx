@@ -17,7 +17,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 import { Pagination } from '@/components/ui/pagination'
-import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User, Copy, Loader2 } from 'lucide-react'
+import { Plus, Pencil, UserX, UserCheck, LayoutGrid, List, User, Copy, Loader2, X } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
 import { toHalfWidthDigits } from '@/lib/zenkaku'
@@ -49,9 +49,10 @@ interface CastListProps {
   storeId: string
   profileFields: { id: string; label: string }[]
   platformProfilesByCastId: Record<string, Partial<PlatformProfileForm>>
+  stageNamesByCastId: Record<string, string[]>
 }
 
-export function CastList({ casts: initialCasts, storeId, profileFields, platformProfilesByCastId }: CastListProps) {
+export function CastList({ casts: initialCasts, storeId, profileFields, platformProfilesByCastId, stageNamesByCastId }: CastListProps) {
   const [casts, setCasts] = useState(initialCasts)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -65,6 +66,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
     platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' } as Record<'stripchat' | 'fc2' | 'dxlive', string>,
     platform_daily_payment_reward_rates: { stripchat: '', fc2: '', dxlive: '' } as Record<'stripchat' | 'fc2' | 'dxlive', string>,
     platform_profiles: EMPTY_PLATFORM_PROFILES,
+    stage_names: [] as string[],
   })
   const [saving, setSaving] = useState(false)
   const [deactivateTarget, setDeactivateTarget] = useState<CastUser | null>(null)
@@ -104,6 +106,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
       platform_reward_rates: { stripchat: '', fc2: '', dxlive: '' },
       platform_daily_payment_reward_rates: { stripchat: '', fc2: '', dxlive: '' },
       platform_profiles: EMPTY_PLATFORM_PROFILES,
+      stage_names: [],
     })
     setOpen(true)
   }
@@ -141,6 +144,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
         fc2: platformProfilesByCastId[cast.id]?.fc2 ?? { platformUserId: '', platformDisplayName: '' },
         dxlive: platformProfilesByCastId[cast.id]?.dxlive ?? { platformUserId: '', platformDisplayName: '' },
       },
+      stage_names: stageNamesByCastId[cast.id] ?? [],
     })
     setOpen(true)
   }
@@ -196,6 +200,18 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
     return false
   }
 
+  // 源氏名一覧を丸ごと入れ替える（削除してから、空でないものだけ挿入し直す）
+  async function syncStageNames(castId: string): Promise<boolean> {
+    const names = Array.from(new Set(form.stage_names.map(n => n.trim()).filter(Boolean)))
+    const { error: deleteError } = await supabase.from('cast_stage_names').delete().eq('cast_id', castId)
+    if (deleteError) return true
+    if (names.length > 0) {
+      const { error } = await supabase.from('cast_stage_names').insert(names.map(name => ({ store_id: storeId, cast_id: castId, name })))
+      if (error) return true
+    }
+    return false
+  }
+
   async function handleSave() {
     setSaving(true)
     try {
@@ -238,6 +254,8 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
         }
         const profileError = await syncPlatformProfiles(editing.id)
         if (profileError) { toast.error('プラットフォーム別ID・源氏名の保存に失敗しました'); return }
+        const stageNameError = await syncStageNames(editing.id)
+        if (stageNameError) { toast.error('源氏名の保存に失敗しました'); return }
         let email = editing.email
         if (form.email !== editing.email) {
           const res = await fetch('/api/account/update-email', {
@@ -616,6 +634,28 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
                   ))}
                 </div>
                 <p className="text-xs text-muted-foreground">同一人物が複数プラットフォームで別のID・源氏名を使っている場合に設定します。報酬・支払通知書はこのキャスト1人にまとめて合算されます</p>
+              </div>
+            )}
+            {editing && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label>追加の源氏名（任意）</Label>
+                <div className="space-y-2">
+                  {form.stage_names.map((name, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <Input
+                        placeholder="源氏名" value={name}
+                        onChange={e => setForm({ ...form, stage_names: form.stage_names.map((n, idx) => idx === i ? e.target.value : n) })}
+                      />
+                      <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, stage_names: form.stage_names.filter((_, idx) => idx !== i) })}>
+                        <X className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button size="sm" variant="outline" onClick={() => setForm({ ...form, stage_names: [...form.stage_names, ''] })}>
+                  <Plus className="h-3.5 w-3.5 mr-1" />源氏名を追加
+                </Button>
+                <p className="text-xs text-muted-foreground">同一人物が複数の源氏名で活動している場合に設定します。売上登録のキャスト選択でどの源氏名を選んでも、このキャスト1人として登録されます</p>
               </div>
             )}
             <div className="pt-3 border-t space-y-3">

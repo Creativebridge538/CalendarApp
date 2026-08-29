@@ -152,6 +152,45 @@ export type Database = {
           },
         ]
       }
+      cast_stage_names: {
+        Row: {
+          cast_id: string
+          created_at: string
+          id: string
+          name: string
+          store_id: string
+        }
+        Insert: {
+          cast_id: string
+          created_at?: string
+          id?: string
+          name: string
+          store_id: string
+        }
+        Update: {
+          cast_id?: string
+          created_at?: string
+          id?: string
+          name?: string
+          store_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "cast_stage_names_cast_id_fkey"
+            columns: ["cast_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cast_stage_names_store_id_fkey"
+            columns: ["store_id"]
+            isOneToOne: false
+            referencedRelation: "stores"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notice_item_templates: {
         Row: {
           created_at: string
