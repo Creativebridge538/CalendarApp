@@ -27,7 +27,7 @@ type SaleInsert = Database['public']['Tables']['sales']['Insert']
 
 interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
-  platform: string; raw_units: number | string | null; manual_label: string | null
+  platform: string; raw_units: number | string | null
   is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
   daily_payment_at: string | null
   worked_hours: number | string | null
@@ -112,7 +112,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
-    amount: '', raw_units: '', manual_label: '',
+    amount: '', raw_units: '',
     is_daily_payment: false, rate_override: '', reward_rate_override: '', daily_payment_at: '',
     notes: '', worked_hours: '', bonus: '', deduction: '',
     custom_items: [] as { label: string; amount: string }[],
@@ -374,7 +374,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       platform: (sale.platform as 'manual' | PlatformKey) ?? 'manual',
       amount: String(sale.amount),
       raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
-      manual_label: sale.manual_label ?? '',
       custom_items: (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number }[] : [])
         .map(i => ({ label: i.label, amount: String(i.amount) })),
       is_daily_payment: sale.is_daily_payment,
@@ -404,7 +403,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       platform: form.platform,
       amount,
       raw_units: isPlatform ? parseFloat(form.raw_units) : null,
-      manual_label: !isPlatform && form.manual_label.trim() ? form.manual_label.trim() : null,
       usd_amount: isPlatform ? preview?.usd ?? null : null,
       fx_rate_snapshot: isPlatform ? usdJpyRate : null,
       is_daily_payment: form.is_daily_payment,
@@ -658,7 +656,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 flex-wrap">
-                        <Badge variant="outline">{sale.platform === 'manual' && sale.manual_label ? sale.manual_label : PLATFORM_LABEL[sale.platform] ?? sale.platform}</Badge>
+                        <Badge variant="outline">{PLATFORM_LABEL[sale.platform] ?? sale.platform}</Badge>
                         {sale.is_daily_payment && (
                           <Badge variant="secondary" className="whitespace-nowrap">
                             日払い済み{sale.daily_payment_at && `（${format(new Date(sale.daily_payment_at), 'M/d HH:mm', { locale: ja })}）`}
@@ -761,16 +759,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   </Select>
                 </div>
                 {form.platform === 'manual' ? (
-                  <>
-                    <div className="space-y-1.5">
-                      <Label>項目名（任意）</Label>
-                      <Input value={form.manual_label} onChange={e => setForm({ ...form, manual_label: e.target.value })} placeholder="例: 指名料" />
-                    </div>
-                    <div className="space-y-1.5">
-                      <Label required>売上金額（円）</Label>
-                      <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
-                    </div>
-                  </>
+                  <div className="space-y-1.5">
+                    <Label required>売上金額（円）</Label>
+                    <Input type="number" min="0" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} placeholder="0" />
+                  </div>
                 ) : (
                   <div className="space-y-1.5">
                     <Label required>{form.platform === 'stripchat' ? 'TK数' : 'ポイント数'}</Label>

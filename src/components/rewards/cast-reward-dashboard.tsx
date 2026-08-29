@@ -25,7 +25,7 @@ const PLATFORM_LABEL: Record<string, string> = {
 
 interface DayDetail {
   total: number
-  rows: { platform: string; manualLabel: string | null; amount: number; is_daily_payment: boolean }[]
+  rows: { platform: string; amount: number; is_daily_payment: boolean }[]
   shift: { start_time: string; end_time: string; admin_note: string | null; checklistLabels: string[] } | null
 }
 
@@ -242,7 +242,7 @@ export function CastRewardDashboard({
                     {detail.rows.map((r, i) => (
                       <div key={i} className="flex items-center justify-between text-sm">
                         <span className="flex items-center gap-1.5 text-muted-foreground">
-                          {r.platform === 'manual' && r.manualLabel ? r.manualLabel : PLATFORM_LABEL[r.platform] ?? r.platform}
+                          {PLATFORM_LABEL[r.platform] ?? r.platform}
                           {r.is_daily_payment && <Badge variant="outline" className="text-[10px]">日払い済み</Badge>}
                         </span>
                         <span className="tabular-nums">¥{r.amount.toLocaleString()}</span>

@@ -29,7 +29,7 @@ export default async function CastRewardsPage() {
 
   const [{ data: sales }, { data: shifts }, { data: paymentNoticeRows }, { data: checklistItems }] =
     await Promise.all([
-      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours, reward_rate_override, bonus, deduction, manual_label, custom_items')
+      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours, reward_rate_override, bonus, deduction, custom_items')
         .eq('cast_id', user.id).gte('date', sixtyDaysAgo).lte('date', today).order('date'),
       supabase.from('shifts').select('date, start_time, end_time, admin_note, checklist_answers, status')
         .eq('cast_id', user.id).gte('date', monthStart).lte('date', monthEnd),
@@ -69,12 +69,12 @@ export default async function CastRewardsPage() {
   }
 
   // 日付ごとの収益合計（当月カレンダー用）
-  const salesByDate = new Map<string, { total: number; rows: { platform: string; manualLabel: string | null; amount: number; is_daily_payment: boolean }[] }>()
+  const salesByDate = new Map<string, { total: number; rows: { platform: string; amount: number; is_daily_payment: boolean }[] }>()
   for (const s of salesList) {
     const entry = salesByDate.get(s.date) ?? { total: 0, rows: [] }
     const reward = rewardOf(s)
     entry.total += reward
-    entry.rows.push({ platform: s.platform, manualLabel: s.manual_label, amount: reward, is_daily_payment: s.is_daily_payment })
+    entry.rows.push({ platform: s.platform, amount: reward, is_daily_payment: s.is_daily_payment })
     salesByDate.set(s.date, entry)
   }
 
@@ -169,7 +169,7 @@ export default async function CastRewardsPage() {
   // 日別詳細（当月分のみ、クリック時にクライアント側で参照）
   const dayDetails: Record<string, {
     total: number
-    rows: { platform: string; manualLabel: string | null; amount: number; is_daily_payment: boolean }[]
+    rows: { platform: string; amount: number; is_daily_payment: boolean }[]
     shift: { start_time: string; end_time: string; admin_note: string | null; checklistLabels: string[] } | null
   }> = {}
   const checklistMap = new Map((checklistItems ?? []).map(c => [c.id, c]))
