@@ -382,7 +382,7 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
               <p className="text-xs text-muted-foreground">
                 {deadlineType === 'monthly'
                   ? `毎月${deadlineDay}日まではその月の翌月分のシフトのみ、${deadlineDay}日を過ぎたら翌々月分のシフトのみ新規提出できます`
-                  : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出でき、${WEEKDAY_LABELS[Number(deadlineDay)]}曜日を過ぎたら次の${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出できます`}
+                  : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日の翌日からの7日間のみ新規提出でき、${WEEKDAY_LABELS[Number(deadlineDay)]}曜日を過ぎたら次の${WEEKDAY_LABELS[Number(deadlineDay)]}曜日の翌日からの7日間のみ新規提出できます`}
               </p>
             </div>
           )}

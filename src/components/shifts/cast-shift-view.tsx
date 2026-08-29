@@ -385,7 +385,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   const confirmedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'confirmed').length
   // 新規シフトを提出できる期間を締切ルールから計算する。常に「その時点で提出対象となる1つの期間」だけが開いており、
   // それ以外の日付は提出できない（全面ブロックではなく、期間そのものがスライドしていくイメージ）。
-  // weekly: 締め切り曜日から7日間のみ提出可能。締め切り曜日を過ぎたら次の締め切り曜日からの7日間に切り替わる
+  // weekly: 締め切り曜日の翌日から7日間のみ提出可能。締め切り曜日を過ぎたら次の締め切り曜日の翌日からの7日間に切り替わる
   // monthly: 締切日までは翌月のみ提出可能。締切日を過ぎたら翌々月のみ提出可能に切り替わる
   const submissionWindow = (() => {
     if (!settings || settings.deadline_type === 'none') return null
@@ -398,8 +398,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
       return { start, end }
     }
     if (settings.deadline_type === 'weekly') {
-      const daysSinceDeadline = (now.getDay() - settings.deadline_day + 7) % 7
-      const start = addDays(now, (7 - daysSinceDeadline) % 7)
+      const windowStartWeekday = (settings.deadline_day + 1) % 7
+      const daysSinceTrigger = (now.getDay() - windowStartWeekday + 7) % 7
+      const start = addDays(now, (7 - daysSinceTrigger) % 7)
       const end = addDays(start, 6)
       return { start, end }
     }
