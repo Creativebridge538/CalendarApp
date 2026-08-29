@@ -766,18 +766,20 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   <Label required>日付</Label>
                   <Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>プラットフォーム</Label>
-                  <Select value={form.platform} onValueChange={v => { if (v) setForm({ ...form, platform: v as 'manual' | PlatformKey }) }}>
-                    <SelectTrigger><SelectValue>{PLATFORM_LABEL[form.platform]}</SelectValue></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">手入力</SelectItem>
-                      {enabledPlatforms.includes('stripchat') && <SelectItem value="stripchat">STRIPCHAT</SelectItem>}
-                      {enabledPlatforms.includes('fc2') && <SelectItem value="fc2">FC2</SelectItem>}
-                      {enabledPlatforms.includes('dxlive') && <SelectItem value="dxlive">DXライブ</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </div>
+                {enabledPlatforms.length > 0 && (
+                  <div className="space-y-1.5">
+                    <Label>プラットフォーム</Label>
+                    <Select value={form.platform} onValueChange={v => { if (v) setForm({ ...form, platform: v as 'manual' | PlatformKey }) }}>
+                      <SelectTrigger><SelectValue>{PLATFORM_LABEL[form.platform]}</SelectValue></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="manual">手入力</SelectItem>
+                        {enabledPlatforms.includes('stripchat') && <SelectItem value="stripchat">STRIPCHAT</SelectItem>}
+                        {enabledPlatforms.includes('fc2') && <SelectItem value="fc2">FC2</SelectItem>}
+                        {enabledPlatforms.includes('dxlive') && <SelectItem value="dxlive">DXライブ</SelectItem>}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
                 {form.platform === 'manual' ? (
                   <div className="space-y-1.5">
                     <Label required>売上金額（円）</Label>
@@ -894,7 +896,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           {mode === 'bulk' && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                外部サイトの表をコピーして、セルをクリックしてから貼り付けられます（複数行・複数列まとめてOK）。日付はその月の全日を用意しています。プラットフォームは行ごとに設定できます。
+                外部サイトの表をコピーして、セルをクリックしてから貼り付けられます（複数行・複数列まとめてOK）。日付はその月の全日を用意しています。
+                {enabledPlatforms.length > 0 && 'プラットフォームは行ごとに設定できます。'}
               </p>
               <p className="text-xs text-muted-foreground">
                 現在の為替レート: {usdJpyRate != null ? `¥${usdJpyRate.toFixed(2)}/$` : '未設定'}
@@ -916,19 +919,23 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 </div>
                 <Button size="sm" variant="outline" onClick={applyCastToAllRows} disabled={!bulkCastFill}>全行に適用</Button>
 
-                <div className="space-y-1.5 w-44">
-                  <Label className="text-xs">プラットフォームを一括設定</Label>
-                  <Select value={bulkPlatformFill} onValueChange={v => { if (v) setBulkPlatformFill(v as 'manual' | PlatformKey) }}>
-                    <SelectTrigger className="h-8"><SelectValue>{PLATFORM_LABEL[bulkPlatformFill]}</SelectValue></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="manual">手入力</SelectItem>
-                      {enabledPlatforms.includes('stripchat') && <SelectItem value="stripchat">STRIPCHAT</SelectItem>}
-                      {enabledPlatforms.includes('fc2') && <SelectItem value="fc2">FC2</SelectItem>}
-                      {enabledPlatforms.includes('dxlive') && <SelectItem value="dxlive">DXライブ</SelectItem>}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button size="sm" variant="outline" onClick={applyPlatformToAllRows}>全行に適用</Button>
+                {enabledPlatforms.length > 0 && (
+                  <>
+                    <div className="space-y-1.5 w-44">
+                      <Label className="text-xs">プラットフォームを一括設定</Label>
+                      <Select value={bulkPlatformFill} onValueChange={v => { if (v) setBulkPlatformFill(v as 'manual' | PlatformKey) }}>
+                        <SelectTrigger className="h-8"><SelectValue>{PLATFORM_LABEL[bulkPlatformFill]}</SelectValue></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="manual">手入力</SelectItem>
+                          {enabledPlatforms.includes('stripchat') && <SelectItem value="stripchat">STRIPCHAT</SelectItem>}
+                          {enabledPlatforms.includes('fc2') && <SelectItem value="fc2">FC2</SelectItem>}
+                          {enabledPlatforms.includes('dxlive') && <SelectItem value="dxlive">DXライブ</SelectItem>}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <Button size="sm" variant="outline" onClick={applyPlatformToAllRows}>全行に適用</Button>
+                  </>
+                )}
               </div>
 
               <datalist id="cast-name-options">
@@ -941,7 +948,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <tr className="bg-muted/50">
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">日付</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>
+                      {enabledPlatforms.length > 0 && <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>}
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">換算金額</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
@@ -970,18 +977,20 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
-                        <td className="p-0.5 border-b">
-                          <select
-                            value={row.platform}
-                            onChange={e => updateBulkCell(row.id, 'platform', e.target.value)}
-                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                          >
-                            <option value="manual">手入力</option>
-                            {enabledPlatforms.includes('stripchat') && <option value="stripchat">STRIPCHAT</option>}
-                            {enabledPlatforms.includes('fc2') && <option value="fc2">FC2</option>}
-                            {enabledPlatforms.includes('dxlive') && <option value="dxlive">DXライブ</option>}
-                          </select>
-                        </td>
+                        {enabledPlatforms.length > 0 && (
+                          <td className="p-0.5 border-b">
+                            <select
+                              value={row.platform}
+                              onChange={e => updateBulkCell(row.id, 'platform', e.target.value)}
+                              className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            >
+                              <option value="manual">手入力</option>
+                              {enabledPlatforms.includes('stripchat') && <option value="stripchat">STRIPCHAT</option>}
+                              {enabledPlatforms.includes('fc2') && <option value="fc2">FC2</option>}
+                              {enabledPlatforms.includes('dxlive') && <option value="dxlive">DXライブ</option>}
+                            </select>
+                          </td>
+                        )}
                         <td className="p-0.5 border-b">
                           <input
                             type="number" value={row.amount}
