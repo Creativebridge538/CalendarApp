@@ -110,6 +110,16 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
     toast.success('空き枠を登録しました')
     setOpen(false)
     setForm({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', capacity: '1' })
+
+    const { data: activeCasts } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true)
+    if (activeCasts?.length) {
+      const title = '空き枠が追加されました'
+      const body = `${format(new Date(data.date), 'M/d(E)', { locale: ja })} ${data.start_time.slice(0, 5)}〜${data.end_time.slice(0, 5)} の空き枠`
+      await supabase.from('notifications').insert(
+        activeCasts.map(c => ({ user_id: c.id, title, body, link: '/cast/vacant-slots' }))
+      )
+      activeCasts.forEach(c => sendPushNotification(c.id, title, body, '/cast/vacant-slots'))
+    }
   }
 
   async function updateCapacity(slot: Slot, capacity: number) {
