@@ -52,7 +52,7 @@ interface Shift {
 }
 
 interface Settings {
-  deadline_type: string; deadline_day: number; deadline_week_start_day: number; require_approval_after_deadline: boolean
+  deadline_type: string; deadline_day: number
   location_mode: string; area_label: string; room_label: string
 }
 

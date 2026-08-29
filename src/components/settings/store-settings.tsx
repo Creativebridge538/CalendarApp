@@ -49,8 +49,6 @@ interface Props {
     id: string
     deadline_type: string
     deadline_day: number
-    deadline_week_start_day: number
-    require_approval_after_deadline: boolean
     location_mode: string
     area_label: string
     room_label: string
@@ -70,8 +68,6 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
   const [storeName, setStoreName] = useState(initialStore?.name ?? '')
   const [deadlineType, setDeadlineType] = useState(initialSettings?.deadline_type ?? 'monthly')
   const [deadlineDay, setDeadlineDay] = useState(String(initialSettings?.deadline_day ?? 25))
-  const [deadlineWeekStartDay, setDeadlineWeekStartDay] = useState(String(initialSettings?.deadline_week_start_day ?? 0))
-  const [requireApproval, setRequireApproval] = useState(initialSettings?.require_approval_after_deadline ?? true)
   const [locationMode, setLocationMode] = useState(initialSettings?.location_mode ?? 'room')
   const [areaLabel, setAreaLabel] = useState(initialSettings?.area_label ?? 'エリア')
   const [roomLabel, setRoomLabel] = useState(initialSettings?.room_label ?? 'ルーム')
@@ -212,8 +208,6 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
       store_id: storeId,
       deadline_type: deadlineType as 'monthly' | 'weekly' | 'none',
       deadline_day: parseInt(deadlineDay),
-      deadline_week_start_day: parseInt(deadlineWeekStartDay),
-      require_approval_after_deadline: requireApproval,
     }
     if (initialSettings) {
       const { error } = await supabase.from('store_settings').update(payload).eq('id', initialSettings.id)
@@ -364,55 +358,33 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             </Select>
           </div>
           {deadlineType !== 'none' && (
-            <>
-              {deadlineType === 'weekly' && (
-                <div className="space-y-1.5">
-                  <Label>週の起点（この曜日にリセット）</Label>
-                  <Select value={deadlineWeekStartDay} onValueChange={v => { if (v) setDeadlineWeekStartDay(v) }}>
-                    <SelectTrigger><SelectValue>{WEEKDAY_LABELS[Number(deadlineWeekStartDay)]}曜日</SelectValue></SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {WEEKDAY_LABELS.map((label, i) => (
-                        <SelectItem key={i} value={String(i)}>{label}曜日</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+            <div className="space-y-1.5">
+              <Label>締切{deadlineType === 'monthly' ? '日' : '曜日'}</Label>
+              {deadlineType === 'monthly' ? (
+                <Select value={deadlineDay} onValueChange={v => { if (v) setDeadlineDay(v) }}>
+                  <SelectTrigger><SelectValue>{`毎月${deadlineDay}日`}</SelectValue></SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
+                      <SelectItem key={d} value={String(d)}>{d}日</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select value={deadlineDay} onValueChange={v => { if (v) setDeadlineDay(v) }}>
+                  <SelectTrigger><SelectValue>{WEEKDAY_LABELS[Number(deadlineDay)]}曜日</SelectValue></SelectTrigger>
+                  <SelectContent alignItemWithTrigger={false}>
+                    {WEEKDAY_LABELS.map((label, i) => (
+                      <SelectItem key={i} value={String(i)}>{label}曜日</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               )}
-              <div className="space-y-1.5">
-                <Label>締切{deadlineType === 'monthly' ? '日' : '曜日'}</Label>
-                {deadlineType === 'monthly' ? (
-                  <Select value={deadlineDay} onValueChange={v => { if (v) setDeadlineDay(v) }}>
-                    <SelectTrigger><SelectValue>{`毎月${deadlineDay}日`}</SelectValue></SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {Array.from({ length: 31 }, (_, i) => i + 1).map(d => (
-                        <SelectItem key={d} value={String(d)}>{d}日</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Select value={deadlineDay} onValueChange={v => { if (v) setDeadlineDay(v) }}>
-                    <SelectTrigger><SelectValue>{WEEKDAY_LABELS[Number(deadlineDay)]}曜日</SelectValue></SelectTrigger>
-                    <SelectContent alignItemWithTrigger={false}>
-                      {WEEKDAY_LABELS.map((label, i) => (
-                        <SelectItem key={i} value={String(i)}>{label}曜日</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-                <p className="text-xs text-muted-foreground">
-                  {deadlineType === 'monthly'
-                    ? `毎月${deadlineDay}日まではその月の翌月分のシフトのみ、${deadlineDay}日を過ぎたら翌々月分のシフトのみ新規提出できます`
-                    : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出でき、${WEEKDAY_LABELS[Number(deadlineDay)]}曜日を過ぎたら次の${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出できます`}
-                </p>
-              </div>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium">締切後の修正に承認を必要とする</p>
-                  <p className="text-xs text-muted-foreground">OFFにすると締切後でも自由に修正できます</p>
-                </div>
-                <Switch checked={requireApproval} onCheckedChange={setRequireApproval} />
-              </div>
-            </>
+              <p className="text-xs text-muted-foreground">
+                {deadlineType === 'monthly'
+                  ? `毎月${deadlineDay}日まではその月の翌月分のシフトのみ、${deadlineDay}日を過ぎたら翌々月分のシフトのみ新規提出できます`
+                  : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出でき、${WEEKDAY_LABELS[Number(deadlineDay)]}曜日を過ぎたら次の${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出できます`}
+              </p>
+            </div>
           )}
           <Button onClick={saveDeadlineSettings}>保存</Button>
         </CardContent>
