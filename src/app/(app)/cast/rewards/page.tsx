@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { CastRewardDashboard } from '@/components/rewards/cast-reward-dashboard'
-import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
 
 function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
@@ -29,7 +29,7 @@ export default async function CastRewardsPage() {
 
   const [{ data: sales }, { data: shifts }, { data: paymentNoticeRows }, { data: checklistItems }] =
     await Promise.all([
-      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours, reward_rate_override, bonus, deduction, manual_label')
+      supabase.from('sales').select('date, amount, platform, is_daily_payment, worked_hours, reward_rate_override, bonus, deduction, manual_label, custom_items')
         .eq('cast_id', user.id).gte('date', sixtyDaysAgo).lte('date', today).order('date'),
       supabase.from('shifts').select('date, start_time, end_time, admin_note, checklist_answers, status')
         .eq('cast_id', user.id).gte('date', monthStart).lte('date', monthEnd),
@@ -62,10 +62,10 @@ export default async function CastRewardsPage() {
   const castPlatformRates = parsePlatformRewardRates(profile.platform_reward_rates)
   const castDailyPaymentRate = profile.daily_payment_reward_rate
   const castPlatformDailyRates = parsePlatformRewardRates(profile.platform_daily_payment_reward_rates)
-  function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'platform' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction'>): number {
+  function rewardOf(s: Pick<typeof salesList[number], 'amount' | 'platform' | 'is_daily_payment' | 'reward_rate_override' | 'bonus' | 'deduction' | 'custom_items'>): number {
     const rate = effectiveRewardRate(s, castRewardRate, castPlatformRates, castDailyPaymentRate, castPlatformDailyRates)
     const baseReward = Math.floor(Number(s.amount) * rate)
-    return baseReward + Number(s.bonus ?? 0) - Number(s.deduction ?? 0)
+    return baseReward + Number(s.bonus ?? 0) - Number(s.deduction ?? 0) + customItemsTotal(s.custom_items)
   }
 
   // 日付ごとの収益合計（当月カレンダー用）

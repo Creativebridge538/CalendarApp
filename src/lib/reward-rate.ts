@@ -12,6 +12,17 @@ export function parsePlatformRewardRates(raw: unknown): PlatformRewardRates {
   return result
 }
 
+export interface SaleCustomItem { label: string; amount: number }
+
+// 売上行に追加した項目（ボーナス・控除と同様に加減算される、名前付きの追加金額）の合計を求める
+export function customItemsTotal(raw: unknown): number {
+  if (!Array.isArray(raw)) return 0
+  return raw.reduce((sum: number, item) => {
+    const amount = Number((item as { amount?: unknown })?.amount)
+    return sum + (Number.isNaN(amount) ? 0 : amount)
+  }, 0)
+}
+
 interface RewardRateSale {
   platform: string
   is_daily_payment: boolean

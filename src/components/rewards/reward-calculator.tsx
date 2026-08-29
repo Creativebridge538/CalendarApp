@@ -18,7 +18,7 @@ import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
-import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
 
 interface CastUser {
   id: string; display_name: string | null; real_name: string | null
@@ -29,6 +29,7 @@ interface SaleRow {
   cast_id: string; amount: number | string; platform: string
   is_daily_payment: boolean; reward_rate_override: number | string | null
   bonus: number | string; deduction: number | string
+  custom_items: unknown
 }
 
 interface Props {
@@ -74,7 +75,8 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     }, 0))
     const bonus = castSales.reduce((sum, s) => sum + Number(s.bonus), 0)
     const deduction = castSales.reduce((sum, s) => sum + Number(s.deduction), 0)
-    const totalReward = baseReward + bonus - deduction
+    const customTotal = castSales.reduce((sum, s) => sum + customItemsTotal(s.custom_items), 0)
+    const totalReward = baseReward + bonus - deduction + customTotal
     return { cast, rewardRate, salesTotal, baseReward, bonus, deduction, totalReward }
   }), [casts, salesByCast])
 

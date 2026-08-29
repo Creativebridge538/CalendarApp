@@ -510,6 +510,7 @@ export type Database = {
           cast_id: string
           created_at: string
           created_by: string | null
+          custom_items: Json
           daily_payment_at: string | null
           date: string
           deduction: number
@@ -534,6 +535,7 @@ export type Database = {
           cast_id: string
           created_at?: string
           created_by?: string | null
+          custom_items?: Json
           daily_payment_at?: string | null
           date: string
           deduction?: number
@@ -558,6 +560,7 @@ export type Database = {
           cast_id?: string
           created_at?: string
           created_by?: string | null
+          custom_items?: Json
           daily_payment_at?: string | null
           date?: string
           deduction?: number

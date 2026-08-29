@@ -19,7 +19,7 @@ import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit, R
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
-import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
 import { usePagination } from '@/hooks/use-pagination'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -33,6 +33,7 @@ interface Sale {
   worked_hours: number | string | null
   bonus: number | string; deduction: number | string
   usd_amount: number | string | null; fx_rate_snapshot: number | string | null
+  custom_items: unknown
   cast: { display_name: string | null } | null
 }
 
@@ -114,6 +115,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     amount: '', raw_units: '', manual_label: '',
     is_daily_payment: false, rate_override: '', reward_rate_override: '', daily_payment_at: '',
     notes: '', worked_hours: '', bonus: '', deduction: '',
+    custom_items: [] as { label: string; amount: string }[],
   }), [year, month])
   const emptyBulkRow = (date?: string): BulkRow => ({
     id: crypto.randomUUID(), date: date ?? defaultDateFor(year, month),
@@ -333,7 +335,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
     const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0, castPlatformRatesById[s.cast_id], castDailyRateById[s.cast_id], castPlatformDailyRatesById[s.cast_id])
-    return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction)
+    return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction) + customItemsTotal(s.custom_items)
   }, 0), [filteredSales, castRewardRateById, castPlatformRatesById, castDailyRateById, castPlatformDailyRatesById])
 
   const prev = month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 }
@@ -373,6 +375,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       amount: String(sale.amount),
       raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
       manual_label: sale.manual_label ?? '',
+      custom_items: (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number }[] : [])
+        .map(i => ({ label: i.label, amount: String(i.amount) })),
       is_daily_payment: sale.is_daily_payment,
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
       reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
@@ -416,6 +420,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       worked_hours: form.worked_hours ? parseFloat(form.worked_hours) : null,
       bonus: form.bonus ? parseInt(form.bonus) : 0,
       deduction: form.deduction ? parseInt(form.deduction) : 0,
+      custom_items: form.custom_items
+        .filter(i => i.label.trim() !== '')
+        .map(i => ({ label: i.label.trim(), amount: parseFloat(i.amount) || 0 })),
       store_id: storeId,
       created_by: userId,
     }
@@ -637,7 +644,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               )}
               {pagedSales.map(sale => {
                 const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0, castPlatformRatesById[sale.cast_id], castDailyRateById[sale.cast_id], castPlatformDailyRatesById[sale.cast_id]))
-                const reward = baseReward + Number(sale.bonus) - Number(sale.deduction)
+                const customTotal = customItemsTotal(sale.custom_items)
+                const reward = baseReward + Number(sale.bonus) - Number(sale.deduction) + customTotal
                 return (
                   <TableRow key={sale.id}>
                     <TableCell>
@@ -671,11 +679,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       ¥{reward.toLocaleString()}
-                      {(Number(sale.bonus) > 0 || Number(sale.deduction) > 0) && (
+                      {(Number(sale.bonus) > 0 || Number(sale.deduction) > 0 || customTotal !== 0) && (
                         <span className="block text-[10px] text-muted-foreground">
                           {Number(sale.bonus) > 0 && `+¥${Number(sale.bonus).toLocaleString()}`}
                           {Number(sale.bonus) > 0 && Number(sale.deduction) > 0 && ' '}
                           {Number(sale.deduction) > 0 && `-¥${Number(sale.deduction).toLocaleString()}`}
+                          {customTotal !== 0 && ` ${customTotal > 0 ? '+' : ''}¥${customTotal.toLocaleString()}`}
                         </span>
                       )}
                     </TableCell>
@@ -784,6 +793,28 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   <Label>備考</Label>
                   <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />
                 </div>
+              </div>
+
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label className="text-xs text-muted-foreground font-normal">追加項目（指名料など・マイナス値で控除も可）</Label>
+                {form.custom_items.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2">
+                    <Input
+                      placeholder="項目名（例: 指名料）" value={item.label}
+                      onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, label: e.target.value } : it) })}
+                    />
+                    <Input
+                      type="number" className="w-28" placeholder="金額" value={item.amount}
+                      onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
+                    />
+                    <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, custom_items: form.custom_items.filter((_, idx) => idx !== i) })}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
+                ))}
+                <Button size="sm" variant="outline" onClick={() => setForm({ ...form, custom_items: [...form.custom_items, { label: '', amount: '' }] })}>
+                  <Plus className="h-3.5 w-3.5 mr-1" />項目を追加
+                </Button>
               </div>
 
               {form.platform !== 'manual' && preview && (
