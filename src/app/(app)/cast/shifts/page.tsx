@@ -25,6 +25,20 @@ export default async function CastShiftsPage() {
     supabase.from('sales').select('date, amount, platform, shift_id, is_daily_payment, reward_rate_override').eq('cast_id', user.id),
   ])
 
+  // シフトごとに最新の修正申請だけを見る。それが却下済みなら理由をシフト詳細に表示する
+  // （新しい申請を出し直した場合は、そちらが最新になるので古い却下理由は自然に消える）
+  const { data: modRequests } = await supabase.from('shift_modification_requests')
+    .select('shift_id, status, reject_reason')
+    .eq('requested_by', user.id)
+    .order('created_at', { ascending: false })
+  const rejectedModificationReasonByShiftId: Record<string, string> = {}
+  const seenShiftIds = new Set<string>()
+  for (const r of modRequests ?? []) {
+    if (seenShiftIds.has(r.shift_id)) continue
+    seenShiftIds.add(r.shift_id)
+    if (r.status === 'rejected' && r.reject_reason) rejectedModificationReasonByShiftId[r.shift_id] = r.reject_reason
+  }
+
   const { count: unreadNotificationCount } = await supabase.from('notifications')
     .select('*', { count: 'exact', head: true }).eq('user_id', user.id).is('read_at', null)
 
@@ -62,6 +76,7 @@ export default async function CastShiftsPage() {
         amountByDate={amountByDate}
         salesByShiftId={salesByShiftId}
         unreadNotificationCount={unreadNotificationCount ?? 0}
+        rejectedModificationReasonByShiftId={rejectedModificationReasonByShiftId}
       />
     </div>
   )

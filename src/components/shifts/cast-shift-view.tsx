@@ -83,6 +83,7 @@ interface Props {
   amountByDate: Record<string, number>
   salesByShiftId: Record<string, { amount: number; reward: number }>
   unreadNotificationCount: number
+  rejectedModificationReasonByShiftId: Record<string, string>
 }
 
 const HOUR_HEIGHT = 56
@@ -201,7 +202,7 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, castName, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId, unreadNotificationCount: initialUnreadNotificationCount }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, castName, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId, unreadNotificationCount: initialUnreadNotificationCount, rejectedModificationReasonByShiftId }: Props) {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(initialUnreadNotificationCount)
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
@@ -1254,6 +1255,18 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                           <div>
                             <p className="text-[10px] font-semibold text-destructive">差し戻し理由</p>
                             <p className="text-xs text-foreground mt-0.5">{shift.admin_note}</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {rejectedModificationReasonByShiftId[shift.id] && (
+                      <div className="border-t px-4 py-3">
+                        <div className="flex gap-2 bg-destructive/10 border border-destructive/30 rounded-lg p-2.5">
+                          <StickyNote className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-[10px] font-semibold text-destructive">修正申請が却下されました</p>
+                            <p className="text-xs text-foreground mt-0.5">{rejectedModificationReasonByShiftId[shift.id]}</p>
                           </div>
                         </div>
                       </div>
