@@ -314,20 +314,21 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   }
 
   async function changeStatus(shift: Shift, status: ShiftStatus, note: string, castNote: string | null = shift.notes) {
-    const update: { status: ShiftStatus; confirmed_at?: string; admin_note: string | null; notes: string | null } = { status, admin_note: note || null, notes: castNote || null }
+    const update: { status: ShiftStatus; confirmed_at?: string | null; admin_note: string | null; notes: string | null } = { status, admin_note: note || null, notes: castNote || null }
     if (status === 'confirmed') update.confirmed_at = new Date().toISOString()
+    else if (shift.status === 'confirmed') update.confirmed_at = null
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
     if (error) {
       toast.error(shiftConflictMessage(error, '更新に失敗しました'))
       return
     }
     setShifts(shifts.map(s => s.id === shift.id ? { ...s, ...update } : s))
-    toast.success(status === 'confirmed' ? 'シフトを確定しました' : '差し戻しました')
+    toast.success(status === 'confirmed' ? 'シフトを確定しました' : status === 'rejected' ? '差し戻しました' : '確定を取り消しました')
     setDetailShift(null)
 
     if (status !== shift.status) {
       const dateLabel = format(new Date(shift.date), 'M/d(E)', { locale: ja })
-      const title = status === 'confirmed' ? 'シフトが確定されました' : 'シフトが差し戻されました'
+      const title = status === 'confirmed' ? 'シフトが確定されました' : status === 'rejected' ? 'シフトが差し戻されました' : 'シフトの確定が取り消されました'
       const body = `${dateLabel} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフト`
       await supabase.from('notifications').insert({ user_id: shift.cast_id, title, body, link: '/cast/shifts' })
       sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
@@ -726,13 +727,18 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                     </Button>
                   </Link>
                 ) : detailShift.status === 'confirmed' ? (
-                  <Button
-                    className="text-white bg-positive hover:bg-positive/90"
-                    disabled={!scheduleFormHasChanges() && noteInput === (detailShift.admin_note ?? '')}
-                    onClick={saveConfirmedShiftChanges}
-                  >
-                    <Check className="h-3.5 w-3.5 mr-1" /> 変更を保存
-                  </Button>
+                  <>
+                    <Button variant="outline" onClick={() => changeStatus(detailShift, 'submitted', noteInput, castNoteInput)}>
+                      確定を取り消す
+                    </Button>
+                    <Button
+                      className="text-white bg-positive hover:bg-positive/90"
+                      disabled={!scheduleFormHasChanges() && noteInput === (detailShift.admin_note ?? '')}
+                      onClick={saveConfirmedShiftChanges}
+                    >
+                      <Check className="h-3.5 w-3.5 mr-1" /> 変更を保存
+                    </Button>
+                  </>
                 ) : (
                   <Button className="text-white bg-positive hover:bg-positive/90"
                     onClick={() => changeStatus(detailShift, 'confirmed', noteInput, castNoteInput)}>
