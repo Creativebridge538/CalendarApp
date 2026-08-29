@@ -577,46 +577,50 @@ export function CastList({ casts: initialCasts, storeId, profileFields, platform
               </div>
               <p className="text-xs text-muted-foreground">日払いに変更した売上で、個別に率を指定しなかった場合に使われます</p>
             </div>
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label>プラットフォーム別の報酬率（任意）</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
-                  <div key={key} className="space-y-1">
-                    <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
-                    <div className="relative">
-                      <Input
-                        type="number" step="1" min="0" max="100" className="pr-6"
-                        value={form.platform_reward_rates[key]}
-                        onChange={e => setForm({ ...form, platform_reward_rates: { ...form.platform_reward_rates, [key]: e.target.value } })}
-                        placeholder={form.reward_rate}
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+            {enabledPlatforms.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label>プラットフォーム別の報酬率（任意）</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
+                    <div key={key} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
+                      <div className="relative">
+                        <Input
+                          type="number" step="1" min="0" max="100" className="pr-6"
+                          value={form.platform_reward_rates[key]}
+                          onChange={e => setForm({ ...form, platform_reward_rates: { ...form.platform_reward_rates, [key]: e.target.value } })}
+                          placeholder={form.reward_rate}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="space-y-1.5 pt-2 border-t">
-              <Label>プラットフォーム別の前払い時報酬率（任意）</Label>
-              <div className="grid grid-cols-3 gap-2">
-                {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
-                  <div key={key} className="space-y-1">
-                    <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
-                    <div className="relative">
-                      <Input
-                        type="number" step="1" min="0" max="100" className="pr-6"
-                        value={form.platform_daily_payment_reward_rates[key]}
-                        onChange={e => setForm({ ...form, platform_daily_payment_reward_rates: { ...form.platform_daily_payment_reward_rates, [key]: e.target.value } })}
-                        placeholder={form.daily_payment_reward_rate || form.reward_rate}
-                      />
-                      <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+            )}
+            {enabledPlatforms.length > 0 && (
+              <div className="space-y-1.5 pt-2 border-t">
+                <Label>プラットフォーム別の前払い時報酬率（任意）</Label>
+                <div className="grid grid-cols-3 gap-2">
+                  {PLATFORM_RATE_FIELDS.filter(f => enabledPlatforms.includes(f.key)).map(({ key, label }) => (
+                    <div key={key} className="space-y-1">
+                      <Label className="text-xs text-muted-foreground font-normal">{label}</Label>
+                      <div className="relative">
+                        <Input
+                          type="number" step="1" min="0" max="100" className="pr-6"
+                          value={form.platform_daily_payment_reward_rates[key]}
+                          onChange={e => setForm({ ...form, platform_daily_payment_reward_rates: { ...form.platform_daily_payment_reward_rates, [key]: e.target.value } })}
+                          placeholder={form.daily_payment_reward_rate || form.reward_rate}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">%</span>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">未設定のプラットフォームは「日払い時の報酬率」（それも未設定ならプラットフォーム別/基本の報酬率）が使われます</p>
               </div>
-              <p className="text-xs text-muted-foreground">未設定のプラットフォームは「日払い時の報酬率」（それも未設定ならプラットフォーム別/基本の報酬率）が使われます</p>
-            </div>
-            {editing && (
+            )}
+            {editing && enabledPlatforms.length > 0 && (
               <div className="space-y-1.5 pt-2 border-t">
                 <Label>プラットフォーム別のID・源氏名（任意）</Label>
                 <div className="space-y-2">
