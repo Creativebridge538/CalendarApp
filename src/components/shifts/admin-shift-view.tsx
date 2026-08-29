@@ -503,9 +503,20 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                       <Link href={`/admin/modification-requests?shift=${shift.id}`} className="flex-1" onClick={e => e.stopPropagation()}>
                         <Button size="sm" variant="outline" className="w-full">修正申請で対応する</Button>
                       </Link>
+                    ) : shift.status === 'confirmed' ? (
+                      <>
+                        <Button size="sm" variant="outline" className="flex-1"
+                          onClick={e => { e.stopPropagation(); changeStatus(shift, 'submitted', shift.admin_note ?? '') }}>
+                          確定取消
+                        </Button>
+                        <Button size="sm" variant="outline" className="flex-1 text-destructive border-destructive/30"
+                          onClick={e => { e.stopPropagation(); quickReject(shift) }}>
+                          <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
+                        </Button>
+                      </>
                     ) : (
                       <>
-                        <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30" disabled={shift.status === 'confirmed'}
+                        <Button size="sm" variant="outline" className="flex-1 text-positive border-positive/30"
                           onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
                           <Check className="h-3.5 w-3.5 mr-1" /> 確定
                         </Button>
@@ -571,9 +582,20 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                         <Link href={`/admin/modification-requests?shift=${shift.id}`} onClick={e => e.stopPropagation()}>
                           <Button size="sm" variant="outline">修正申請で対応する</Button>
                         </Link>
+                      ) : shift.status === 'confirmed' ? (
+                        <>
+                          <Button size="sm" variant="outline"
+                            onClick={e => { e.stopPropagation(); changeStatus(shift, 'submitted', shift.admin_note ?? '') }}>
+                            確定取消
+                          </Button>
+                          <Button size="sm" variant="outline" className="text-destructive border-destructive/30"
+                            onClick={e => { e.stopPropagation(); quickReject(shift) }}>
+                            <X className="h-3.5 w-3.5 mr-1" /> 差し戻し
+                          </Button>
+                        </>
                       ) : (
                         <>
-                          <Button size="sm" variant="outline" className="text-positive border-positive/30" disabled={shift.status === 'confirmed'}
+                          <Button size="sm" variant="outline" className="text-positive border-positive/30"
                             onClick={e => { e.stopPropagation(); changeStatus(shift, 'confirmed', shift.admin_note ?? '') }}>
                             <Check className="h-3.5 w-3.5 mr-1" /> 確定
                           </Button>
@@ -710,7 +732,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
                 <label className="text-sm font-medium">管理者メモ（任意・管理者のみ閲覧できます）</label>
                 <Textarea value={noteInput} onChange={e => setNoteInput(e.target.value)} rows={3} placeholder="例: 遅刻連絡あり、来月から時給改定など" />
               </div>
-              <div className="flex justify-end gap-2 pt-2">
+              <div className="flex justify-end gap-2 pt-2 flex-wrap">
                 <Button variant="outline" size="icon" className="text-destructive border-destructive/30 shrink-0" onClick={() => handleDelete(detailShift)} aria-label="削除">
                   <Trash2 className="h-3.5 w-3.5" />
                 </Button>
