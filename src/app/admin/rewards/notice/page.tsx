@@ -9,9 +9,9 @@ import { fetchNoticeContent, getNoticeSnapshotById, getLatestNoticeSnapshot } fr
 export default async function PaymentNoticePage({
   searchParams,
 }: {
-  searchParams: Promise<{ cast_id?: string; from?: string; to?: string; notice_id?: string }>
+  searchParams: Promise<{ cast_id?: string; from?: string; to?: string; notice_id?: string; hide_download?: string }>
 }) {
-  const { cast_id, from, to, notice_id } = await searchParams
+  const { cast_id, from, to, notice_id, hide_download } = await searchParams
   const supabase = await createClient()
   const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
@@ -103,9 +103,11 @@ export default async function PaymentNoticePage({
         table.bank-table .bank-header td { font-weight: bold; }
       `}</style>
 
-      <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
-        <DownloadPdfButton castId={cast_id} from={from} to={to} noticeId={content.id} />
-      </div>
+      {!hide_download && content.id !== null && (
+        <div className="no-print" style={{ maxWidth: '210mm', margin: '0 auto', padding: '16px', display: 'flex', justifyContent: 'flex-end', gap: 8 }}>
+          <DownloadPdfButton castId={cast_id} from={from} to={to} noticeId={content.id} />
+        </div>
+      )}
 
       <div className="notice-page">
         <div className="notice-title-row">

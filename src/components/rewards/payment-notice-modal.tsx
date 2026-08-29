@@ -18,11 +18,14 @@ interface Props {
   variant?: VariantProps<typeof buttonVariants>['variant']
   size?: VariantProps<typeof buttonVariants>['size']
   className?: string
+  /** 支払通知書の発行（作成）一覧からのプレビューなど、ダウンロード操作が不要な場面で指定する */
+  hideDownload?: boolean
 }
 
-export function PaymentNoticeButton({ castId, from, to, noticeId, label, variant = 'ghost', size = 'sm', className }: Props) {
+export function PaymentNoticeButton({ castId, from, to, noticeId, label, variant = 'ghost', size = 'sm', className, hideDownload }: Props) {
   const [open, setOpen] = useState(false)
   const noticeParam = noticeId ? `&notice_id=${noticeId}` : ''
+  const hideDownloadParam = hideDownload ? '&hide_download=1' : ''
 
   return (
     <>
@@ -34,7 +37,7 @@ export function PaymentNoticeButton({ castId, from, to, noticeId, label, variant
           <DialogTitle className="sr-only">支払通知書</DialogTitle>
           {open && (
             <iframe
-              src={`/admin/rewards/notice?cast_id=${castId}&from=${from}&to=${to}${noticeParam}`}
+              src={`/admin/rewards/notice?cast_id=${castId}&from=${from}&to=${to}${noticeParam}${hideDownloadParam}`}
               title="支払通知書"
               className="w-full h-full border-0 rounded-xl"
             />

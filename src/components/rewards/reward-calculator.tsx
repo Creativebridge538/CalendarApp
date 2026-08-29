@@ -265,7 +265,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
                   )}
                 </TableCell>
                 <TableCell className="text-right">
-                  <PaymentNoticeButton castId={r.cast.id} from={from} to={to} label="プレビュー" />
+                  <PaymentNoticeButton castId={r.cast.id} from={from} to={to} label="プレビュー" hideDownload />
                 </TableCell>
               </TableRow>
             ))}
