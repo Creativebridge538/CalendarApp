@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/current-user'
 import { getNoticeSnapshotById } from '@/lib/payment-notice-data'
+import { parseNoticeItemConfig } from '@/lib/notice-template'
 import type { Json } from '@/lib/supabase/database.types'
 
 // 発行済み支払通知書（スナップショット）の内容取得・編集。キャストへの表示内容そのものを
@@ -36,7 +37,7 @@ export async function PATCH(request: Request) {
   const {
     id,
     cast_name, cast_real_name, bank_name, bank_branch, bank_account_number, bank_account_holder,
-    reward_rate, sales_rows, bonus, deduction, custom_items, show_sales_total, show_reward_rate,
+    reward_rate, sales_rows, bonus, deduction, custom_items, item_config, header_text, footer_text,
   } = body
 
   if (!id) return NextResponse.json({ error: 'id は必須です' }, { status: 400 })
@@ -69,6 +70,9 @@ export async function PATCH(request: Request) {
     : existing.customItems
   const customItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
   const totalReward = baseReward + nextBonus - nextDeduction + customItemsTotal
+  const nextItemConfig = Array.isArray(item_config) ? parseNoticeItemConfig(item_config) : existing.itemConfig
+  const nextHeaderText = header_text !== undefined ? (header_text || null) : existing.headerText
+  const nextFooterText = footer_text !== undefined ? (footer_text || null) : existing.footerText
 
   // payment_noticesへの書き込みはservice_role専用（RLSでadmin/castともにwriteポリシーがない）
   // ため、通常のセッションクライアントでupdateすると0件更新のまま成功扱いになってしまう
@@ -84,8 +88,8 @@ export async function PATCH(request: Request) {
     sales_rows: nextSalesRows as unknown as Json, sales_total: salesTotal, base_reward: baseReward,
     bonus: nextBonus, deduction: nextDeduction,
     custom_items: nextCustomItems as unknown as Json, total_reward: totalReward,
-    show_sales_total: show_sales_total ?? existing.showSalesTotal,
-    show_reward_rate: show_reward_rate ?? existing.showRewardRate,
+    item_config: nextItemConfig as unknown as Json,
+    header_text: nextHeaderText, footer_text: nextFooterText,
     manually_edited: true,
   }).eq('store_id', profile.store_id).eq('id', id).select('id')
 

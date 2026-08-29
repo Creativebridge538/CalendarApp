@@ -290,9 +290,12 @@ export type Database = {
           cast_real_name: string
           custom_items: Json
           deduction: number
+          footer_text: string | null
+          header_text: string | null
           id: string
           issued_at: string
           issued_by: string | null
+          item_config: Json
           logo_url: string | null
           manually_edited: boolean
           period_from: string
@@ -300,8 +303,6 @@ export type Database = {
           reward_rate: number
           sales_rows: Json
           sales_total: number
-          show_reward_rate: boolean
-          show_sales_total: boolean
           store_id: string
           store_name: string
           total_reward: number
@@ -318,9 +319,12 @@ export type Database = {
           cast_real_name: string
           custom_items?: Json
           deduction: number
+          footer_text?: string | null
+          header_text?: string | null
           id?: string
           issued_at?: string
           issued_by?: string | null
+          item_config?: Json
           logo_url?: string | null
           manually_edited?: boolean
           period_from: string
@@ -328,8 +332,6 @@ export type Database = {
           reward_rate: number
           sales_rows: Json
           sales_total: number
-          show_reward_rate?: boolean
-          show_sales_total?: boolean
           store_id: string
           store_name: string
           total_reward: number
@@ -346,9 +348,12 @@ export type Database = {
           cast_real_name?: string
           custom_items?: Json
           deduction?: number
+          footer_text?: string | null
+          header_text?: string | null
           id?: string
           issued_at?: string
           issued_by?: string | null
+          item_config?: Json
           logo_url?: string | null
           manually_edited?: boolean
           period_from?: string
@@ -356,8 +361,6 @@ export type Database = {
           reward_rate?: number
           sales_rows?: Json
           sales_total?: number
-          show_reward_rate?: boolean
-          show_sales_total?: boolean
           store_id?: string
           store_name?: string
           total_reward?: number
@@ -915,8 +918,9 @@ export type Database = {
           id: string
           location_mode: string
           logo_url: string | null
-          notice_show_reward_rate: boolean
-          notice_show_sales_total: boolean
+          notice_footer_text: string | null
+          notice_header_text: string | null
+          notice_item_config: Json
           platform_settings: Json
           room_label: string
           store_id: string
@@ -935,8 +939,9 @@ export type Database = {
           id?: string
           location_mode?: string
           logo_url?: string | null
-          notice_show_reward_rate?: boolean
-          notice_show_sales_total?: boolean
+          notice_footer_text?: string | null
+          notice_header_text?: string | null
+          notice_item_config?: Json
           platform_settings?: Json
           room_label?: string
           store_id: string
@@ -955,8 +960,9 @@ export type Database = {
           id?: string
           location_mode?: string
           logo_url?: string | null
-          notice_show_reward_rate?: boolean
-          notice_show_sales_total?: boolean
+          notice_footer_text?: string | null
+          notice_header_text?: string | null
+          notice_item_config?: Json
           platform_settings?: Json
           room_label?: string
           store_id?: string

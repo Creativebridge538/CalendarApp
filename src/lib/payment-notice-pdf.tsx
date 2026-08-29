@@ -2,7 +2,8 @@ import { Document, Page, Text, View, StyleSheet, Font } from '@react-pdf/rendere
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import path from 'path'
-import type { NoticeContent } from './payment-notice-data'
+import { buildNoticeSummaryRows, type NoticeContent } from './payment-notice-data'
+import { DEFAULT_NOTICE_FOOTER_TEXT } from './notice-template'
 
 let fontRegistered = false
 function ensureFont() {
@@ -77,14 +78,12 @@ const styles = StyleSheet.create({
 export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; issuedAt: string }) {
   ensureFont()
   const {
-    castName, castRealName, storeName, from, to, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward,
-    bankName, bankBranch, bankAccountNumber, bankAccountHolder, customItems, dailySettledAmount, showSalesTotal, showRewardRate,
+    castName, castRealName, storeName, from, to, salesRows, totalReward,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder, headerText, footerText,
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   const hasFxRow = salesRows.some(s => s.fxRate != null)
-  // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
-  const taxExcluded = Math.floor(totalReward / 1.1)
-  const taxAmount = totalReward - taxExcluded
+  const summaryRows = buildNoticeSummaryRows(content)
 
   return (
     <Document>
@@ -98,6 +97,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
           <View>
             <Text style={styles.castName}>{castRealName || castName} 様</Text>
             <Text style={styles.periodNote}>{periodLabel} のお支払い明細をお送りいたします。</Text>
+            {headerText && <Text style={styles.periodNote}>{headerText}</Text>}
           </View>
           <Text style={styles.storeName}>{storeName}</Text>
         </View>
@@ -109,24 +109,9 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
         <Text style={styles.taxNote}>※上記金額は消費税10%を含みます（内税）</Text>
 
         <View style={styles.summaryTable}>
-          {showSalesTotal && <View style={styles.summaryRow}><Text>売上合計</Text><Text>¥{salesTotal.toLocaleString()}</Text></View>}
-          {showRewardRate && <View style={styles.summaryRow}><Text>報酬率</Text><Text>{(rewardRate * 100).toFixed(1)}%</Text></View>}
-          <View style={styles.summaryRow}><Text>基本報酬</Text><Text>¥{baseReward.toLocaleString()}</Text></View>
-          {bonus !== 0 && <View style={styles.summaryRow}><Text>ボーナス</Text><Text>+¥{bonus.toLocaleString()}</Text></View>}
-          {deduction !== 0 && <View style={styles.summaryRow}><Text>控除</Text><Text>-¥{deduction.toLocaleString()}</Text></View>}
-          {customItems.map((item, i) => (
-            <View key={i} style={styles.summaryRow}>
-              <Text>{item.label}</Text>
-              <Text>{item.amount >= 0 ? '+' : ''}¥{item.amount.toLocaleString()}</Text>
-            </View>
+          {summaryRows.map((row, i) => (
+            <View key={i} style={styles.summaryRow}><Text>{row.label}</Text><Text>{row.text}</Text></View>
           ))}
-          <View style={styles.summaryRow}>
-            <Text>うち消費税（10%内税）</Text>
-            <Text>¥{taxAmount.toLocaleString()}</Text>
-          </View>
-          {dailySettledAmount > 0 && (
-            <View style={styles.summaryRow}><Text>精算済み金額（参考）</Text><Text>¥{dailySettledAmount.toLocaleString()}</Text></View>
-          )}
           <View style={styles.summaryFinalRow}>
             <Text>合計お支払額（10%内税）</Text><Text>¥{totalReward.toLocaleString()}</Text>
           </View>
@@ -179,10 +164,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
           </View>
         )}
 
-        <Text style={styles.footer}>
-          ※本明細に関するお問い合わせは店舗管理者までご連絡ください{'\n'}
-          ※本支払通知書の受領後、1週間以内に記載内容に誤りがある旨のご連絡がない場合は、記載内容のとおりご確認いただいたものとみなします。
-        </Text>
+        <Text style={styles.footer}>{footerText || DEFAULT_NOTICE_FOOTER_TEXT}</Text>
       </Page>
     </Document>
   )

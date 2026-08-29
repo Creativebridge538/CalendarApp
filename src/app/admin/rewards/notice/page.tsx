@@ -4,7 +4,8 @@ import { redirect } from 'next/navigation'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { DownloadPdfButton } from './download-button'
-import { fetchNoticeContent, getNoticeSnapshotById, getLatestNoticeSnapshot } from '@/lib/payment-notice-data'
+import { fetchNoticeContent, getNoticeSnapshotById, getLatestNoticeSnapshot, buildNoticeSummaryRows } from '@/lib/payment-notice-data'
+import { DEFAULT_NOTICE_FOOTER_TEXT } from '@/lib/notice-template'
 
 export default async function PaymentNoticePage({
   searchParams,
@@ -45,17 +46,15 @@ export default async function PaymentNoticePage({
   }
 
   const {
-    castName, castRealName, logoUrl, rewardRate, salesRows, salesTotal, baseReward, bonus, deduction, totalReward,
-    bankName, bankBranch, bankAccountNumber, bankAccountHolder, customItems, dailySettledAmount, showSalesTotal, showRewardRate,
+    castName, castRealName, logoUrl, salesRows, totalReward,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder, headerText, footerText,
   } = content
   const store = { name: content.storeName }
   const settings = { logo_url: logoUrl }
 
   const hasFxRow = salesRows.some(s => s.fxRate != null)
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
-  // 合計お支払額は消費税10%を含む金額として扱い、内訳表示用に税抜額と税額を逆算する
-  const taxExcluded = Math.floor(totalReward / 1.1)
-  const taxAmount = totalReward - taxExcluded
+  const summaryRows = buildNoticeSummaryRows(content)
 
   return (
     <div style={{ background: '#eef0f2', minHeight: '100vh' }}>
@@ -119,6 +118,7 @@ export default async function PaymentNoticePage({
           <div>
             <div style={{ fontSize: 18, fontWeight: 'bold' }}>{castRealName || castName} 様</div>
             <div style={{ fontSize: 12, color: '#555', marginTop: 6 }}>{periodLabel} のお支払い明細をお送りいたします。</div>
+            {headerText && <div style={{ fontSize: 12, color: '#555', marginTop: 6, whiteSpace: 'pre-wrap' }}>{headerText}</div>}
           </div>
           <div className="notice-issuer">
             {settings?.logo_url && (
@@ -137,21 +137,9 @@ export default async function PaymentNoticePage({
 
         <table className="summary-table">
           <tbody>
-            {showSalesTotal && <tr><td>売上合計</td><td className="right">¥{salesTotal.toLocaleString()}</td></tr>}
-            {showRewardRate && <tr><td>報酬率</td><td className="right">{(rewardRate * 100).toFixed(1)}%</td></tr>}
-            <tr><td>基本報酬</td><td className="right">¥{baseReward.toLocaleString()}</td></tr>
-            {bonus !== 0 && <tr><td>ボーナス</td><td className="right">+¥{bonus.toLocaleString()}</td></tr>}
-            {deduction !== 0 && <tr><td>控除</td><td className="right">-¥{deduction.toLocaleString()}</td></tr>}
-            {customItems.map((item, i) => (
-              <tr key={i}>
-                <td>{item.label}</td>
-                <td className="right">{item.amount >= 0 ? '+' : ''}¥{item.amount.toLocaleString()}</td>
-              </tr>
+            {summaryRows.map((row, i) => (
+              <tr key={i}><td>{row.label}</td><td className="right">{row.text}</td></tr>
             ))}
-            <tr><td>うち消費税（10%内税）</td><td className="right">¥{taxAmount.toLocaleString()}</td></tr>
-            {dailySettledAmount > 0 && (
-              <tr><td>精算済み金額（参考）</td><td className="right">¥{dailySettledAmount.toLocaleString()}</td></tr>
-            )}
             <tr className="final-row"><td>合計お支払額（10%内税）</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
           </tbody>
         </table>
@@ -220,9 +208,8 @@ export default async function PaymentNoticePage({
           </table>
         )}
 
-        <div style={{ fontSize: 11, color: '#555', paddingTop: 8, borderTop: '1px dotted #ccc' }}>
-          ※本明細に関するお問い合わせは店舗管理者までご連絡ください<br />
-          ※本支払通知書の受領後、1週間以内に記載内容に誤りがある旨のご連絡がない場合は、記載内容のとおりご確認いただいたものとみなします。
+        <div style={{ fontSize: 11, color: '#555', paddingTop: 8, borderTop: '1px dotted #ccc', whiteSpace: 'pre-wrap' }}>
+          {footerText || DEFAULT_NOTICE_FOOTER_TEXT}
         </div>
       </div>
     </div>

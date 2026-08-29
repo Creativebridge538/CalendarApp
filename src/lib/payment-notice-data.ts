@@ -1,5 +1,7 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from './reward-rate'
+import { parseNoticeItemConfig, type NoticeItemConfigEntry } from './notice-template'
+import type { Json } from './supabase/database.types'
 
 const PLATFORM_LABEL: Record<string, string> = {
   manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
@@ -30,8 +32,9 @@ export interface NoticeContent {
   dailySettledAmount: number
   customItems: CustomItem[]
   totalReward: number
-  showSalesTotal: boolean
-  showRewardRate: boolean
+  itemConfig: NoticeItemConfigEntry[]
+  headerText: string | null
+  footerText: string | null
   /** 管理者が「編集」機能で内容を補正済みかどうか（一覧でのバッジ表示用） */
   manuallyEdited: boolean
 }
@@ -41,7 +44,7 @@ export interface NoticeContent {
 export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }, { data: platformProfiles }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
-    supabase.from('store_settings').select('logo_url, notice_show_sales_total, notice_show_reward_rate').eq('store_id', storeId).single(),
+    supabase.from('store_settings').select('logo_url, notice_item_config, notice_header_text, notice_footer_text').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
     supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction, fx_rate_snapshot, usd_amount, custom_items')
       .eq('cast_id', castId).eq('store_id', storeId)
@@ -98,8 +101,9 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     from, to, rewardRate,
     salesRows,
     salesTotal, baseReward, bonus, deduction, dailySettledAmount, customItems, totalReward,
-    showSalesTotal: settings?.notice_show_sales_total ?? true,
-    showRewardRate: settings?.notice_show_reward_rate ?? true,
+    itemConfig: parseNoticeItemConfig(settings?.notice_item_config),
+    headerText: settings?.notice_header_text ?? null,
+    footerText: settings?.notice_footer_text ?? null,
   }
 }
 
@@ -112,7 +116,7 @@ function mapNoticeRow(data: {
   sales_total: number; base_reward: number; bonus: number; deduction: number
   custom_items: unknown
   total_reward: number
-  show_sales_total: boolean; show_reward_rate: boolean
+  item_config: unknown; header_text: string | null; footer_text: string | null
   manually_edited: boolean
 }): NoticeContent {
   // 古い発行済み通知書には fxRate/usdAmount が保存されていないため、欠けている場合はnull扱いにする
@@ -134,7 +138,8 @@ function mapNoticeRow(data: {
     dailySettledAmount: salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + (s.reward ?? 0), 0),
     customItems: (data.custom_items as CustomItem[] | null) ?? [],
     totalReward: Number(data.total_reward),
-    showSalesTotal: data.show_sales_total, showRewardRate: data.show_reward_rate,
+    itemConfig: parseNoticeItemConfig(data.item_config),
+    headerText: data.header_text, footerText: data.footer_text,
   }
 }
 
@@ -179,8 +184,51 @@ export async function createNoticeSnapshot(supabase: SupabaseClient<any>, storeI
     sales_total: content.salesTotal, base_reward: content.baseReward,
     bonus: content.bonus, deduction: content.deduction,
     custom_items: content.customItems, total_reward: totalReward,
-    show_sales_total: content.showSalesTotal, show_reward_rate: content.showRewardRate,
+    item_config: content.itemConfig as unknown as Json, header_text: content.headerText, footer_text: content.footerText,
   }).select('id').single()
+}
+
+export interface NoticeSummaryRow { label: string; text: string }
+
+// 支払通知書の内訳テーブル（最終行の「合計お支払額」を除く）を、店舗のitemConfig設定
+// （並び順・表示ON/OFF・ラベル）に基づいて組み立てる。PDF/HTML両方の表示で共通利用する
+export function buildNoticeSummaryRows(content: NoticeContent): NoticeSummaryRow[] {
+  const { itemConfig, salesTotal, rewardRate, baseReward, bonus, deduction, customItems, dailySettledAmount, totalReward } = content
+  const taxExcluded = Math.floor(totalReward / 1.1)
+  const taxAmount = totalReward - taxExcluded
+  const rows: NoticeSummaryRow[] = []
+  for (const entry of itemConfig) {
+    if (!entry.visible) continue
+    switch (entry.key) {
+      case 'sales_total':
+        rows.push({ label: entry.label, text: `¥${salesTotal.toLocaleString()}` })
+        break
+      case 'reward_rate':
+        rows.push({ label: entry.label, text: `${(rewardRate * 100).toFixed(1)}%` })
+        break
+      case 'base_reward':
+        rows.push({ label: entry.label, text: `¥${baseReward.toLocaleString()}` })
+        break
+      case 'bonus':
+        if (bonus !== 0) rows.push({ label: entry.label, text: `+¥${bonus.toLocaleString()}` })
+        break
+      case 'deduction':
+        if (deduction !== 0) rows.push({ label: entry.label, text: `-¥${deduction.toLocaleString()}` })
+        break
+      case 'custom_items':
+        for (const item of customItems) {
+          rows.push({ label: item.label, text: `${item.amount >= 0 ? '+' : ''}¥${item.amount.toLocaleString()}` })
+        }
+        break
+      case 'tax_breakdown':
+        rows.push({ label: entry.label, text: `¥${taxAmount.toLocaleString()}` })
+        break
+      case 'daily_settled':
+        if (dailySettledAmount > 0) rows.push({ label: entry.label, text: `¥${dailySettledAmount.toLocaleString()}` })
+        break
+    }
+  }
+  return rows
 }
 
 // 例: 20260801-20260815_55000_山田太郎_支払通知書.pdf（対象期間(開始日-終了日)_支払額_本名(または源氏名)）

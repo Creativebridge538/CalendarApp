@@ -20,6 +20,7 @@ import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
+import { DEFAULT_NOTICE_ITEM_CONFIG, type NoticeItemConfigEntry } from '@/lib/notice-template'
 
 interface Notice {
   id: string
@@ -61,9 +62,13 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTe
   const [editTarget, setEditTarget] = useState<Notice | null>(null)
   const [editLoading, setEditLoading] = useState(false)
   const [editSaving, setEditSaving] = useState(false)
-  const [editForm, setEditForm] = useState({
+  const [editForm, setEditForm] = useState<{
+    cast_name: string; cast_real_name: string; bank_name: string; bank_branch: string
+    bank_account_number: string; bank_account_holder: string
+    reward_rate: string; bonus: string; deduction: string; item_config: NoticeItemConfigEntry[]
+  }>({
     cast_name: '', cast_real_name: '', bank_name: '', bank_branch: '', bank_account_number: '', bank_account_holder: '',
-    reward_rate: '', bonus: '', deduction: '', show_sales_total: true, show_reward_rate: true,
+    reward_rate: '', bonus: '', deduction: '', item_config: DEFAULT_NOTICE_ITEM_CONFIG,
   })
   const [editCustomItems, setEditCustomItems] = useState<{ templateId: string; label: string; unit: string; rawUnits: string; amount: string }[]>([])
   const [editSalesRows, setEditSalesRows] = useState<{ date: string; platformLabel: string; amount: string; reward: string; isDailyPayment: boolean }[]>([])
@@ -105,7 +110,7 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTe
       bank_name: c.bankName, bank_branch: c.bankBranch,
       bank_account_number: c.bankAccountNumber, bank_account_holder: c.bankAccountHolder,
       reward_rate: String(Number(c.rewardRate) * 100), bonus: String(c.bonus), deduction: String(c.deduction),
-      show_sales_total: c.showSalesTotal, show_reward_rate: c.showRewardRate,
+      item_config: c.itemConfig ?? DEFAULT_NOTICE_ITEM_CONFIG,
     })
     setEditCustomItems((c.customItems ?? []).map((i: { label: string; amount: number }) => ({ templateId: '', label: i.label, unit: 'jpy', rawUnits: '', amount: String(i.amount) })))
     setEditSalesRows((c.salesRows ?? []).map((r: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean }) => ({
@@ -513,14 +518,18 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTe
 
               <div className="space-y-2 pt-2 border-t">
                 <Label className="text-xs text-muted-foreground font-normal">表示設定</Label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={editForm.show_sales_total} onCheckedChange={v => setEditForm({ ...editForm, show_sales_total: !!v })} />
-                  売上合計を通知書に載せる
-                </label>
-                <label className="flex items-center gap-2 text-sm">
-                  <Checkbox checked={editForm.show_reward_rate} onCheckedChange={v => setEditForm({ ...editForm, show_reward_rate: !!v })} />
-                  報酬率を通知書に載せる
-                </label>
+                {editForm.item_config.map((entry, i) => (
+                  <label key={entry.key} className="flex items-center gap-2 text-sm">
+                    <Checkbox
+                      checked={entry.visible}
+                      onCheckedChange={v => setEditForm({
+                        ...editForm,
+                        item_config: editForm.item_config.map((e, idx) => idx === i ? { ...e, visible: !!v } : e),
+                      })}
+                    />
+                    {entry.label}を通知書に載せる
+                  </label>
+                ))}
               </div>
 
               <div className="flex justify-end gap-2 pt-2">
