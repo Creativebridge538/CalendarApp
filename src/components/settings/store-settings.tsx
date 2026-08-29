@@ -401,8 +401,8 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
                 )}
                 <p className="text-xs text-muted-foreground">
                   {deadlineType === 'monthly'
-                    ? `毎月${deadlineDay}日になった時点で、その月が終わるまでシフトの新規提出・編集ができなくなります（翌月1日にリセット）`
-                    : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日になった時点で、${WEEKDAY_LABELS[(Number(deadlineWeekStartDay) + 6) % 7]}曜日まで新規提出・編集ができなくなります（次の${WEEKDAY_LABELS[Number(deadlineWeekStartDay)]}曜日にリセット）`}
+                    ? `毎月${deadlineDay}日まではその月の翌月分のシフトのみ、${deadlineDay}日を過ぎたら翌々月分のシフトのみ新規提出できます`
+                    : `毎週${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出でき、${WEEKDAY_LABELS[Number(deadlineDay)]}曜日を過ぎたら次の${WEEKDAY_LABELS[Number(deadlineDay)]}曜日からの7日間のみ新規提出できます`}
                 </p>
               </div>
               <div className="flex items-center justify-between">

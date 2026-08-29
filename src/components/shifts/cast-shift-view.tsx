@@ -383,19 +383,36 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   const thisMonthKey = format(new Date(), 'yyyy-MM')
   const submittedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'submitted').length
   const confirmedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'confirmed').length
-  // 締切を過ぎたら新規シフトの提出をブロックする。
-  // monthly: 毎月deadline_day以降は月末までブロック(翌月1日にリセット)。
-  // weekly: 週の起点(deadline_week_start_day)からdeadline_day(曜日)以降〜次の起点前日までブロック(次の起点でリセット)。
-  const isPastDeadline = (() => {
-    if (!settings || settings.deadline_type === 'none') return false
+  // 新規シフトを提出できる期間を締切ルールから計算する。常に「その時点で提出対象となる1つの期間」だけが開いており、
+  // それ以外の日付は提出できない（全面ブロックではなく、期間そのものがスライドしていくイメージ）。
+  // weekly: 締め切り曜日から7日間のみ提出可能。締め切り曜日を過ぎたら次の締め切り曜日からの7日間に切り替わる
+  // monthly: 締切日までは翌月のみ提出可能。締切日を過ぎたら翌々月のみ提出可能に切り替わる
+  const submissionWindow = (() => {
+    if (!settings || settings.deadline_type === 'none') return null
     const now = new Date()
-    if (settings.deadline_type === 'monthly') return now.getDate() >= settings.deadline_day
-    if (settings.deadline_type === 'weekly') {
-      const offsetFromWeekStart = (d: number) => (d - settings.deadline_week_start_day + 7) % 7
-      return offsetFromWeekStart(now.getDay()) >= offsetFromWeekStart(settings.deadline_day)
+    now.setHours(0, 0, 0, 0)
+    if (settings.deadline_type === 'monthly') {
+      const monthsAhead = now.getDate() > settings.deadline_day ? 2 : 1
+      const start = new Date(now.getFullYear(), now.getMonth() + monthsAhead, 1)
+      const end = new Date(now.getFullYear(), now.getMonth() + monthsAhead + 1, 0)
+      return { start, end }
     }
-    return false
+    if (settings.deadline_type === 'weekly') {
+      const daysSinceDeadline = (now.getDay() - settings.deadline_day + 7) % 7
+      const start = addDays(now, (7 - daysSinceDeadline) % 7)
+      const end = addDays(start, 6)
+      return { start, end }
+    }
+    return null
   })()
+  function isDateAllowed(dateStr: string): boolean {
+    if (!submissionWindow) return true
+    const target = new Date(`${dateStr}T00:00:00`)
+    return target >= submissionWindow.start && target <= submissionWindow.end
+  }
+  const submissionWindowLabel = submissionWindow
+    ? `${format(submissionWindow.start, 'M/d(E)', { locale: ja })}〜${format(submissionWindow.end, 'M/d(E)', { locale: ja })}`
+    : null
   const locationMode = settings?.location_mode ?? 'room'
   const areaLabel = settings?.area_label ?? 'エリア'
   const roomLabel = settings?.room_label ?? 'ルーム'
@@ -562,7 +579,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   }
 
   async function handleSave() {
-    if (!editing && isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); return }
+    if (!editing && !isDateAllowed(form.date)) { toast.error(`シフトを提出できるのは ${submissionWindowLabel} の期間のみです`); return }
     const payload = {
       cast_id: castId,
       date: form.date,
@@ -606,9 +623,15 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   }
 
   async function handleBulkSave() {
-    if (isPastDeadline) { toast.error('シフト提出の締切を過ぎています。管理者にお問い合わせください'); return }
-    const dates = Array.from(bulkDates).sort()
-    if (dates.length === 0) return
+    const allDates = Array.from(bulkDates).sort()
+    const dates = allDates.filter(isDateAllowed)
+    if (dates.length === 0) {
+      toast.error(submissionWindowLabel ? `シフトを提出できるのは ${submissionWindowLabel} の期間のみです` : '日付を選んでください')
+      return
+    }
+    if (dates.length < allDates.length) {
+      toast.error(`${submissionWindowLabel} の期間外の日付は除外して提出します`)
+    }
     setBulkSaving(true)
     const payload = dates.map(date => {
       const t = bulkTimes[date] ?? bulkTemplates[0]
@@ -1373,12 +1396,19 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
         <DialogContent>
           <DialogHeader><DialogTitle>{editing ? 'シフト編集' : 'シフト提出'}</DialogTitle></DialogHeader>
           <div className="space-y-4 mt-2">
-            {!editing && isPastDeadline && (
-              <div className="px-3 py-2 rounded-lg border border-destructive/30 bg-destructive/10 text-xs text-destructive">
-                シフト提出の締切を過ぎています。このまま提出はできません。管理者にお問い合わせください
+            {!editing && submissionWindow && (
+              <div className="px-3 py-2 rounded-lg border text-xs text-muted-foreground">
+                現在シフトを提出できるのは {submissionWindowLabel} の期間のみです
               </div>
             )}
-            <div className="space-y-1.5"><Label required>日付</Label><Input type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} /></div>
+            <div className="space-y-1.5">
+              <Label required>日付</Label>
+              <Input
+                type="date" value={form.date} onChange={e => setForm({ ...form, date: e.target.value })}
+                min={!editing && submissionWindow ? format(submissionWindow.start, 'yyyy-MM-dd') : undefined}
+                max={!editing && submissionWindow ? format(submissionWindow.end, 'yyyy-MM-dd') : undefined}
+              />
+            </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               <div className="space-y-1.5 min-w-0"><Label>開始時間</Label><Input type="time" value={form.start_time} onChange={e => setForm({ ...form, start_time: e.target.value })} /></div>
               <div className="space-y-1.5 min-w-0"><Label>終了時間</Label><Input type="time" value={form.end_time} onChange={e => setForm({ ...form, end_time: e.target.value })} /></div>
@@ -1461,9 +1491,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
         <DialogContent variant="sheet" onDismiss={() => setBulkSheetOpen(false)}>
           <DialogHeader><DialogTitle>まとめてシフト提出</DialogTitle></DialogHeader>
           <div className="space-y-5 mt-2">
-            {isPastDeadline && (
-              <div className="px-3 py-2 rounded-lg border border-destructive/30 bg-destructive/10 text-xs text-destructive">
-                シフト提出の締切を過ぎています。このまま提出はできません。管理者にお問い合わせください
+            {submissionWindow && (
+              <div className="px-3 py-2 rounded-lg border text-xs text-muted-foreground">
+                現在シフトを提出できるのは {submissionWindowLabel} の期間のみです
               </div>
             )}
             <div>
