@@ -516,6 +516,7 @@ export type Database = {
           fx_rate_snapshot: number | null
           id: string
           is_daily_payment: boolean
+          manual_label: string | null
           notes: string | null
           platform: string
           rate_override: number | null
@@ -539,6 +540,7 @@ export type Database = {
           fx_rate_snapshot?: number | null
           id?: string
           is_daily_payment?: boolean
+          manual_label?: string | null
           notes?: string | null
           platform?: string
           rate_override?: number | null
@@ -562,6 +564,7 @@ export type Database = {
           fx_rate_snapshot?: number | null
           id?: string
           is_daily_payment?: boolean
+          manual_label?: string | null
           notes?: string | null
           platform?: string
           rate_override?: number | null
