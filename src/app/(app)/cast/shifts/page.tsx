@@ -24,7 +24,10 @@ export default async function CastShiftsPage() {
     supabase.from('store_settings').select('*').eq('store_id', profile.store_id).single(),
     supabase.from('shift_checklist_items').select('id, label, item_type, options').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
     supabase.from('stores').select('name').eq('id', profile.store_id).single(),
-    getMonthToDateSummary(supabase, user.id),
+    getMonthToDateSummary(supabase, user.id, {
+      reward_rate: profile.reward_rate, platform_reward_rates: profile.platform_reward_rates,
+      daily_payment_reward_rate: profile.daily_payment_reward_rate, platform_daily_payment_reward_rates: profile.platform_daily_payment_reward_rates,
+    }),
     supabase.from('sales').select('date, amount, platform, shift_id, is_daily_payment, reward_rate_override, custom_items').eq('cast_id', user.id),
     supabase.from('notice_item_templates').select('label').eq('store_id', profile.store_id).eq('include_in_sales', true),
   ])
