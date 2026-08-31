@@ -1,7 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
-import { eachDayOfInterval, parseISO, format, addDays, startOfWeek } from 'date-fns'
+import { eachDayOfInterval, format, addDays, startOfWeek } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -97,13 +97,7 @@ export function ShiftTimeline({ shifts, areas, rooms, locationMode, areaLabel, r
 
   const [activeTab, setActiveTab] = useState('all')
 
-  const [startDate, setStartDate] = useState<Date>(() => {
-    if (shifts.length > 0) {
-      const earliest = [...shifts].map(s => s.date).sort()[0]
-      return startOfWeek(parseISO(earliest), { weekStartsOn: 1 })
-    }
-    return startOfWeek(new Date(), { weekStartsOn: 1 })
-  })
+  const [startDate, setStartDate] = useState<Date>(() => startOfWeek(new Date(), { weekStartsOn: 1 }))
 
   const filteredShifts = useMemo(() => {
     if (activeTab === 'all') return shifts
