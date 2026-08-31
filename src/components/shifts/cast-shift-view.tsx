@@ -374,15 +374,27 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     router.push('/login')
     router.refresh()
   }
-  const rewardDelta = rewardSummary.prevMonthToDateTotal > 0
-    ? ((rewardSummary.thisMonthTotal - rewardSummary.prevMonthToDateTotal) / rewardSummary.prevMonthToDateTotal) * 100
-    : null
+  // 「◯月の売上」はカレンダーで見ている月に連動させる（今月とは限らない）
+  const viewedMonthKey = format(calAnchor, 'yyyy-MM')
+  const isViewingCurrentMonth = viewedMonthKey === format(new Date(), 'yyyy-MM')
+  const viewedMonthLabel = format(calAnchor, 'M月', { locale: ja })
+  const viewedMonthTotal = Object.entries(amountByDate)
+    .filter(([date]) => date.startsWith(viewedMonthKey))
+    .reduce((sum, [, amount]) => sum + amount, 0)
+  const prevMonthKey = format(subMonths(calAnchor, 1), 'yyyy-MM')
+  const prevMonthTotal = Object.entries(amountByDate)
+    .filter(([date]) => date.startsWith(prevMonthKey))
+    .reduce((sum, [, amount]) => sum + amount, 0)
+  const rewardDelta = isViewingCurrentMonth
+    ? (rewardSummary.prevMonthToDateTotal > 0
+      ? ((rewardSummary.thisMonthTotal - rewardSummary.prevMonthToDateTotal) / rewardSummary.prevMonthToDateTotal) * 100
+      : null)
+    : (prevMonthTotal > 0 ? ((viewedMonthTotal - prevMonthTotal) / prevMonthTotal) * 100 : null)
   const rewardGoalProgress = rewardSummary.monthlyGoal && rewardSummary.monthlyGoal > 0
-    ? Math.min(100, (rewardSummary.thisMonthTotal / rewardSummary.monthlyGoal) * 100)
+    ? Math.min(100, (viewedMonthTotal / rewardSummary.monthlyGoal) * 100)
     : null
-  const thisMonthKey = format(new Date(), 'yyyy-MM')
-  const submittedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'submitted').length
-  const confirmedCountThisMonth = shifts.filter(s => s.date.startsWith(thisMonthKey) && s.status === 'confirmed').length
+  const submittedCountThisMonth = shifts.filter(s => s.date.startsWith(viewedMonthKey) && s.status === 'submitted').length
+  const confirmedCountThisMonth = shifts.filter(s => s.date.startsWith(viewedMonthKey) && s.status === 'confirmed').length
   // 新規シフトを提出できる期間を締切ルールから計算する。常に「その時点で提出対象となる1つの期間」だけが開いており、
   // それ以外の日付は提出できない（全面ブロックではなく、期間そのものがスライドしていくイメージ）。
   // weekly: 締め切り曜日の翌日から7日間のみ提出可能。締め切り曜日を過ぎたら次の締め切り曜日の翌日からの7日間に切り替わる
@@ -911,9 +923,9 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                 className="flex items-center gap-3 mx-4 md:mx-0 mb-3 px-3 py-2.5 rounded-lg border hover:bg-muted/40 transition-colors"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="text-[10px] text-muted-foreground">{rewardSummary.monthLabel}ここまでの売上</p>
+                  <p className="text-[10px] text-muted-foreground">{isViewingCurrentMonth ? `${viewedMonthLabel}ここまでの売上` : `${viewedMonthLabel}の売上`}</p>
                   <div className="flex items-baseline gap-1.5 flex-wrap">
-                    <p className="text-base font-bold tabular-nums">¥{rewardSummary.thisMonthTotal.toLocaleString()}</p>
+                    <p className="text-base font-bold tabular-nums">¥{viewedMonthTotal.toLocaleString()}</p>
                     {rewardDelta != null && (
                       <span className={cn(
                         'text-[10px] font-semibold',
