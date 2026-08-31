@@ -1149,24 +1149,24 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 {castOptions.map(o => <option key={o.key} value={o.label} />)}
               </datalist>
 
-              <div className="overflow-auto border rounded-lg max-h-[45vh]">
+              <div className="overflow-auto border rounded-lg max-h-[55vh]">
                 <table className="w-full text-sm border-collapse">
                   <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="bg-muted/50">
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-32">日付</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
-                      {enabledPlatforms.length > 0 && <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>}
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">日付</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">キャスト</th>
+                      {enabledPlatforms.length > 0 && <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">プラットフォーム</th>}
+                      <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">金額/数量</th>
                       {itemTemplates.map(t => (
-                        <th key={t.id} className="text-left font-medium px-2 py-1.5 border-b w-24">
+                        <th key={t.id} className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">
                           {t.label}（{NOTICE_ITEM_UNIT_LABEL[t.unit] ?? t.unit}）
                         </th>
                       ))}
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">売上</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
-                      {bonusFieldVisible && <th className="text-left font-medium px-2 py-1.5 border-b w-20">{bonusFieldLabel}</th>}
-                      {deductionFieldVisible && <th className="text-left font-medium px-2 py-1.5 border-b w-20">{deductionFieldLabel}</th>}
-                      <th className="text-left font-medium px-2 py-1.5 border-b min-w-[12rem]">備考</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">売上</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">時間</th>
+                      {bonusFieldVisible && <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">{bonusFieldLabel}</th>}
+                      {deductionFieldVisible && <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap">{deductionFieldLabel}</th>}
+                      <th className="text-left font-medium px-2 py-1.5 border-b whitespace-nowrap min-w-[12rem]">備考</th>
                       <th className="w-8 border-b" />
                     </tr>
                   </thead>
