@@ -83,7 +83,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   const hasFxRow = salesRows.some(s => s.fxRate != null)
-  const summaryRows = buildNoticeSummaryRows(content)
+  const { rows: summaryRows, settlementRows } = buildNoticeSummaryRows(content)
 
   return (
     <Document>
@@ -106,16 +106,25 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
           <Text style={styles.totalLabel}>お支払額</Text>
           <Text style={styles.totalAmount}>¥{totalReward.toLocaleString()}</Text>
         </View>
-        <Text style={styles.taxNote}>※上記金額は消費税10%を含みます（内税）</Text>
+        <Text style={styles.taxNote}>※上記金額には消費税10%が含まれています。</Text>
 
         <View style={styles.summaryTable}>
           {summaryRows.map((row, i) => (
             <View key={i} style={styles.summaryRow}><Text>{row.label}</Text><Text>{row.text}</Text></View>
           ))}
           <View style={styles.summaryFinalRow}>
-            <Text>合計お支払額（10%内税）</Text><Text>¥{totalReward.toLocaleString()}</Text>
+            <Text>今回お支払額</Text><Text>¥{totalReward.toLocaleString()}</Text>
           </View>
         </View>
+
+        {settlementRows.length > 0 && (
+          <View style={styles.summaryTable} wrap={false}>
+            <Text style={styles.breakdownTitle}>精算情報</Text>
+            {settlementRows.map((row, i) => (
+              <View key={i} style={styles.summaryRow}><Text>{row.label}</Text><Text>{row.text}</Text></View>
+            ))}
+          </View>
+        )}
 
         <Text style={styles.breakdownTitle}>売上内訳（{periodLabel}）</Text>
         <View style={styles.tableHeadRow}>

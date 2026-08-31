@@ -15,7 +15,7 @@ export const NOTICE_ITEM_DEFAULT_LABEL: Record<NoticeItemKey, string> = {
   bonus: 'ボーナス',
   deduction: '控除',
   custom_items: '追加項目',
-  tax_breakdown: 'うち消費税（10%内税）',
+  tax_breakdown: 'うち消費税（10%）',
   daily_settled: '精算済み金額（参考）',
 }
 

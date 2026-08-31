@@ -54,7 +54,7 @@ export default async function PaymentNoticePage({
 
   const hasFxRow = salesRows.some(s => s.fxRate != null)
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
-  const summaryRows = buildNoticeSummaryRows(content)
+  const { rows: summaryRows, settlementRows } = buildNoticeSummaryRows(content)
 
   return (
     <div style={{ background: '#eef0f2', minHeight: '100vh' }}>
@@ -133,18 +133,33 @@ export default async function PaymentNoticePage({
           <div style={{ fontSize: 14, fontWeight: 'bold', width: 90 }}>お支払額</div>
           <div className="notice-total-amount">¥{totalReward.toLocaleString()}</div>
         </div>
-        <p style={{ fontSize: 11, color: '#555', marginBottom: 16 }}>※上記金額は消費税10%を含みます（内税）</p>
+        <p style={{ fontSize: 11, color: '#555', marginBottom: 16 }}>※上記金額には消費税10%が含まれています。</p>
 
         <table className="summary-table">
           <tbody>
             {summaryRows.map((row, i) => (
               <tr key={i}><td>{row.label}</td><td className="right">{row.text}</td></tr>
             ))}
-            <tr className="final-row"><td>合計お支払額（10%内税）</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
+            <tr className="final-row"><td>今回お支払額</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
           </tbody>
         </table>
 
-        <div style={{ fontSize: 12, fontWeight: 'bold', borderBottom: '1px solid #ccc', paddingBottom: 4, marginBottom: 8 }}>
+        {settlementRows.length > 0 && (
+          <>
+            <div style={{ fontSize: 12, fontWeight: 'bold', borderBottom: '1px solid #ccc', paddingBottom: 4, marginTop: 20, marginBottom: 8 }}>
+              精算情報
+            </div>
+            <table className="summary-table">
+              <tbody>
+                {settlementRows.map((row, i) => (
+                  <tr key={i}><td>{row.label}</td><td className="right">{row.text}</td></tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        <div style={{ fontSize: 12, fontWeight: 'bold', borderBottom: '1px solid #ccc', paddingBottom: 4, marginTop: 20, marginBottom: 8 }}>
           売上内訳（{periodLabel}）
         </div>
         <table className="notice-table">
