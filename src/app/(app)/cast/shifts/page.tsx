@@ -3,7 +3,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { CastShiftView } from '@/components/shifts/cast-shift-view'
 import { getMonthToDateSummary } from '@/lib/reward-summary'
-import { effectiveRewardRate, parsePlatformRewardRates } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, includedInSalesTotal } from '@/lib/reward-rate'
 
 export default async function CastShiftsPage() {
   const supabase = await createClient()
@@ -14,7 +14,10 @@ export default async function CastShiftsPage() {
     return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
   }
 
-  const [{ data: shifts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems }, { data: store }, rewardSummary, { data: sales }] = await Promise.all([
+  const [
+    { data: shifts }, { data: rooms }, { data: areas }, { data: settings }, { data: checklistItems },
+    { data: store }, rewardSummary, { data: sales }, { data: includedInSalesTemplates },
+  ] = await Promise.all([
     supabase.from('shifts').select('*, rooms(name), areas(name)').eq('cast_id', user.id).order('date', { ascending: false }),
     supabase.from('rooms').select('id, name, area_id').eq('store_id', profile.store_id).eq('is_active', true),
     supabase.from('areas').select('id, name').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
@@ -22,8 +25,10 @@ export default async function CastShiftsPage() {
     supabase.from('shift_checklist_items').select('id, label, item_type, options').eq('store_id', profile.store_id).eq('is_active', true).order('sort_order'),
     supabase.from('stores').select('name').eq('id', profile.store_id).single(),
     getMonthToDateSummary(supabase, user.id),
-    supabase.from('sales').select('date, amount, platform, shift_id, is_daily_payment, reward_rate_override').eq('cast_id', user.id),
+    supabase.from('sales').select('date, amount, platform, shift_id, is_daily_payment, reward_rate_override, custom_items').eq('cast_id', user.id),
+    supabase.from('notice_item_templates').select('label').eq('store_id', profile.store_id).eq('include_in_sales', true),
   ])
+  const includedInSalesLabels = new Set((includedInSalesTemplates ?? []).map(t => t.label))
 
   // シフトごとに最新の修正申請だけを見る。それが却下済みなら理由をシフト詳細に表示する
   // （新しい申請を出し直した場合は、そちらが最新になるので古い却下理由は自然に消える）
@@ -48,12 +53,14 @@ export default async function CastShiftsPage() {
   const platformRates = parsePlatformRewardRates(profile.platform_reward_rates)
   const platformDailyRates = parsePlatformRewardRates(profile.platform_daily_payment_reward_rates)
   for (const s of sales ?? []) {
-    amountByDate[s.date] = (amountByDate[s.date] ?? 0) + Number(s.amount)
+    // 「売上に反映する」設定がオンのテンプレート項目は、管理画面の売上合計と同様にその分も加算する
+    const salesAmount = Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
+    amountByDate[s.date] = (amountByDate[s.date] ?? 0) + salesAmount
     if (s.shift_id) {
       const rate = effectiveRewardRate(s, rewardRate, platformRates, profile.daily_payment_reward_rate, platformDailyRates)
       const prev = salesByShiftId[s.shift_id] ?? { amount: 0, reward: 0 }
       salesByShiftId[s.shift_id] = {
-        amount: prev.amount + Number(s.amount),
+        amount: prev.amount + salesAmount,
         reward: prev.reward + Math.floor(Number(s.amount) * rate),
       }
     }
