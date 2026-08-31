@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { format } from 'date-fns'
@@ -153,12 +153,38 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const [filterCast, setFilterCast] = useState('all')
   const [filterPlatform, setFilterPlatform] = useState('all')
   // 表示中の月をデフォルトの絞り込み期間にする
-  const [filterFrom, setFilterFrom] = useState(() => `${year}-${String(month).padStart(2, '0')}-01`)
-  const [filterTo, setFilterTo] = useState(() => {
+  const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
+  const monthEnd = (() => {
     const lastDay = new Date(year, month, 0).getDate()
     return `${year}-${String(month).padStart(2, '0')}-${String(lastDay).padStart(2, '0')}`
-  })
+  })()
+  const [filterFrom, setFilterFrom] = useState(monthStart)
+  const [filterTo, setFilterTo] = useState(monthEnd)
   const supabase = createClient()
+
+  // サーバーからは表示中の月（monthStart〜monthEnd）分の売上しか渡ってきていないため、
+  // 絞り込みの日付範囲がその月の外にはみ出た場合は、その範囲分をサーバーから改めて取得し直す
+  // （そうしないと「開始日/終了日」で他の月を指定しても、まだ手元にないデータのため何も出てこない）
+  const [salesLoading, setSalesLoading] = useState(false)
+  const loadedRangeRef = useRef({ from: monthStart, to: monthEnd })
+  useEffect(() => {
+    const from = filterFrom || monthStart
+    const to = filterTo || monthEnd
+    if (from === loadedRangeRef.current.from && to === loadedRangeRef.current.to) return
+    const timer = setTimeout(async () => {
+      setSalesLoading(true)
+      const { data, error } = await supabase.from('sales')
+        .select('*, cast:users!sales_cast_id_fkey(display_name)')
+        .eq('store_id', storeId).gte('date', from).lte('date', to)
+        .order('date', { ascending: false })
+      setSalesLoading(false)
+      if (error) { toast.error('売上データの取得に失敗しました'); return }
+      setSales(data ?? [])
+      loadedRangeRef.current = { from, to }
+    }, 300)
+    return () => clearTimeout(timer)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- supabase/storeId/monthStart/monthEndは同一マウント中は不変のためdepsから除外
+  }, [filterFrom, filterTo])
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
   // 支払通知書のテンプレート設定でボーナス・控除を非表示にしている店舗では、
@@ -699,6 +725,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 <X className="h-3.5 w-3.5 mr-1" />絞り込みを解除
               </Button>
             )}
+            {salesLoading && <span className="text-xs text-muted-foreground">読み込み中...</span>}
           </div>
           <Table>
             <TableHeader>
