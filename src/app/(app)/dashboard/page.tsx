@@ -38,9 +38,11 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
       supabase.from('shift_modification_requests').select('shifts!inner(store_id)', { count: 'exact', head: true })
         .eq('status', 'pending')
         .eq('shifts.store_id', storeId),
-      supabase.from('vacant_slot_applications').select('vacant_slots!inner(store_id)', { count: 'exact', head: true })
+      // 日付が過ぎた空き枠への申請は、管理画面の一覧からも消えて対応しようがないため件数に含めない
+      supabase.from('vacant_slot_applications').select('vacant_slots!inner(store_id, date)', { count: 'exact', head: true })
         .eq('status', 'pending')
-        .eq('vacant_slots.store_id', storeId),
+        .eq('vacant_slots.store_id', storeId)
+        .gte('vacant_slots.date', today),
       supabase.from('shifts')
         .select('*, cast:users!shifts_cast_id_fkey(display_name), rooms(name)')
         .eq('store_id', storeId)
