@@ -1,0 +1,305 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>納品物一覧 - 株式会社Rayzy</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Hiragino Kaku Gothic ProN", "Hiragino Sans", "Yu Gothic", Meiryo, sans-serif;
+      font-size: 13px;
+      color: #1a1a1a;
+      background: #f0f0f0;
+    }
+
+    .page {
+      width: 210mm;
+      min-height: 297mm;
+      margin: 20px auto;
+      background: white;
+      padding: 14mm 16mm;
+      box-shadow: 0 2px 16px rgba(0,0,0,0.1);
+    }
+
+    /* タイトル行 */
+    .title-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #1a1a1a;
+      margin-bottom: 14px;
+    }
+    .title-left {
+      display: flex;
+      align-items: baseline;
+      gap: 16px;
+    }
+    .doc-title {
+      font-size: 26px;
+      font-weight: bold;
+      letter-spacing: 10px;
+    }
+    .doc-subtitle {
+      font-size: 13px;
+      letter-spacing: 3px;
+      color: #555;
+    }
+    .issue-date {
+      font-size: 12px;
+    }
+
+    /* ヘッダー */
+    .header-grid {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 18px;
+    }
+    .client-section { flex: 1; }
+    .client-name-row {
+      display: flex;
+      align-items: baseline;
+      gap: 8px;
+      margin-bottom: 2px;
+    }
+    .client-name {
+      font-size: 20px;
+      font-weight: bold;
+    }
+    .client-honorific { font-size: 14px; }
+    .client-greeting {
+      font-size: 12px;
+      color: #333;
+      margin-top: 10px;
+    }
+
+    .issuer-section {
+      text-align: right;
+      flex-shrink: 0;
+    }
+    .issuer-logo {
+      height: 52px;
+      width: auto;
+      display: block;
+      margin-left: auto;
+      margin-bottom: 4px;
+    }
+    .issuer-name {
+      font-size: 12px;
+      font-weight: bold;
+      margin-top: 2px;
+      margin-bottom: 4px;
+    }
+    .issuer-address {
+      font-size: 11px;
+      line-height: 1.9;
+      color: #333;
+    }
+
+    /* 件名・条件 */
+    .meta-wrap { margin-bottom: 18px; }
+    .meta-row {
+      display: flex;
+      border-bottom: 1px solid #ccc;
+      padding: 5px 0;
+      font-size: 12px;
+    }
+    .meta-label {
+      width: 72px;
+      font-weight: bold;
+      flex-shrink: 0;
+    }
+
+    /* 明細テーブル */
+    .detail-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 18px;
+      font-size: 12px;
+    }
+    .detail-table thead th {
+      text-align: left;
+      padding: 6px 8px;
+      border-top: 1.5px solid #1a1a1a;
+      border-bottom: 1.5px solid #1a1a1a;
+      font-weight: normal;
+    }
+    .detail-table .cat-row td {
+      padding: 9px 8px 3px;
+      font-weight: bold;
+    }
+    .detail-table .item-row td {
+      padding: 6px 8px;
+      border-bottom: 1px solid #e8e8e8;
+      vertical-align: top;
+    }
+    .item-desc {
+      font-size: 10.5px;
+      color: #666;
+      line-height: 1.7;
+      margin-top: 3px;
+    }
+    .status-note {
+      display: inline-block;
+      font-size: 10.5px;
+      font-weight: bold;
+      color: #b91c1c;
+      background: #fee2e2;
+      padding: 1px 6px;
+      border-radius: 3px;
+      margin-top: 4px;
+    }
+
+    /* 備考・その他 */
+    .doc-section { margin-bottom: 14px; }
+    .doc-section-title {
+      font-size: 12px;
+      font-weight: bold;
+      border-bottom: 1px solid #ccc;
+      padding-bottom: 3px;
+      margin-bottom: 8px;
+    }
+    .doc-subsection-body {
+      font-size: 11.5px;
+      line-height: 1.9;
+      color: #333;
+    }
+
+    .footer-note {
+      font-size: 11px;
+      color: #555;
+      padding-top: 8px;
+      border-top: 1px dotted #ccc;
+      margin-top: 18px;
+    }
+
+    @media print {
+      body { background: white; }
+      .page { margin: 0; box-shadow: none; padding: 12mm 14mm; }
+      @page { size: A4; margin: 0; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <div class="title-row">
+    <div class="title-left">
+      <span class="doc-title">納　品　物　一　覧</span>
+      <span class="doc-subtitle">DELIVERABLES</span>
+    </div>
+    <div class="issue-date">発行日　2026年8月31日</div>
+  </div>
+
+  <div class="header-grid">
+    <div class="client-section">
+      <div class="client-name-row">
+        <span class="client-name">[宛先会社名]</span>
+        <span class="client-honorific">御中</span>
+      </div>
+      <div class="client-greeting">下記の通り納品物をご報告いたします。</div>
+    </div>
+    <div class="issuer-section">
+      <img class="issuer-logo" src="Rayzy_logo.png" alt="Rayzy">
+      <div class="issuer-name">株式会社Rayzy</div>
+      <div class="issuer-address">
+        〒161-0033<br>
+        東京都新宿区下落合1丁目14-4<br>
+        TEL: 03-6824-7885
+      </div>
+    </div>
+  </div>
+
+  <div class="meta-wrap">
+    <div class="meta-row">
+      <span class="meta-label">件名</span>
+      <span>業務管理システム「ShiftMate」（シフト・報酬・キャスト管理）開発 一式</span>
+    </div>
+    <div class="meta-row">
+      <span class="meta-label">対象範囲</span>
+      <span>ソースコード／動作環境／仕様書／説明書</span>
+    </div>
+  </div>
+
+  <table class="detail-table">
+    <thead>
+      <tr>
+        <th style="width:20%;">区分</th>
+        <th style="width:80%;">内容</th>
+      </tr>
+    </thead>
+    <tbody>
+
+      <tr class="cat-row"><td colspan="2">ソースコード</td></tr>
+      <tr class="item-row">
+        <td>GitHub<br>リポジトリ</td>
+        <td>
+          本システムのソースコード一式（Next.jsアプリケーション + Supabaseマイグレーション）をGitHubリポジトリで納品。
+          <div class="item-desc">
+            ・自社運用環境: rayzyfurukawa/CalendarApp（mainブランチ、最新コミット ff0f005・2026年8月31日時点）<br>
+            ・クライアント向け環境: eve8008/CalendarApp（専用リポジトリとして払い出し済み）
+          </div>
+          <div class="status-note">※クライアント向けリポジトリは現在アクセスできない状態を確認しています。別途状況をご確認ください</div>
+        </td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="2">動作環境</td></tr>
+      <tr class="item-row">
+        <td>技術構成</td>
+        <td>
+          Next.js（App Router）+ TypeScript、Tailwind CSS + shadcn/ui、Supabase（PostgreSQL / Auth / Realtime / Storage）
+          <div class="item-desc">
+            メール送信: Resend　／　Web Push通知: VAPID + Service Worker　／　Google Drive連携: OAuth 2.0
+          </div>
+        </td>
+      </tr>
+      <tr class="item-row">
+        <td>ホスティング</td>
+        <td>
+          Vercel（Next.jsアプリケーション）+ Supabase Cloud（データベース・認証）
+          <div class="item-desc">
+            本番URL（自社運用環境）: https://calendar-app-one-sage.vercel.app<br>
+            Vercelプロジェクト・Supabaseプロジェクトの詳細情報、管理者アカウントは別途共有いたします。
+          </div>
+        </td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="2">仕様書</td></tr>
+      <tr class="item-row">
+        <td>SPEC</td>
+        <td>
+          プロダクト概要・技術スタック・データベース設計・主要機能をまとめた開発者向け仕様書
+          <div class="item-desc">docs/SPEC.md（Markdown）／ docs/SPEC.pdf</div>
+        </td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="2">説明書</td></tr>
+      <tr class="item-row">
+        <td>GUIDE</td>
+        <td>
+          管理者側・キャスト側それぞれの画面操作方法を、実画面のスクリーンショット付きで解説したエンドユーザー向け説明書
+          <div class="item-desc">docs/GUIDE.md（Markdown）／ docs/GUIDE.pdf</div>
+        </td>
+      </tr>
+
+    </tbody>
+  </table>
+
+  <div class="doc-section">
+    <div class="doc-section-title">備考</div>
+    <div class="doc-subsection-body">
+      ・仕様書・説明書は、機能追加・仕様変更に応じて随時更新いたします。最新版はGitHubリポジトリの docs/ 配下をご参照ください。<br>
+      ・サーバー・各種SaaSの利用料（Supabase、Vercel、Resend等）は別途実費となります。<br>
+      ・保守・運用サポートについては別途ご相談ください。
+    </div>
+  </div>
+
+  <div class="footer-note">
+    ※ご不明な点がございましたら、ご遠慮なくお問い合わせください
+  </div>
+
+</div>
+</body>
+</html>
