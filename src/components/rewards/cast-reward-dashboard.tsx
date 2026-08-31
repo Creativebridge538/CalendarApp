@@ -214,14 +214,8 @@ export function CastRewardDashboard({
                       )}
                     >
                       <span className="text-xs font-medium tabular-nums">{c.day}</span>
-                      {c.isToday ? (
-                        <span className="text-[10px] font-semibold" style={{ color: 'var(--brand-accent)' }}>本日出勤</span>
-                      ) : (
-                        <>
-                          {c.amount > 0 && <span className="text-[12px] font-bold tabular-nums leading-tight">{c.amount.toLocaleString()}</span>}
-                          {c.hours > 0 && <span className="text-[10px] text-muted-foreground tabular-nums">{c.hours.toFixed(1)}h</span>}
-                        </>
-                      )}
+                      {c.amount > 0 && <span className="text-[12px] font-bold tabular-nums leading-tight">{c.amount.toLocaleString()}</span>}
+                      {c.hours > 0 && <span className="text-[10px] text-muted-foreground tabular-nums">{c.hours.toFixed(1)}h</span>}
                     </button>
                   )
                 ))}
