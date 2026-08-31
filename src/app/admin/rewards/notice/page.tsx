@@ -218,14 +218,6 @@ export default async function PaymentNoticePage({
             ))}
           </tbody>
         </table>
-        {/* 発行済み（content.id !== null）の通知書は為替レートが確定済みのスナップショットのため、
-            未発行のプレビュー時点でのみ「参考値」の注意書きを表示する */}
-        {hasFxRow && content.id === null && (
-          <p style={{ fontSize: 11, color: '#555', marginTop: -12, marginBottom: 16 }}>
-            ※為替換算額は参考値です。精算時の金額と異なる場合があります。
-          </p>
-        )}
-
         {(bankName || bankBranch || bankAccountNumber || bankAccountHolder) && (
           <table className="bank-table">
             <tbody>
