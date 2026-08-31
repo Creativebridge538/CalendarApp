@@ -187,12 +187,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     ? liveFxRate + (storeSettings?.usd_jpy_adjustment ?? 0)
     : storeSettings?.usd_jpy_rate ?? null
 
-  function calcItemAmount(unit: string, rawUnits: string): number {
-    const units = parseFloat(rawUnits) || 0
-    if (unit === 'jpy') return units
-    return calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
-  }
-
   const castRewardRateById = useMemo(() => {
     const map: Record<string, number> = {}
     for (const c of casts) map[c.id] = Number(c.reward_rate)
@@ -213,6 +207,26 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     for (const c of casts) map[c.id] = parsePlatformRewardRates(c.platform_daily_payment_reward_rates)
     return map
   }, [casts])
+
+  // プラットフォーム単位（トークン・ポイント）の追加項目は、換算後の売上額をそのまま使うのではなく、
+  // このキャストの報酬率を掛けた女子給ベースの金額にする（通知書には売上ではなく女子給を載せるため）
+  function calcItemAmount(unit: string, rawUnits: string): number {
+    const units = parseFloat(rawUnits) || 0
+    if (unit === 'jpy') return units
+    const salesAmount = calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+    const rate = effectiveRewardRate(
+      {
+        platform: unit,
+        is_daily_payment: form.is_daily_payment,
+        reward_rate_override: form.is_daily_payment && form.reward_rate_override ? parseFloat(form.reward_rate_override) / 100 : null,
+      },
+      castRewardRateById[form.cast_id] ?? 0,
+      castPlatformRatesById[form.cast_id],
+      castDailyRateById[form.cast_id],
+      castPlatformDailyRatesById[form.cast_id]
+    )
+    return Math.floor(salesAmount * rate)
+  }
 
   const filteredSales = useMemo(() => sales.filter(s =>
     (filterCast === 'all' || s.cast_id === filterCast)

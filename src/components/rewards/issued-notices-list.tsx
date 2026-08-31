@@ -91,10 +91,14 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTe
     ? liveFxRate + (storeSettings?.usd_jpy_adjustment ?? 0)
     : storeSettings?.usd_jpy_rate ?? null
 
+  // プラットフォーム単位の追加項目は、換算後の売上額ではなく、この通知書の報酬率を掛けた
+  // 女子給ベースの金額にする（通知書には売上ではなく女子給を載せるため）
   function calcItemAmount(unit: string, rawUnits: string): number {
     const units = parseFloat(rawUnits) || 0
     if (unit === 'jpy') return units
-    return calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+    const salesAmount = calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+    const rate = (parseFloat(editForm.reward_rate) || 0) / 100
+    return Math.floor(salesAmount * rate)
   }
 
   const editSalesTotal = editSalesRows.reduce((sum, r) => sum + (parseFloat(r.amount) || 0), 0)
