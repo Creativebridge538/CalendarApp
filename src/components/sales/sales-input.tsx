@@ -1038,7 +1038,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                               onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, rawUnits: e.target.value } : it) })}
                             />
                             <span className="text-xs text-muted-foreground whitespace-nowrap">
-                              → ¥{calcItemAmount(item.unit, item.rawUnits).toLocaleString()}
+                              → 女子給¥{calcItemAmount(item.unit, item.rawUnits).toLocaleString()}
                             </span>
                           </div>
                         )}
