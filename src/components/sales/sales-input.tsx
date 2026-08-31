@@ -63,6 +63,8 @@ interface Props {
   month: number
   stageNamesByCastId: Record<string, string[]>
   itemTemplates: { id: string; label: string; unit: string; include_in_sales: boolean }[]
+  /** 売上合計への反映対象ラベル。無効化した項目の過去データも他画面と同じ集計にするため、itemTemplatesとは別にis_active無関係で渡す */
+  includedInSalesLabels: string[]
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -115,7 +117,7 @@ interface BulkRow {
 }
 type BulkFixedColumn = 'date' | 'castName' | 'platform' | 'amount' | 'worked_hours' | 'bonus' | 'deduction' | 'notes'
 
-export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month, stageNamesByCastId, itemTemplates }: Props) {
+export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month, stageNamesByCastId, itemTemplates, includedInSalesLabels: includedInSalesLabelsProp }: Props) {
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
@@ -431,10 +433,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     }
   }
 
-  // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する
+  // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する。
+  // itemTemplatesはis_activeで絞り込まれているため使わず、無効化した項目の過去データも含む
+  // includedInSalesLabelsPropを使う（他画面（支払通知書・ダッシュボード）と集計を揃えるため）
   const includedInSalesLabels = useMemo(
-    () => new Set(itemTemplates.filter(t => t.include_in_sales).map(t => t.label)),
-    [itemTemplates]
+    () => new Set(includedInSalesLabelsProp),
+    [includedInSalesLabelsProp]
   )
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) =>
     sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0
@@ -496,9 +500,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       const match = existingItems.find(i => i.label === t.label)
       if (match) usedLabels.add(match.label)
       // 円建て項目のamountは「売上に反映する」ONだと報酬率適用後の金額になるため、
-      // 編集フォームには入力時の生の金額（常に生の値のsalesAmount）を復元する
+      // 編集フォームには入力時の生の金額（常に生の値のsalesAmount）を復元する。
+      // ??ではなく||を使うのは、この機能追加前に保存された行はsalesAmountが常に0のまま保存されており、
+      // ??だと0を正当な値として扱ってしまい入力欄が空扱いになる（保存すると項目自体が消える）ため
       const restoredAmount = match
-        ? (match.unit === 'jpy' || t.unit === 'jpy' ? String(match.salesAmount ?? match.amount) : String(match.amount))
+        ? (match.unit === 'jpy' || t.unit === 'jpy' ? String(match.salesAmount || match.amount) : String(match.amount))
         : ''
       return { templateId: t.id, label: t.label, unit: t.unit, rawUnits: match?.rawUnits ?? '', amount: restoredAmount }
     })
@@ -1067,9 +1073,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 )}
               </div>
 
-              {(preview || formIncludedSalesTotal !== 0) && (
+              {(preview || formIncludedSalesTotal !== 0 || (form.platform === 'manual' && form.amount.trim() !== '')) && (
                 <p className="text-sm text-muted-foreground">
-                  売上: <span className="font-medium text-foreground">¥{((preview?.jpy ?? 0) + formIncludedSalesTotal).toLocaleString()}</span>
+                  売上: <span className="font-medium text-foreground">¥{((form.platform === 'manual' ? (parseFloat(form.amount) || 0) : (preview?.jpy ?? 0)) + formIncludedSalesTotal).toLocaleString()}</span>
                   {preview?.usd != null && ` （$${preview.usd.toFixed(2)}）`}
                   {preview?.usd != null && usdJpyRate != null && ` ・ 為替レート: ¥${usdJpyRate.toFixed(2)}/$`}
                 </p>

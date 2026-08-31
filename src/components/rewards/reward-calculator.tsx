@@ -80,11 +80,13 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
     const castSales = salesByCast.get(cast.id) ?? []
     const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
-    // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）
-    const baseReward = Math.floor(castSales.reduce((sum, s) => {
+    // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）。
+    // 実際の発行処理（payment-notice-data.ts）と同じく行ごとにfloorしてから合計する
+    // （合計してから1回だけfloorすると、行数が多いキャストほど発行後の金額と数円ズレることがあるため）
+    const baseReward = castSales.reduce((sum, s) => {
       const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
-      return sum + Number(s.amount) * rate
-    }, 0))
+      return sum + Math.floor(Number(s.amount) * rate)
+    }, 0)
     const bonus = castSales.reduce((sum, s) => sum + Number(s.bonus), 0)
     const deduction = castSales.reduce((sum, s) => sum + Number(s.deduction), 0)
     const customTotal = castSales.reduce((sum, s) => sum + customItemsTotal(s.custom_items), 0)

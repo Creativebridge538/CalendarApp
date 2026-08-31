@@ -32,7 +32,7 @@ export interface NoticeContent {
   dailySettledAmount: number
   /** 発行後に管理者が個別編集で手動追加した加算項目（baseRewardには含まれず、totalRewardに加算される） */
   customItems: CustomItem[]
-  /** 売上入力時に登録された追加項目の集計（表示専用。金額は既にbaseRewardの各行reward計算に含まれている） */
+  /** 売上入力時に登録された追加項目の集計。baseRewardには含まれないため、totalRewardの計算に別途加算する必要がある */
   salesCustomItems: CustomItem[]
   totalReward: number
   itemConfig: NoticeItemConfigEntry[]

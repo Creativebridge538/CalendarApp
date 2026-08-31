@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getCurrentUser } from '@/lib/current-user'
 import { getNoticeSnapshotById } from '@/lib/payment-notice-data'
 import { parseNoticeItemConfig } from '@/lib/notice-template'
+import { customItemsTotal } from '@/lib/reward-rate'
 import type { Json } from '@/lib/supabase/database.types'
 
 // 発行済み支払通知書（スナップショット）の内容取得・編集。キャストへの表示内容そのものを
@@ -47,17 +48,22 @@ export async function PATCH(request: Request) {
   if (!existing) return NextResponse.json({ error: '発行済みの通知書が見つかりません' }, { status: 404 })
 
   const nextRewardRate = reward_rate != null ? Number(reward_rate) : existing.rewardRate
+  // rowTotalはこの編集フォームでは個別に入力できない（行ごとのボーナス・控除・追加項目内訳を持たないため）。
+  // 表示側のフォールバック（rowTotal ?? reward）と同じ扱いになるよう、reward自体をrowTotalとして明示的に保存する
   const nextSalesRows = Array.isArray(sales_rows)
     ? sales_rows
         .filter((r: unknown) => r && typeof r === 'object' && typeof (r as { date?: unknown }).date === 'string')
-        .map((r: { date: string; platformLabel?: unknown; amount: unknown; reward: unknown; isDailyPayment?: unknown; dailyPaymentAt?: unknown }) => ({
-          date: r.date,
-          platformLabel: typeof r.platformLabel === 'string' ? r.platformLabel : '',
-          amount: Number(r.amount) || 0,
-          reward: Number(r.reward) || 0,
-          isDailyPayment: !!r.isDailyPayment,
-          dailyPaymentAt: typeof r.dailyPaymentAt === 'string' ? r.dailyPaymentAt : null,
-        }))
+        .map((r: { date: string; platformLabel?: unknown; amount: unknown; reward: unknown; isDailyPayment?: unknown; dailyPaymentAt?: unknown }) => {
+          const reward = Number(r.reward) || 0
+          return {
+            date: r.date,
+            platformLabel: typeof r.platformLabel === 'string' ? r.platformLabel : '',
+            amount: Number(r.amount) || 0,
+            reward, rowTotal: reward,
+            isDailyPayment: !!r.isDailyPayment,
+            dailyPaymentAt: typeof r.dailyPaymentAt === 'string' ? r.dailyPaymentAt : null,
+          }
+        })
     : existing.salesRows
   const salesTotal = nextSalesRows.reduce((sum: number, r: { amount: number }) => sum + r.amount, 0)
   const baseReward = nextSalesRows.reduce((sum: number, r: { reward: number }) => sum + r.reward, 0)
@@ -68,8 +74,12 @@ export async function PATCH(request: Request) {
         .filter((i: unknown) => i && typeof i === 'object' && typeof (i as { label?: unknown }).label === 'string')
         .map((i: { label: string; amount: unknown }) => ({ label: i.label, amount: Number(i.amount) || 0 }))
     : existing.customItems
-  const customItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
-  const totalReward = baseReward + nextBonus - nextDeduction + customItemsTotal
+  const nextCustomItemsTotal = nextCustomItems.reduce((sum: number, i: { amount: number }) => sum + i.amount, 0)
+  // 売上入力時に登録された追加項目（sales_custom_items）はこの編集画面では変更できず、
+  // baseRewardにも含まれていないため、既存のスナップショットの値をそのまま合計額に加算する
+  // （ここを忘れると、通知書のどこかを編集するたびに追加項目分の女子給が支払合計から消えてしまう）
+  const salesCustomItemsTotal = customItemsTotal(existing.salesCustomItems)
+  const totalReward = baseReward + nextBonus - nextDeduction + nextCustomItemsTotal + salesCustomItemsTotal
   const nextItemConfig = Array.isArray(item_config) ? parseNoticeItemConfig(item_config) : existing.itemConfig
   const nextHeaderText = header_text !== undefined ? (header_text || null) : existing.headerText
   const nextFooterText = footer_text !== undefined ? (footer_text || null) : existing.footerText
