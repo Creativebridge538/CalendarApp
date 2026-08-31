@@ -17,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   const [{ data: settings }, { data: store }] = profile?.store_id
     ? await Promise.all([
-        supabase.from('store_settings').select('theme').eq('store_id', profile.store_id).single(),
+        supabase.from('store_settings').select('theme, area_label, room_label').eq('store_id', profile.store_id).single(),
         supabase.from('stores').select('name, is_active').eq('id', profile.store_id).single(),
       ])
     : [{ data: null }, { data: null }]
@@ -39,6 +39,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const role = profile?.role ?? 'cast'
   // 管理画面は店舗ごとのデザインテーマ選択に関わらず、常に同じ見た目（default）に固定する
   const theme = role === 'admin' ? 'default' : ((settings as { theme?: string } | null)?.theme ?? 'default')
+  const labelSettings = settings as { area_label?: string; room_label?: string } | null
+  const areaLabel = labelSettings?.area_label || 'エリア'
+  const roomLabel = labelSettings?.room_label || 'ルーム'
 
   // キャスト個人の「着せ替え」: ブランドアクセント色とフォントは、それぞれ独立して個人が選択できる（店舗テーマとは別軸）
   const castSkin = role === 'cast' ? getAccentSkin(profile?.accent_skin) : null
@@ -74,7 +77,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       data-theme={theme}
     >
       {role === 'cast' && <LockBodyScroll />}
-      <AppNav role={role} userEmail={user.email ?? ''} theme={theme} />
+      <AppNav role={role} userEmail={user.email ?? ''} theme={theme} areaLabel={areaLabel} roomLabel={roomLabel} />
       <main
         className={`flex-1 min-w-0 md:pt-0 ${role === 'cast' ? 'overflow-y-auto pb-[calc(var(--cast-tabbar-h,4.5rem)_+_1rem)] md:pb-0 bg-[var(--cast-mobile-bg)] md:bg-transparent' : 'pt-14 pb-16 md:pb-0'}`}
       >

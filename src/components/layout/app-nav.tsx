@@ -15,21 +15,24 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Logo } from '@/components/logo'
 
-const adminNav = [
-  { href: '/dashboard',                   label: 'ダッシュボード',  icon: LayoutDashboard },
-  { href: '/admin/shifts',                label: 'シフト管理',      icon: Calendar },
-  { href: '/admin/casts',                 label: 'キャスト管理',    icon: Users },
-  { href: '/admin/areas',                 label: 'エリア管理',      icon: MapPin },
-  { href: '/admin/rooms',                 label: 'ルーム管理',      icon: DoorOpen },
-  { href: '/admin/modification-requests', label: '修正申請',        icon: FileEdit },
-  { href: '/admin/vacant-slots',          label: '空き枠管理',      icon: Briefcase },
-  { href: '/admin/sales',                 label: '売上一覧',        icon: BarChart2 },
-  { href: '/admin/rewards',               label: '支払通知書作成',  icon: Award },
-  { href: '/admin/issued-notices',        label: '発行済み支払通知書', icon: FileText },
-  { href: '/admin/notice-template',       label: '通知書テンプレート設定', icon: LayoutTemplate },
-  { href: '/notifications',               label: '通知',            icon: Bell },
-  { href: '/admin/settings',              label: '店舗設定',        icon: Settings },
-]
+// エリア・ルームの呼び名は店舗設定でカスタマイズできるため、サイドバーの項目名にもそれを反映する
+function getAdminNav(areaLabel: string, roomLabel: string) {
+  return [
+    { href: '/dashboard',                   label: 'ダッシュボード',  icon: LayoutDashboard },
+    { href: '/admin/shifts',                label: 'シフト管理',      icon: Calendar },
+    { href: '/admin/casts',                 label: 'キャスト管理',    icon: Users },
+    { href: '/admin/areas',                 label: `${areaLabel}管理`, icon: MapPin },
+    { href: '/admin/rooms',                 label: `${roomLabel}管理`, icon: DoorOpen },
+    { href: '/admin/modification-requests', label: '修正申請',        icon: FileEdit },
+    { href: '/admin/vacant-slots',          label: '空き枠管理',      icon: Briefcase },
+    { href: '/admin/sales',                 label: '売上一覧',        icon: BarChart2 },
+    { href: '/admin/rewards',               label: '支払通知書作成',  icon: Award },
+    { href: '/admin/issued-notices',        label: '発行済み支払通知書', icon: FileText },
+    { href: '/admin/notice-template',       label: '通知書テンプレート設定', icon: LayoutTemplate },
+    { href: '/notifications',               label: '通知',            icon: Bell },
+    { href: '/admin/settings',              label: '店舗設定',        icon: Settings },
+  ]
+}
 
 const castNav = [
   { href: '/cast/shifts',       label: 'シフト',         icon: Calendar },
@@ -137,6 +140,8 @@ interface AppNavProps {
   role: string
   userEmail: string
   theme?: string
+  areaLabel?: string
+  roomLabel?: string
 }
 
 type NavItem = { href: string; label: string; icon: typeof LayoutDashboard }
@@ -203,11 +208,11 @@ function NavContent({
   )
 }
 
-export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
+export function AppNav({ role, userEmail, theme = 'default', areaLabel = 'エリア', roomLabel = 'ルーム' }: AppNavProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
-  const nav = role === 'admin' ? adminNav : castNav
+  const nav = role === 'admin' ? getAdminNav(areaLabel, roomLabel) : castNav
   const [mobileOpen, setMobileOpen] = useState(false)
   const s = THEME_STYLES[theme] ?? THEME_STYLES.default
   const bottomNavRef = useRef<HTMLElement>(null)
