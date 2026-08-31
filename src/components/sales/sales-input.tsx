@@ -403,6 +403,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return calcPlatformAmount(form.platform, rawUnits, platformSettings[form.platform], usdJpyRate, override)
   }, [form.platform, form.raw_units, form.is_daily_payment, form.rate_override, platformSettings, usdJpyRate])
 
+  // 「売上に反映する」設定がオンの追加項目は、プレビューの売上額にもその場で加算して見せる
+  const formIncludedSalesTotal = useMemo(() => form.custom_items.reduce((sum, item) => {
+    if (!includedInSalesLabels.has(item.label)) return sum
+    return sum + (item.unit === 'jpy' ? (parseFloat(item.amount) || 0) : calcSalesAmount(item.unit, item.rawUnits))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- calcSalesAmountはplatformSettings/usdJpyRateに依存する関数のため、それらをdepsに含める
+  }, 0), [form.custom_items, includedInSalesLabels, platformSettings, usdJpyRate])
+
   // テンプレート登録済みの追加項目を、値未入力の状態でデフォルト項目としてあらかじめ並べておく
   function defaultCustomItemsFromTemplates() {
     return itemTemplates.map(t => ({ templateId: t.id, label: t.label, unit: t.unit, rawUnits: '', amount: '' }))
@@ -939,7 +946,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
               {form.platform !== 'manual' && preview && (
                 <p className="text-sm text-muted-foreground">
-                  換算金額: <span className="font-medium text-foreground">¥{preview.jpy.toLocaleString()}</span>
+                  売上: <span className="font-medium text-foreground">¥{(preview.jpy + formIncludedSalesTotal).toLocaleString()}</span>
                   {preview.usd != null && ` （$${preview.usd.toFixed(2)}）`}
                   {preview.usd != null && usdJpyRate != null && ` ・ 為替レート: ¥${usdJpyRate.toFixed(2)}/$`}
                 </p>
@@ -1056,7 +1063,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
                       {enabledPlatforms.length > 0 && <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>}
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">換算金額</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-24">売上</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">{bonusFieldLabel}</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">{deductionFieldLabel}</th>
