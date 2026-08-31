@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { format, subDays, subMonths, startOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
+import { includedInSalesTotal } from '@/lib/reward-rate'
 
 export default async function DashboardPage() {
   const { user, profile } = await getCurrentUser()
@@ -29,7 +30,7 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const prevMonthStart = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd')
 
-  const [{ count: pendingShifts }, { count: pendingRequests }, { count: pendingVacantApplications }, { data: todayShifts }, { data: sales }, { data: casts }] =
+  const [{ count: pendingShifts }, { count: pendingRequests }, { count: pendingVacantApplications }, { data: todayShifts }, { data: sales }, { data: casts }, { data: includedInSalesTemplates }] =
     await Promise.all([
       supabase.from('shifts').select('*', { count: 'exact', head: true })
         .eq('store_id', storeId).eq('status', 'submitted'),
@@ -45,32 +46,38 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
         .eq('date', today)
         .eq('status', 'confirmed')
         .order('start_time'),
-      supabase.from('sales').select('date, amount, cast_id')
+      supabase.from('sales').select('date, amount, cast_id, custom_items')
         .eq('store_id', storeId).gte('date', sixtyDaysAgo).lte('date', today),
       supabase.from('users').select('id, display_name')
         .eq('store_id', storeId).eq('role', 'cast'),
+      supabase.from('notice_item_templates').select('label').eq('store_id', storeId).eq('include_in_sales', true),
     ])
 
   const salesList = sales ?? []
   const castNameMap = new Map((casts ?? []).map(c => [c.id, c.display_name ?? '—']))
+  // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する
+  const includedInSalesLabels = new Set((includedInSalesTemplates ?? []).map(t => t.label))
+  function salesAmountOf(s: { amount: number | string; custom_items: unknown }): number {
+    return Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
+  }
 
   // 直近30日の日次売上推移
   const trend = Array.from({ length: 30 }, (_, idx) => {
     const i = 29 - idx
     const d = format(subDays(now, i), 'yyyy-MM-dd')
-    const amount = salesList.filter(s => s.date === d).reduce((sum, s) => sum + Number(s.amount), 0)
+    const amount = salesList.filter(s => s.date === d).reduce((sum, s) => sum + salesAmountOf(s), 0)
     return { date: d, amount }
   })
 
   // 今月・先月の合計
   const thisMonthSales = salesList.filter(s => s.date >= monthStart)
   const prevMonthSales = salesList.filter(s => s.date >= prevMonthStart && s.date < monthStart)
-  const totalThisMonth = thisMonthSales.reduce((sum, s) => sum + Number(s.amount), 0)
-  const totalPrevMonth = prevMonthSales.reduce((sum, s) => sum + Number(s.amount), 0)
+  const totalThisMonth = thisMonthSales.reduce((sum, s) => sum + salesAmountOf(s), 0)
+  const totalPrevMonth = prevMonthSales.reduce((sum, s) => sum + salesAmountOf(s), 0)
 
   // キャスト別ランキング（今月）
   const castTotals = new Map<string, number>()
-  thisMonthSales.forEach(s => castTotals.set(s.cast_id, (castTotals.get(s.cast_id) ?? 0) + Number(s.amount)))
+  thisMonthSales.forEach(s => castTotals.set(s.cast_id, (castTotals.get(s.cast_id) ?? 0) + salesAmountOf(s)))
   const castRanking = [...castTotals.entries()]
     .map(([castId, amount]) => ({ name: castNameMap.get(castId) ?? '—', amount }))
     .sort((a, b) => b.amount - a.amount)
@@ -82,7 +89,7 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
   const weekdayCounts = new Array(7).fill(0)
   salesList.forEach(s => {
     const dow = parseLocalDate(s.date).getDay()
-    weekdaySums[dow] += Number(s.amount)
+    weekdaySums[dow] += salesAmountOf(s)
     weekdayCounts[dow] += 1
   })
   const weekday = weekdayLabels.map((label, i) => ({

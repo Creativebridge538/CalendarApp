@@ -18,7 +18,7 @@ import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
 import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
-import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, includedInSalesTotal } from '@/lib/reward-rate'
 import { parseNoticeItemConfig } from '@/lib/notice-template'
 
 interface CastUser {
@@ -42,12 +42,15 @@ interface Props {
   /** cast_id -> この期間ですでに発行済みの通知の作成日時（ISO文字列） */
   issuedAt: Record<string, string>
   noticeItemConfig?: unknown
+  /** 「売上に反映する」設定がオンの通知書テンプレート項目名一覧 */
+  includedInSalesLabels?: string[]
 }
 
-export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssuedAt, noticeItemConfig }: Props) {
+export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssuedAt, noticeItemConfig, includedInSalesLabels: includedInSalesLabelsProp }: Props) {
   const itemConfig = useMemo(() => parseNoticeItemConfig(noticeItemConfig), [noticeItemConfig])
   const bonusLabel = itemConfig.find(e => e.key === 'bonus')?.label || 'ボーナス'
   const deductionLabel = itemConfig.find(e => e.key === 'deduction')?.label || '控除'
+  const includedInSalesLabels = useMemo(() => new Set(includedInSalesLabelsProp ?? []), [includedInSalesLabelsProp])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -72,7 +75,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
     const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
     const castSales = salesByCast.get(cast.id) ?? []
-    const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount), 0)
+    const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
     // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）
     const baseReward = Math.floor(castSales.reduce((sum, s) => {
       const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
@@ -83,7 +86,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     const customTotal = castSales.reduce((sum, s) => sum + customItemsTotal(s.custom_items), 0)
     const totalReward = baseReward + bonus - deduction + customTotal
     return { cast, rewardRate, salesTotal, baseReward, bonus, deduction, totalReward }
-  }), [casts, salesByCast])
+  }), [casts, salesByCast, includedInSalesLabels])
 
   const filteredRows = useMemo(
     () => filterCastId === 'all' ? rows : rows.filter(r => r.cast.id === filterCastId),
