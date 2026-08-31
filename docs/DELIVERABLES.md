@@ -12,7 +12,7 @@ GitHub リポジトリにて、本システムのソースコード一式（Next
 
 ## 動作環境
 
-Next.js + Supabase（PostgreSQL / Auth）で構成された Web アプリケーションです。
+Vercel（Next.js アプリケーション）+ Supabase（PostgreSQL / Auth）で構成された Web アプリケーションです。
 
 ## 仕様書
 
