@@ -23,6 +23,17 @@ export function customItemsTotal(raw: unknown): number {
   }, 0)
 }
 
+// 売上行のcustom_itemsを検証済みの{label, amount}配列として取り出す（支払通知書への内訳表示用）
+export function parseCustomItems(raw: unknown): SaleCustomItem[] {
+  if (!Array.isArray(raw)) return []
+  return raw.flatMap(item => {
+    const label = (item as { label?: unknown })?.label
+    const amount = Number((item as { amount?: unknown })?.amount)
+    if (typeof label !== 'string' || !label.trim() || Number.isNaN(amount)) return []
+    return [{ label: label.trim(), amount }]
+  })
+}
+
 interface RewardRateSale {
   platform: string
   is_daily_payment: boolean

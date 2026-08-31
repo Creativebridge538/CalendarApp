@@ -23,12 +23,13 @@ export default async function SalesPage({
   const monthStart = `${year}-${String(month).padStart(2, '0')}-01`
   const monthEnd = format(endOfMonth(new Date(`${monthStart}T00:00:00`)), 'yyyy-MM-dd')
 
-  const [{ data: casts }, { data: sales }, { data: settings }, { data: stageNameRows }] = await Promise.all([
+  const [{ data: casts }, { data: sales }, { data: settings }, { data: stageNameRows }, { data: itemTemplates }] = await Promise.all([
     supabase.from('users').select('id, display_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true).order('display_name'),
     supabase.from('sales').select('*, cast:users!sales_cast_id_fkey(display_name)').eq('store_id', storeId)
       .gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false }),
     supabase.from('store_settings').select('usd_jpy_rate, usd_jpy_auto_fetch, usd_jpy_adjustment, platform_settings, enabled_platforms').eq('store_id', storeId).single(),
     supabase.from('cast_stage_names').select('cast_id, name').eq('store_id', storeId),
+    supabase.from('notice_item_templates').select('id, label, unit').eq('store_id', storeId).eq('is_active', true).order('sort_order'),
   ])
 
   const stageNamesByCastId: Record<string, string[]> = {}
@@ -43,6 +44,7 @@ export default async function SalesPage({
         key={`${year}-${month}`}
         casts={casts ?? []} sales={sales ?? []} storeId={storeId} userId={user.id} storeSettings={settings}
         year={year} month={month} stageNamesByCastId={stageNamesByCastId}
+        itemTemplates={itemTemplates ?? []}
       />
     </div>
   )

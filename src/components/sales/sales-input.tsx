@@ -20,6 +20,7 @@ import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
+import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
 import { usePagination } from '@/hooks/use-pagination'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -59,6 +60,7 @@ interface Props {
   year: number
   month: number
   stageNamesByCastId: Record<string, string[]>
+  itemTemplates: { id: string; label: string; unit: string }[]
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -110,14 +112,14 @@ interface BulkRow {
 const BULK_COLUMNS = ['date', 'castName', 'amount', 'worked_hours', 'bonus', 'deduction', 'notes'] as const
 type BulkColumn = typeof BULK_COLUMNS[number]
 
-export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month, stageNamesByCastId }: Props) {
+export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month, stageNamesByCastId, itemTemplates }: Props) {
   const emptyForm = useMemo(() => ({
     cast_id: '', date: defaultDateFor(year, month),
     platform: 'manual' as 'manual' | PlatformKey,
     amount: '', raw_units: '',
     is_daily_payment: false, rate_override: '', reward_rate_override: '', daily_payment_at: '',
     notes: '', worked_hours: '', bonus: '', deduction: '',
-    custom_items: [] as { label: string; amount: string }[],
+    custom_items: [] as { templateId: string; label: string; unit: string; rawUnits: string; amount: string }[],
   }), [year, month])
   const emptyBulkRow = (date?: string): BulkRow => ({
     id: crypto.randomUUID(), date: date ?? defaultDateFor(year, month),
@@ -173,6 +175,12 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const usdJpyRate = autoFetchFx && liveFxRate != null
     ? liveFxRate + (storeSettings?.usd_jpy_adjustment ?? 0)
     : storeSettings?.usd_jpy_rate ?? null
+
+  function calcItemAmount(unit: string, rawUnits: string): number {
+    const units = parseFloat(rawUnits) || 0
+    if (unit === 'jpy') return units
+    return calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+  }
 
   const castRewardRateById = useMemo(() => {
     const map: Record<string, number> = {}
@@ -386,7 +394,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       amount: String(sale.amount),
       raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
       custom_items: (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number }[] : [])
-        .map(i => ({ label: i.label, amount: String(i.amount) })),
+        .map(i => ({ templateId: '', label: i.label, unit: 'jpy', rawUnits: '', amount: String(i.amount) })),
       is_daily_payment: sale.is_daily_payment,
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
       reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
@@ -431,7 +439,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       deduction: form.deduction ? parseInt(form.deduction) : 0,
       custom_items: form.custom_items
         .filter(i => i.label.trim() !== '')
-        .map(i => ({ label: i.label.trim(), amount: parseFloat(i.amount) || 0 })),
+        .map(i => ({ label: i.label.trim(), amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits) })),
       store_id: storeId,
       created_by: userId,
     }
@@ -812,21 +820,58 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
               <div className="space-y-1.5 pt-2 border-t">
                 <Label className="text-xs text-muted-foreground font-normal">追加項目（指名料など・マイナス値で控除も可）</Label>
                 {form.custom_items.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2">
+                  <div key={i} className="flex items-center gap-2 flex-wrap">
+                    <Select
+                      value={item.templateId || '__free__'}
+                      onValueChange={v => {
+                        if (!v) return
+                        const template = itemTemplates.find(t => t.id === v)
+                        setForm({
+                          ...form,
+                          custom_items: form.custom_items.map((it, idx) => idx === i ? (
+                            template
+                              ? { ...it, templateId: template.id, label: template.label, unit: template.unit, rawUnits: '', amount: '' }
+                              : { ...it, templateId: '', unit: 'jpy', rawUnits: '' }
+                          ) : it),
+                        })
+                      }}
+                    >
+                      <SelectTrigger className="w-36">
+                        <SelectValue>{item.templateId ? item.label : '自由入力'}</SelectValue>
+                      </SelectTrigger>
+                      <SelectContent alignItemWithTrigger={false}>
+                        <SelectItem value="__free__">自由入力</SelectItem>
+                        {itemTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
                     <Input
-                      placeholder="項目名（例: 指名料）" value={item.label}
+                      placeholder="項目名（例: 指名料）" className="w-40" value={item.label}
+                      disabled={!!item.templateId}
                       onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, label: e.target.value } : it) })}
                     />
-                    <Input
-                      type="number" className="w-28" placeholder="金額" value={item.amount}
-                      onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
-                    />
+                    {item.unit === 'jpy' ? (
+                      <Input
+                        type="number" className="w-28" placeholder="金額" value={item.amount}
+                        onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
+                      />
+                    ) : (
+                      <>
+                        <Input
+                          type="number" className="w-24" placeholder={`数量（${NOTICE_ITEM_UNIT_LABEL[item.unit] ?? item.unit}）`}
+                          value={item.rawUnits}
+                          onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, rawUnits: e.target.value } : it) })}
+                        />
+                        <span className="text-xs text-muted-foreground whitespace-nowrap">
+                          → ¥{calcItemAmount(item.unit, item.rawUnits).toLocaleString()}
+                        </span>
+                      </>
+                    )}
                     <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, custom_items: form.custom_items.filter((_, idx) => idx !== i) })}>
                       <X className="h-3.5 w-3.5" />
                     </Button>
                   </div>
                 ))}
-                <Button size="sm" variant="outline" onClick={() => setForm({ ...form, custom_items: [...form.custom_items, { label: '', amount: '' }] })}>
+                <Button size="sm" variant="outline" onClick={() => setForm({ ...form, custom_items: [...form.custom_items, { templateId: '', label: '', unit: 'jpy', rawUnits: '', amount: '' }] })}>
                   <Plus className="h-3.5 w-3.5 mr-1" />項目を追加
                 </Button>
               </div>

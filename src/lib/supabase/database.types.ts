@@ -253,6 +253,7 @@ export type Database = {
           period_from: string
           period_to: string
           reward_rate: number
+          sales_custom_items: Json
           sales_rows: Json
           sales_total: number
           store_id: string
@@ -282,6 +283,7 @@ export type Database = {
           period_from: string
           period_to: string
           reward_rate: number
+          sales_custom_items?: Json
           sales_rows: Json
           sales_total: number
           store_id: string
@@ -311,6 +313,7 @@ export type Database = {
           period_from?: string
           period_to?: string
           reward_rate?: number
+          sales_custom_items?: Json
           sales_rows?: Json
           sales_total?: number
           store_id?: string

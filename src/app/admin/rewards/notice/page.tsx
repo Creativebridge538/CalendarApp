@@ -169,7 +169,7 @@ export default async function PaymentNoticePage({
                     ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
                     : '（日払い済み）')}
                 </td>
-                <td className="right">¥{s.amount.toLocaleString()}</td>
+                <td className="right">¥{s.reward.toLocaleString()}</td>
                 {hasFxRow && (
                   <td className="right">
                     {s.fxRate != null ? (

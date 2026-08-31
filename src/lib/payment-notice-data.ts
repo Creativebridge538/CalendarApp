@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from './reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, parseCustomItems } from './reward-rate'
 import { parseNoticeItemConfig, type NoticeItemConfigEntry } from './notice-template'
 import type { Json } from './supabase/database.types'
 
@@ -30,7 +30,10 @@ export interface NoticeContent {
   deduction: number
   /** 日払いで既に精算済みの分の報酬額（合計お支払額には含まれるが、参考として内訳表示する） */
   dailySettledAmount: number
+  /** 発行後に管理者が個別編集で手動追加した加算項目（baseRewardには含まれず、totalRewardに加算される） */
   customItems: CustomItem[]
+  /** 売上入力時に登録された追加項目の集計（表示専用。金額は既にbaseRewardの各行reward計算に含まれている） */
+  salesCustomItems: CustomItem[]
   totalReward: number
   itemConfig: NoticeItemConfigEntry[]
   headerText: string | null
@@ -76,8 +79,17 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const dailySettledAmount = salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + s.reward, 0)
   const bonus = rawSalesRows.reduce((sum, s) => sum + Number(s.bonus), 0)
   const deduction = rawSalesRows.reduce((sum, s) => sum + Number(s.deduction), 0)
-  // 発行前（プレビュー等）の時点ではカスタム項目はまだ存在しない。発行後に個別編集で追加する
+  // 発行前（プレビュー等）の時点では手動追加のカスタム項目はまだ存在しない。発行後に個別編集で追加する
   const customItems: CustomItem[] = []
+  // 売上入力時に登録した追加項目は、同じラベルの行同士を合算し内訳表示専用の項目として保持する
+  // （金額自体は既にbaseReward側の各行reward計算に含まれているため、totalRewardには重複加算しない）
+  const salesCustomItemsMap = new Map<string, number>()
+  for (const s of rawSalesRows) {
+    for (const item of parseCustomItems(s.custom_items)) {
+      salesCustomItemsMap.set(item.label, (salesCustomItemsMap.get(item.label) ?? 0) + item.amount)
+    }
+  }
+  const salesCustomItems: CustomItem[] = Array.from(salesCustomItemsMap, ([label, amount]) => ({ label, amount }))
   const totalReward = baseReward + bonus - deduction
 
   return {
@@ -93,7 +105,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     logoUrl: settings?.logo_url ?? null,
     from, to, rewardRate,
     salesRows,
-    salesTotal, baseReward, bonus, deduction, dailySettledAmount, customItems, totalReward,
+    salesTotal, baseReward, bonus, deduction, dailySettledAmount, customItems, salesCustomItems, totalReward,
     itemConfig: parseNoticeItemConfig(settings?.notice_item_config),
     headerText: settings?.notice_header_text ?? null,
     footerText: settings?.notice_footer_text ?? null,
@@ -108,6 +120,7 @@ function mapNoticeRow(data: {
   sales_rows: unknown
   sales_total: number; base_reward: number; bonus: number; deduction: number
   custom_items: unknown
+  sales_custom_items: unknown
   total_reward: number
   item_config: unknown; header_text: string | null; footer_text: string | null
   manually_edited: boolean
@@ -130,6 +143,7 @@ function mapNoticeRow(data: {
     bonus: Number(data.bonus), deduction: Number(data.deduction),
     dailySettledAmount: salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + (s.reward ?? 0), 0),
     customItems: (data.custom_items as CustomItem[] | null) ?? [],
+    salesCustomItems: (data.sales_custom_items as CustomItem[] | null) ?? [],
     totalReward: Number(data.total_reward),
     itemConfig: parseNoticeItemConfig(data.item_config),
     headerText: data.header_text, footerText: data.footer_text,
@@ -163,9 +177,8 @@ export async function getLatestNoticeSnapshot(supabase: SupabaseClient<any>, sto
 // 同じキャスト・同じ期間の過去の発行記録には一切影響しない）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function createNoticeSnapshot(supabase: SupabaseClient<any>, storeId: string, castId: string, issuedBy: string, content: NoticeContent) {
-  const customItemsTotal = content.customItems.reduce((sum, i) => sum + i.amount, 0)
-  const totalReward = content.baseReward + content.bonus - content.deduction + customItemsTotal
-
+  // content.baseRewardには売上行のsalesCustomItemsが既に加算済みのため、content.totalRewardをそのまま使う
+  // （salesCustomItemsは表示専用でtotalRewardの計算には含まれない。二重加算防止）
   return supabase.from('payment_notices').insert({
     store_id: storeId, cast_id: castId, period_from: content.from, period_to: content.to,
     issued_by: issuedBy,
@@ -176,7 +189,7 @@ export async function createNoticeSnapshot(supabase: SupabaseClient<any>, storeI
     reward_rate: content.rewardRate, sales_rows: content.salesRows,
     sales_total: content.salesTotal, base_reward: content.baseReward,
     bonus: content.bonus, deduction: content.deduction,
-    custom_items: content.customItems, total_reward: totalReward,
+    custom_items: content.customItems, sales_custom_items: content.salesCustomItems, total_reward: content.totalReward,
     item_config: content.itemConfig as unknown as Json, header_text: content.headerText, footer_text: content.footerText,
   }).select('id').single()
 }
@@ -186,7 +199,7 @@ export interface NoticeSummaryRow { label: string; text: string }
 // 支払通知書の内訳テーブル（最終行の「合計お支払額」を除く）を、店舗のitemConfig設定
 // （並び順・表示ON/OFF・ラベル）に基づいて組み立てる。PDF/HTML両方の表示で共通利用する
 export function buildNoticeSummaryRows(content: NoticeContent): NoticeSummaryRow[] {
-  const { itemConfig, salesTotal, rewardRate, baseReward, bonus, deduction, customItems, dailySettledAmount, totalReward } = content
+  const { itemConfig, salesTotal, rewardRate, baseReward, bonus, deduction, customItems, salesCustomItems, dailySettledAmount, totalReward } = content
   const taxExcluded = Math.floor(totalReward / 1.1)
   const taxAmount = totalReward - taxExcluded
   const rows: NoticeSummaryRow[] = []
@@ -209,7 +222,7 @@ export function buildNoticeSummaryRows(content: NoticeContent): NoticeSummaryRow
         if (deduction !== 0) rows.push({ label: entry.label, text: `-¥${deduction.toLocaleString()}` })
         break
       case 'custom_items':
-        for (const item of customItems) {
+        for (const item of [...salesCustomItems, ...customItems]) {
           rows.push({ label: item.label, text: `${item.amount >= 0 ? '+' : ''}¥${item.amount.toLocaleString()}` })
         }
         break
