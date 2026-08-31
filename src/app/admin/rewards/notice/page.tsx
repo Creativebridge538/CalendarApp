@@ -6,6 +6,7 @@ import { ja } from 'date-fns/locale'
 import { DownloadPdfButton } from './download-button'
 import { fetchNoticeContent, getNoticeSnapshotById, getLatestNoticeSnapshot, buildNoticeSummaryRows } from '@/lib/payment-notice-data'
 import { DEFAULT_NOTICE_FOOTER_TEXT } from '@/lib/notice-template'
+import { nowJST } from '@/lib/jst'
 
 export default async function PaymentNoticePage({
   searchParams,
@@ -115,7 +116,7 @@ export default async function PaymentNoticePage({
       <div className="notice-page">
         <div className="notice-title-row">
           <span className="notice-doc-title">支　払　通　知　書</span>
-          <div style={{ fontSize: 12 }}>発行日　{format(new Date(), 'yyyy年M月d日', { locale: ja })}</div>
+          <div style={{ fontSize: 12 }}>発行日　{format(nowJST(), 'yyyy年M月d日', { locale: ja })}</div>
         </div>
 
         <div className="notice-header-grid">

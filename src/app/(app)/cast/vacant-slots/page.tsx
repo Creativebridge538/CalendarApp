@@ -1,7 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
+import { format } from 'date-fns'
 import { CastVacantSlots } from '@/components/vacant-slots/cast-vacant-slots'
+import { nowJST } from '@/lib/jst'
 
 export default async function CastVacantSlotsPage() {
   const supabase = await createClient()
@@ -17,7 +19,7 @@ export default async function CastVacantSlotsPage() {
       .select('*, rooms(name), areas(name)')
       .eq('store_id', profile.store_id)
       .eq('is_published', true)
-      .gte('date', new Date().toISOString().split('T')[0])
+      .gte('date', format(nowJST(), 'yyyy-MM-dd'))
       .order('date'),
     supabase.from('vacant_slot_applications')
       .select('vacant_slot_id, status, shift_id')

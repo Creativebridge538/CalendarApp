@@ -4,6 +4,7 @@ import { ja } from 'date-fns/locale'
 import path from 'path'
 import { buildNoticeSummaryRows, type NoticeContent } from './payment-notice-data'
 import { DEFAULT_NOTICE_FOOTER_TEXT } from './notice-template'
+import { toJSTWallClock } from './jst'
 
 let fontRegistered = false
 function ensureFont() {
@@ -96,7 +97,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
       <Page size="A4" style={styles.page}>
         <View style={styles.titleRow}>
           <Text style={styles.docTitle}>支払通知書</Text>
-          <Text style={styles.issuedAt}>発行日　{format(new Date(issuedAt), 'yyyy年M月d日', { locale: ja })}</Text>
+          <Text style={styles.issuedAt}>発行日　{format(toJSTWallClock(issuedAt), 'yyyy年M月d日', { locale: ja })}</Text>
         </View>
 
         <View style={styles.headerGrid}>

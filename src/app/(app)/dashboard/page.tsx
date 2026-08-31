@@ -5,6 +5,7 @@ import { format, subDays, subMonths, startOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 import { includedInSalesTotal } from '@/lib/reward-rate'
+import { nowJST } from '@/lib/jst'
 
 export default async function DashboardPage() {
   const { user, profile } = await getCurrentUser()
@@ -24,7 +25,7 @@ function parseLocalDate(dateStr: string): Date {
 
 async function AdminDashboard({ storeId }: { storeId: string }) {
   const supabase = await createClient()
-  const now = new Date()
+  const now = nowJST()
   const today = format(now, 'yyyy-MM-dd')
   const sixtyDaysAgo = format(subDays(now, 59), 'yyyy-MM-dd')
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')

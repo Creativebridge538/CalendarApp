@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 import { RewardCalculator } from '@/components/rewards/reward-calculator'
+import { nowJST } from '@/lib/jst'
 
 export default async function RewardsPage({
   searchParams,
@@ -15,7 +16,7 @@ export default async function RewardsPage({
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const storeId = profile.store_id!
-  const now = new Date()
+  const now = nowJST()
   const { from: fromParam, to: toParam } = await searchParams
   const from = fromParam || format(startOfMonth(now), 'yyyy-MM-dd')
   const to = toParam || format(endOfMonth(now), 'yyyy-MM-dd')

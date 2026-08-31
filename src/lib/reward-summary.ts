@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { Database } from '@/lib/supabase/database.types'
 import { shiftHours } from '@/lib/shift-hours'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
+import { nowJST } from '@/lib/jst'
 
 export interface MonthToDateSummary {
   monthLabel: string
@@ -28,7 +29,7 @@ export async function getMonthToDateSummary(
   castId: string,
   castProfile: CastRewardProfile
 ): Promise<MonthToDateSummary> {
-  const now = new Date()
+  const now = nowJST()
   const today = format(now, 'yyyy-MM-dd')
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
   const monthEnd = format(endOfMonth(now), 'yyyy-MM-dd')

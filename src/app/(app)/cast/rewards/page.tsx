@@ -4,6 +4,7 @@ import { redirect } from 'next/navigation'
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns'
 import { CastRewardDashboard } from '@/components/rewards/cast-reward-dashboard'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
+import { nowJST } from '@/lib/jst'
 
 function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
@@ -18,7 +19,7 @@ export default async function CastRewardsPage() {
     return <div className="p-6 text-sm text-muted-foreground">店舗が割り当てられていません。管理者にお問い合わせください。</div>
   }
 
-  const now = new Date()
+  const now = nowJST()
   const today = format(now, 'yyyy-MM-dd')
   const sixtyDaysAgo = format(subDays(now, 59), 'yyyy-MM-dd')
   const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')

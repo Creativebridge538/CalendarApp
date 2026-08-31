@@ -3,6 +3,7 @@ import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { format, endOfMonth } from 'date-fns'
 import { SalesInput } from '@/components/sales/sales-input'
+import { nowJST } from '@/lib/jst'
 
 export default async function SalesPage({
   searchParams,
@@ -15,7 +16,7 @@ export default async function SalesPage({
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const storeId = profile.store_id!
-  const now = new Date()
+  const now = nowJST()
   const { year: yearParam, month: monthParam } = await searchParams
   const year = parseInt(yearParam ?? '') || now.getFullYear()
   const month = parseInt(monthParam ?? '') || now.getMonth() + 1

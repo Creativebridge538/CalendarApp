@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { format, addDays, subDays } from 'date-fns'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { buildIcsCalendar } from '@/lib/ics'
+import { nowJST } from '@/lib/jst'
 
 const STATUS_LABEL: Record<string, string> = {
   draft: '下書き', submitted: '提出済み', confirmed: '確定', rejected: '差し戻し',
@@ -25,7 +26,7 @@ export async function GET(
 
   const { data: store } = await admin.from('stores').select('name').eq('id', user.store_id ?? '').maybeSingle()
 
-  const today = new Date()
+  const today = nowJST()
   const from = format(subDays(today, 30), 'yyyy-MM-dd')
   const to = format(addDays(today, 180), 'yyyy-MM-dd')
 

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
 import { VacantSlotManager } from '@/components/vacant-slots/vacant-slot-manager'
+import { nowJST } from '@/lib/jst'
 
 export default async function VacantSlotsPage() {
   const supabase = await createClient()
@@ -11,7 +12,7 @@ export default async function VacantSlotsPage() {
   if (profile?.role !== 'admin') redirect('/dashboard')
 
   const storeId = profile.store_id!
-  const today = format(new Date(), 'yyyy-MM-dd')
+  const today = format(nowJST(), 'yyyy-MM-dd')
 
   const [{ data: slots }, { data: rooms }, { data: areas }, { data: settings }] = await Promise.all([
     // 日付が過ぎた空き枠は一覧から消す（管理画面を今後の分だけにするため）
