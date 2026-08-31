@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -45,6 +46,7 @@ interface CastListProps {
 }
 
 export function CastList({ casts: initialCasts, storeId, profileFields, stageNamesByCastId, enabledPlatforms }: CastListProps) {
+  const router = useRouter()
   const [casts, setCasts] = useState(initialCasts)
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list')
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -171,6 +173,13 @@ export function CastList({ casts: initialCasts, storeId, profileFields, stageNam
   }
 
   async function handleSave() {
+    const trimmedStageNames = form.stage_names.map(n => n.trim()).filter(Boolean)
+    const allNames = [form.display_name.trim(), ...trimmedStageNames].map(n => n.toLowerCase())
+    if (new Set(allNames).size !== allNames.length) {
+      toast.error('同じ源氏名が重複しています。それぞれ別の名前にしてください')
+      return
+    }
+
     setSaving(true)
     try {
       if (!editing) {
@@ -246,6 +255,9 @@ export function CastList({ casts: initialCasts, storeId, profileFields, stageNam
         toast.success('キャスト情報を更新しました')
       }
       setOpen(false)
+      // 源氏名はサーバーコンポーネント側で取得したstageNamesByCastIdに依存するため、
+      // 保存直後の画面にも反映されるよう再取得する
+      router.refresh()
     } finally {
       setSaving(false)
     }
