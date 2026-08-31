@@ -174,9 +174,25 @@ export function CastList({ casts: initialCasts, storeId, profileFields, stageNam
 
   async function handleSave() {
     const trimmedStageNames = form.stage_names.map(n => n.trim()).filter(Boolean)
-    const allNames = [form.display_name.trim(), ...trimmedStageNames].map(n => n.toLowerCase())
-    if (new Set(allNames).size !== allNames.length) {
+    const namesToCheck = [form.display_name.trim(), ...trimmedStageNames]
+    const lowerNames = namesToCheck.map(n => n.toLowerCase())
+    if (new Set(lowerNames).size !== lowerNames.length) {
       toast.error('同じ源氏名が重複しています。それぞれ別の名前にしてください')
+      return
+    }
+
+    // 売上登録のキャスト選択で同じ表記が複数キャストにまたがると区別できなくなるため、
+    // 他のキャスト（本名以外の源氏名も含む）との重複も禁止する
+    const otherCastsNames = new Set(
+      casts
+        .filter(c => c.id !== editing?.id)
+        .flatMap(c => [c.display_name ?? '', ...(stageNamesByCastId[c.id] ?? [])])
+        .map(n => n.trim().toLowerCase())
+        .filter(Boolean)
+    )
+    const conflictingName = namesToCheck.find(n => otherCastsNames.has(n.toLowerCase()))
+    if (conflictingName) {
+      toast.error(`「${conflictingName}」という源氏名は既に他のキャストで使われています。別の名前にしてください`)
       return
     }
 
