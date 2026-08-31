@@ -1036,9 +1036,6 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     ))}
                   </div>
                 )}
-                <Button size="sm" variant="outline" onClick={() => setForm({ ...form, custom_items: [...form.custom_items, { templateId: '', label: '', unit: 'jpy', rawUnits: '', amount: '' }] })}>
-                  <Plus className="h-3.5 w-3.5 mr-1" />その他の項目を追加
-                </Button>
               </div>
 
               {form.platform !== 'manual' && preview && (
