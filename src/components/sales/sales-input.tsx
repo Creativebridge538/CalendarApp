@@ -263,6 +263,14 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return Math.floor(calcSalesAmount(unit, rawUnits) * rate)
   }
 
+  // 円建ての追加項目で「売上に反映する」がONの場合、入力金額はプラットフォーム換算なしの売上そのものとして扱い、
+  // キャスト報酬はそのキャストの基本報酬率（日払い・プラットフォーム別の上書きは考慮しない）を掛けた金額にする。
+  // OFFの場合（ボーナス・交通費など）は従来通り入力金額をそのままキャスト報酬に加算する
+  function calcJpyItemReward(rawYen: number, castId: string, includedInSales: boolean): number {
+    if (!includedInSales) return rawYen
+    return Math.floor(rawYen * (castRewardRateById[castId] ?? 0))
+  }
+
   // まとめて登録用: 1件ずつ登録のcalcItemAmountと同じ計算だが、対象キャストをform.cast_idではなく引数で受け取る
   // （まとめて登録の日払い扱いは常にfalseのため、reward_rate_overrideも常にnull）
   function calcBulkItemAmount(cast: { id: string }, unit: string, rawUnits: string): number {
@@ -482,12 +490,17 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     setCastOptionKey(sale.cast_id)
     // 既存の追加項目のうち、テンプレートと項目名が一致するものはそのテンプレートのデフォルト欄に値を復元し、
     // 一致しないもの（テンプレート削除後や自由入力分）はその他の項目として残す
-    const existingItems = (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number; unit?: string; rawUnits?: string }[] : [])
+    const existingItems = (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number; unit?: string; rawUnits?: string; salesAmount?: number }[] : [])
     const usedLabels = new Set<string>()
     const templateItems = itemTemplates.map(t => {
       const match = existingItems.find(i => i.label === t.label)
       if (match) usedLabels.add(match.label)
-      return { templateId: t.id, label: t.label, unit: t.unit, rawUnits: match?.rawUnits ?? '', amount: match ? String(match.amount) : '' }
+      // 円建て項目のamountは「売上に反映する」ONだと報酬率適用後の金額になるため、
+      // 編集フォームには入力時の生の金額（常に生の値のsalesAmount）を復元する
+      const restoredAmount = match
+        ? (match.unit === 'jpy' || t.unit === 'jpy' ? String(match.salesAmount ?? match.amount) : String(match.amount))
+        : ''
+      return { templateId: t.id, label: t.label, unit: t.unit, rawUnits: match?.rawUnits ?? '', amount: restoredAmount }
     })
     const extraItems = existingItems.filter(i => !usedLabels.has(i.label))
       .map(i => ({ templateId: '', label: i.label, unit: i.unit ?? 'jpy', rawUnits: i.rawUnits ?? '', amount: String(i.amount) }))
@@ -546,8 +559,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
         .filter(i => i.label.trim() !== '')
         .map(i => ({
           label: i.label.trim(), unit: i.unit, rawUnits: i.rawUnits,
-          amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits),
-          salesAmount: calcSalesAmount(i.unit, i.rawUnits),
+          amount: i.unit === 'jpy'
+            ? calcJpyItemReward(parseFloat(i.amount) || 0, form.cast_id, includedInSalesLabels.has(i.label.trim()))
+            : calcItemAmount(i.unit, i.rawUnits),
+          salesAmount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcSalesAmount(i.unit, i.rawUnits),
         }))
         // デフォルト項目は未入力のまま保存しないよう、金額が0の行は除外する
         .filter(i => i.amount !== 0),
@@ -675,7 +690,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
         .map(t => {
           const rawUnits = row.customItems[t.id] ?? ''
           if (!rawUnits.trim()) return null
-          const amount = t.unit === 'jpy' ? (parseFloat(rawUnits) || 0) : calcBulkItemAmount(cast, t.unit, rawUnits)
+          const amount = t.unit === 'jpy'
+            ? calcJpyItemReward(parseFloat(rawUnits) || 0, cast.id, includedInSalesLabels.has(t.label))
+            : calcBulkItemAmount(cast, t.unit, rawUnits)
           return { label: t.label, unit: t.unit, rawUnits, amount, salesAmount: calcSalesAmount(t.unit, rawUnits) }
         })
         .filter((i): i is NonNullable<typeof i> => i !== null && i.amount !== 0)
@@ -997,10 +1014,22 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                           {item.label}（{NOTICE_ITEM_UNIT_LABEL[item.unit] ?? item.unit}）
                         </Label>
                         {item.unit === 'jpy' ? (
-                          <Input
-                            type="number" placeholder="0" value={item.amount}
-                            onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
-                          />
+                          includedInSalesLabels.has(item.label) ? (
+                            <div className="flex items-center gap-2">
+                              <Input
+                                type="number" placeholder="0" value={item.amount}
+                                onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
+                              />
+                              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                                → 女子給¥{calcJpyItemReward(parseFloat(item.amount) || 0, form.cast_id, true).toLocaleString()}
+                              </span>
+                            </div>
+                          ) : (
+                            <Input
+                              type="number" placeholder="0" value={item.amount}
+                              onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
+                            />
+                          )
                         ) : (
                           <div className="flex items-center gap-2">
                             <Input
@@ -1038,11 +1067,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 )}
               </div>
 
-              {form.platform !== 'manual' && preview && (
+              {(preview || formIncludedSalesTotal !== 0) && (
                 <p className="text-sm text-muted-foreground">
-                  売上: <span className="font-medium text-foreground">¥{(preview.jpy + formIncludedSalesTotal).toLocaleString()}</span>
-                  {preview.usd != null && ` （$${preview.usd.toFixed(2)}）`}
-                  {preview.usd != null && usdJpyRate != null && ` ・ 為替レート: ¥${usdJpyRate.toFixed(2)}/$`}
+                  売上: <span className="font-medium text-foreground">¥{((preview?.jpy ?? 0) + formIncludedSalesTotal).toLocaleString()}</span>
+                  {preview?.usd != null && ` （$${preview.usd.toFixed(2)}）`}
+                  {preview?.usd != null && usdJpyRate != null && ` ・ 為替レート: ¥${usdJpyRate.toFixed(2)}/$`}
                 </p>
               )}
 
