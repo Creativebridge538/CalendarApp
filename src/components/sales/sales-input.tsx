@@ -19,7 +19,7 @@ import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit, R
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
-import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, includedInSalesTotal } from '@/lib/reward-rate'
 import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
 import { parseNoticeItemConfig } from '@/lib/notice-template'
 import { usePagination } from '@/hooks/use-pagination'
@@ -62,7 +62,7 @@ interface Props {
   year: number
   month: number
   stageNamesByCastId: Record<string, string[]>
-  itemTemplates: { id: string; label: string; unit: string }[]
+  itemTemplates: { id: string; label: string; unit: string; include_in_sales: boolean }[]
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -208,12 +208,18 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return map
   }, [casts])
 
+  // プラットフォーム単位（トークン・ポイント）の追加項目を、店舗の粗売上ベース（報酬率を掛ける前）の
+  // 金額に円換算する。円単位の項目はそのまま数値を返す
+  function calcSalesAmount(unit: string, rawUnits: string): number {
+    const units = parseFloat(rawUnits) || 0
+    if (unit === 'jpy') return units
+    return calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+  }
+
   // プラットフォーム単位（トークン・ポイント）の追加項目は、換算後の売上額をそのまま使うのではなく、
   // このキャストの報酬率を掛けた女子給ベースの金額にする（通知書には売上ではなく女子給を載せるため）
   function calcItemAmount(unit: string, rawUnits: string): number {
-    const units = parseFloat(rawUnits) || 0
-    if (unit === 'jpy') return units
-    const salesAmount = calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
+    if (unit === 'jpy') return calcSalesAmount(unit, rawUnits)
     const rate = effectiveRewardRate(
       {
         platform: unit,
@@ -225,7 +231,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       castDailyRateById[form.cast_id],
       castPlatformDailyRatesById[form.cast_id]
     )
-    return Math.floor(salesAmount * rate)
+    return Math.floor(calcSalesAmount(unit, rawUnits) * rate)
   }
 
   const filteredSales = useMemo(() => sales.filter(s =>
@@ -374,7 +380,14 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     }
   }
 
-  const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) => sum + Number(s.amount), 0), [filteredSales])
+  // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する
+  const includedInSalesLabels = useMemo(
+    () => new Set(itemTemplates.filter(t => t.include_in_sales).map(t => t.label)),
+    [itemTemplates]
+  )
+  const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) =>
+    sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0
+  ), [filteredSales, includedInSalesLabels])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
     const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0, castPlatformRatesById[s.cast_id], castDailyRateById[s.cast_id], castPlatformDailyRatesById[s.cast_id])
     return sum + Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction) + customItemsTotal(s.custom_items)
@@ -419,15 +432,15 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     setCastOptionKey(sale.cast_id)
     // 既存の追加項目のうち、テンプレートと項目名が一致するものはそのテンプレートのデフォルト欄に値を復元し、
     // 一致しないもの（テンプレート削除後や自由入力分）はその他の項目として残す
-    const existingItems = (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number }[] : [])
+    const existingItems = (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number; unit?: string; rawUnits?: string }[] : [])
     const usedLabels = new Set<string>()
     const templateItems = itemTemplates.map(t => {
       const match = existingItems.find(i => i.label === t.label)
       if (match) usedLabels.add(match.label)
-      return { templateId: t.id, label: t.label, unit: t.unit, rawUnits: '', amount: match ? String(match.amount) : '' }
+      return { templateId: t.id, label: t.label, unit: t.unit, rawUnits: match?.rawUnits ?? '', amount: match ? String(match.amount) : '' }
     })
     const extraItems = existingItems.filter(i => !usedLabels.has(i.label))
-      .map(i => ({ templateId: '', label: i.label, unit: 'jpy', rawUnits: '', amount: String(i.amount) }))
+      .map(i => ({ templateId: '', label: i.label, unit: i.unit ?? 'jpy', rawUnits: i.rawUnits ?? '', amount: String(i.amount) }))
     setForm({
       cast_id: sale.cast_id,
       date: sale.date,
@@ -477,9 +490,15 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       worked_hours: form.worked_hours ? parseFloat(form.worked_hours) : null,
       bonus: form.bonus ? parseInt(form.bonus) : 0,
       deduction: form.deduction ? parseInt(form.deduction) : 0,
+      // unit/rawUnitsも保存しておくことで、編集時に円換算前の入力値をそのまま復元できるようにする。
+      // salesAmountは報酬率を掛ける前の売上ベースの金額（「売上に反映する」設定の項目を売上合計に足す際に使う）
       custom_items: form.custom_items
         .filter(i => i.label.trim() !== '')
-        .map(i => ({ label: i.label.trim(), amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits) }))
+        .map(i => ({
+          label: i.label.trim(), unit: i.unit, rawUnits: i.rawUnits,
+          amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits),
+          salesAmount: calcSalesAmount(i.unit, i.rawUnits),
+        }))
         // デフォルト項目は未入力のまま保存しないよう、金額が0の行は除外する
         .filter(i => i.amount !== 0),
       store_id: storeId,
@@ -705,6 +724,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0, castPlatformRatesById[sale.cast_id], castDailyRateById[sale.cast_id], castPlatformDailyRatesById[sale.cast_id]))
                 const customTotal = customItemsTotal(sale.custom_items)
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction) + customTotal
+                const salesAmount = Number(sale.amount) + includedInSalesTotal(sale.custom_items, includedInSalesLabels)
                 return (
                   <TableRow key={sale.id}>
                     <TableCell>
@@ -735,7 +755,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                         </>
                       ) : '—'}
                     </TableCell>
-                    <TableCell className="text-right">¥{Number(sale.amount).toLocaleString()}</TableCell>
+                    <TableCell className="text-right">¥{salesAmount.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       ¥{reward.toLocaleString()}
                       {(Number(sale.bonus) > 0 || Number(sale.deduction) > 0 || customTotal !== 0) && (

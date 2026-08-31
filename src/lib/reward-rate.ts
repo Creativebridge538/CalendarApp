@@ -12,7 +12,15 @@ export function parsePlatformRewardRates(raw: unknown): PlatformRewardRates {
   return result
 }
 
-export interface SaleCustomItem { label: string; amount: number }
+export interface SaleCustomItem {
+  label: string
+  /** 女子給ベースの金額（報酬率を掛けた後の金額。円以外の単位はここに報酬率が反映済み） */
+  amount: number
+  unit?: string
+  rawUnits?: string
+  /** 売上（店舗の粗売上）ベースの金額（報酬率を掛けていない、プラットフォーム換算後の金額）。円単位ならamountと同額 */
+  salesAmount?: number
+}
 
 // 売上行に追加した項目（ボーナス・控除と同様に加減算される、名前付きの追加金額）の合計を求める
 export function customItemsTotal(raw: unknown): number {
@@ -23,15 +31,32 @@ export function customItemsTotal(raw: unknown): number {
   }, 0)
 }
 
-// 売上行のcustom_itemsを検証済みの{label, amount}配列として取り出す（支払通知書への内訳表示用）
+// 売上行のcustom_itemsを検証済みの配列として取り出す（支払通知書への内訳表示・売上反映判定用）
 export function parseCustomItems(raw: unknown): SaleCustomItem[] {
   if (!Array.isArray(raw)) return []
   return raw.flatMap(item => {
     const label = (item as { label?: unknown })?.label
     const amount = Number((item as { amount?: unknown })?.amount)
     if (typeof label !== 'string' || !label.trim() || Number.isNaN(amount)) return []
-    return [{ label: label.trim(), amount }]
+    const unit = (item as { unit?: unknown })?.unit
+    const rawUnits = (item as { rawUnits?: unknown })?.rawUnits
+    const salesAmountRaw = (item as { salesAmount?: unknown })?.salesAmount
+    const salesAmount = Number(salesAmountRaw)
+    return [{
+      label: label.trim(), amount,
+      unit: typeof unit === 'string' ? unit : undefined,
+      rawUnits: typeof rawUnits === 'string' ? rawUnits : undefined,
+      salesAmount: Number.isNaN(salesAmount) ? undefined : salesAmount,
+    }]
   })
+}
+
+// 「売上に反映する」設定がオンのテンプレートに一致する項目だけ、売上ベースの金額を合計する
+// （店舗の粗売上に含めるかどうかは項目テンプレート側の設定で決まる。円以外の単位は報酬率を掛ける前の金額を使う）
+export function includedInSalesTotal(raw: unknown, includedLabels: ReadonlySet<string>): number {
+  return parseCustomItems(raw)
+    .filter(item => includedLabels.has(item.label))
+    .reduce((sum, item) => sum + (item.salesAmount ?? item.amount), 0)
 }
 
 interface RewardRateSale {

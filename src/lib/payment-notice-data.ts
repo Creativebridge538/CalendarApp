@@ -1,5 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, parseCustomItems } from './reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, parseCustomItems, includedInSalesTotal } from './reward-rate'
 import { parseNoticeItemConfig, type NoticeItemConfigEntry } from './notice-template'
 import type { Json } from './supabase/database.types'
 
@@ -45,7 +45,7 @@ export interface NoticeContent {
 // 現時点の売上・キャスト情報からその場で計算する（発行前のプレビューや、新規発行時に使う）
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
-  const [{ data: store }, { data: settings }, { data: cast }, { data: sales }] = await Promise.all([
+  const [{ data: store }, { data: settings }, { data: cast }, { data: sales }, { data: itemTemplates }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url, notice_item_config, notice_header_text, notice_footer_text').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
@@ -53,6 +53,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
       .order('date'),
+    supabase.from('notice_item_templates').select('label').eq('store_id', storeId).eq('include_in_sales', true),
   ])
 
   if (!cast) return null
@@ -61,7 +62,9 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
   const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
   const rawSalesRows = sales ?? []
-  const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.amount), 0)
+  // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する
+  const includedInSalesLabels = new Set((itemTemplates ?? []).map(t => t.label))
+  const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
   // その行だけ別の率で計算する（それ以外は通常の報酬率）。後で日払い精算済み分の内訳表示にも
   // 使えるよう、行ごとの報酬額も保持しておく

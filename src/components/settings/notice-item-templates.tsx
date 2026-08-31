@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -29,26 +30,26 @@ export function NoticeItemTemplates({ templates: initialTemplates, storeId }: Pr
   const [templates, setTemplates] = useState(initialTemplates)
   const [open, setOpen] = useState(false)
   const [editing, setEditing] = useState<NoticeItemTemplate | null>(null)
-  const [form, setForm] = useState({ label: '', unit: 'jpy', sort_order: '0' })
+  const [form, setForm] = useState({ label: '', unit: 'jpy', sort_order: '0', include_in_sales: false })
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
   function openNew() {
     setEditing(null)
-    setForm({ label: '', unit: 'jpy', sort_order: String(templates.length) })
+    setForm({ label: '', unit: 'jpy', sort_order: String(templates.length), include_in_sales: false })
     setOpen(true)
   }
 
   function openEdit(template: NoticeItemTemplate) {
     setEditing(template)
-    setForm({ label: template.label, unit: template.unit, sort_order: String(template.sort_order) })
+    setForm({ label: template.label, unit: template.unit, sort_order: String(template.sort_order), include_in_sales: template.include_in_sales })
     setOpen(true)
   }
 
   async function handleSave() {
     setSaving(true)
     try {
-      const payload = { label: form.label, unit: form.unit, sort_order: parseInt(form.sort_order) || 0 }
+      const payload = { label: form.label, unit: form.unit, sort_order: parseInt(form.sort_order) || 0, include_in_sales: form.include_in_sales }
       if (editing) {
         const { error } = await supabase.from('notice_item_templates').update(payload).eq('id', editing.id)
         if (error) { toast.error('更新に失敗しました'); return }
@@ -118,7 +119,12 @@ export function NoticeItemTemplates({ templates: initialTemplates, storeId }: Pr
             )}
             {sorted.map(template => (
               <TableRow key={template.id} className={!template.is_active ? 'opacity-50' : ''}>
-                <TableCell className="font-medium">{template.label}</TableCell>
+                <TableCell className="font-medium">
+                  {template.label}
+                  {template.include_in_sales && (
+                    <Badge variant="outline" className="ml-1.5 text-[10px] font-normal align-middle">売上反映</Badge>
+                  )}
+                </TableCell>
                 <TableCell>{NOTICE_ITEM_UNIT_LABEL[template.unit] ?? template.unit}</TableCell>
                 <TableCell className="text-right">{template.sort_order}</TableCell>
                 <TableCell>
@@ -173,6 +179,19 @@ export function NoticeItemTemplates({ templates: initialTemplates, storeId }: Pr
               <Label>表示順</Label>
               <Input type="number" min="0" value={form.sort_order} onChange={e => setForm({ ...form, sort_order: e.target.value })} />
             </div>
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox
+                checked={form.include_in_sales}
+                onCheckedChange={v => setForm({ ...form, include_in_sales: !!v })}
+                className="mt-0.5"
+              />
+              <span>
+                売上に反映する
+                <span className="block text-xs text-muted-foreground font-normal">
+                  チェックすると、この項目の金額が売上入力の売上合計にも加算されます（円以外の単位は報酬率を掛ける前の金額で加算）
+                </span>
+              </span>
+            </label>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)} disabled={saving}>キャンセル</Button>
               <Button onClick={handleSave} disabled={saving || !form.label}>

@@ -147,6 +147,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          include_in_sales: boolean
           is_active: boolean
           label: string
           sort_order: number
@@ -156,6 +157,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          include_in_sales?: boolean
           is_active?: boolean
           label: string
           sort_order?: number
@@ -165,6 +167,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          include_in_sales?: boolean
           is_active?: boolean
           label?: string
           sort_order?: number

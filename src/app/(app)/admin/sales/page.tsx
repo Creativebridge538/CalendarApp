@@ -29,7 +29,7 @@ export default async function SalesPage({
       .gte('date', monthStart).lte('date', monthEnd).order('date', { ascending: false }),
     supabase.from('store_settings').select('usd_jpy_rate, usd_jpy_auto_fetch, usd_jpy_adjustment, platform_settings, enabled_platforms, notice_item_config').eq('store_id', storeId).single(),
     supabase.from('cast_stage_names').select('cast_id, name').eq('store_id', storeId),
-    supabase.from('notice_item_templates').select('id, label, unit').eq('store_id', storeId).eq('is_active', true).order('sort_order'),
+    supabase.from('notice_item_templates').select('id, label, unit, include_in_sales').eq('store_id', storeId).eq('is_active', true).order('sort_order'),
   ])
 
   const stageNamesByCastId: Record<string, string[]> = {}
