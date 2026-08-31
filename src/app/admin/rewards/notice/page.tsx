@@ -54,7 +54,7 @@ export default async function PaymentNoticePage({
 
   const hasFxRow = salesRows.some(s => s.fxRate != null)
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
-  const { rows: summaryRows, settlementRows } = buildNoticeSummaryRows(content)
+  const { itemRows, subtotalRows, settlementRows } = buildNoticeSummaryRows(content)
 
   return (
     <div style={{ background: '#eef0f2', minHeight: '100vh' }}>
@@ -97,6 +97,10 @@ export default async function PaymentNoticePage({
         table.summary-table td { padding: 6px 10px; border-bottom: 1px dotted #ccc; }
         table.summary-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
         table.summary-table .final-row td { padding: 8px 10px; font-weight: bold; font-size: 15px; border-top: 1.5px solid #1a1a1a; border-bottom: 1.5px solid #1a1a1a; }
+        /* 小計・消費税は報酬明細（項目一覧）ではなく集計結果のため、視覚的に分離する */
+        table.subtotal-table { width: 100%; border-collapse: collapse; font-size: 12px; color: #555; margin-top: 4px; }
+        table.subtotal-table td { padding: 3px 10px; }
+        table.subtotal-table td.right { text-align: right; font-variant-numeric: tabular-nums; }
         table.bank-table { width: 100%; border-collapse: collapse; font-size: 13px; border: 1.5px solid #1a1a1a; margin-top: 20px; }
         table.bank-table td { padding: 8px 10px; border: 1px solid #1a1a1a; }
         table.bank-table .bank-header td { font-weight: bold; }
@@ -137,9 +141,24 @@ export default async function PaymentNoticePage({
 
         <table className="summary-table">
           <tbody>
-            {summaryRows.map((row, i) => (
+            {itemRows.map((row, i) => (
               <tr key={i}><td>{row.label}</td><td className="right">{row.text}</td></tr>
             ))}
+          </tbody>
+        </table>
+
+        {subtotalRows.length > 0 && (
+          <table className="subtotal-table">
+            <tbody>
+              {subtotalRows.map((row, i) => (
+                <tr key={i}><td>{row.label}</td><td className="right">{row.text}</td></tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+
+        <table className="summary-table">
+          <tbody>
             <tr className="final-row"><td>今回お支払額</td><td className="right">¥{totalReward.toLocaleString()}</td></tr>
           </tbody>
         </table>

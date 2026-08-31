@@ -199,55 +199,58 @@ export async function createNoticeSnapshot(supabase: SupabaseClient<any>, storeI
 
 export interface NoticeSummaryRow { label: string; text: string }
 export interface NoticeSummaryGroups {
-  /** 報酬明細ブロック（最終行の「今回お支払額」を除く） */
-  rows: NoticeSummaryRow[]
+  /** 報酬明細ブロック（基本報酬・ボーナス・控除・追加項目など、加算対象の項目一覧） */
+  itemRows: NoticeSummaryRow[]
+  /** 明細を集計した行（小計・うち消費税）。「今回お支払額」の直前に、明細一覧とは別枠で表示する */
+  subtotalRows: NoticeSummaryRow[]
   /** 精算情報ブロック（今回お支払額には影響しない参考情報） */
   settlementRows: NoticeSummaryRow[]
 }
 
 // 支払通知書の内訳を、店舗のitemConfig設定（並び順・表示ON/OFF・ラベル）に基づいて
-// 「報酬明細」と「精算情報」の2ブロックに分けて組み立てる。PDF/HTML両方の表示で共通利用する。
+// 「報酬明細」「小計・消費税」「精算情報」の3ブロックに分けて組み立てる。PDF/HTML両方の表示で共通利用する。
 // 内税運用が前提のため、小計は常に今回お支払額（totalReward）と同額になる
 export function buildNoticeSummaryRows(content: NoticeContent): NoticeSummaryGroups {
   const { itemConfig, salesTotal, rewardRate, baseReward, bonus, deduction, customItems, salesCustomItems, dailySettledAmount, totalReward } = content
   const taxExcluded = Math.floor(totalReward / 1.1)
   const taxAmount = totalReward - taxExcluded
-  const rows: NoticeSummaryRow[] = []
+  const itemRows: NoticeSummaryRow[] = []
+  const subtotalRows: NoticeSummaryRow[] = []
   const settlementRows: NoticeSummaryRow[] = []
   for (const entry of itemConfig) {
     if (!entry.visible) continue
     switch (entry.key) {
       case 'sales_total':
-        rows.push({ label: entry.label, text: `¥${salesTotal.toLocaleString()}` })
+        itemRows.push({ label: entry.label, text: `¥${salesTotal.toLocaleString()}` })
         break
       case 'reward_rate':
-        rows.push({ label: entry.label, text: `${(rewardRate * 100).toFixed(1)}%` })
+        itemRows.push({ label: entry.label, text: `${(rewardRate * 100).toFixed(1)}%` })
         break
       case 'base_reward':
-        rows.push({ label: entry.label, text: `¥${baseReward.toLocaleString()}` })
+        itemRows.push({ label: entry.label, text: `¥${baseReward.toLocaleString()}` })
         break
       case 'bonus':
-        if (bonus !== 0) rows.push({ label: entry.label, text: `+¥${bonus.toLocaleString()}` })
+        if (bonus !== 0) itemRows.push({ label: entry.label, text: `+¥${bonus.toLocaleString()}` })
         break
       case 'deduction':
-        if (deduction !== 0) rows.push({ label: entry.label, text: `-¥${deduction.toLocaleString()}` })
+        if (deduction !== 0) itemRows.push({ label: entry.label, text: `-¥${deduction.toLocaleString()}` })
         break
       case 'custom_items':
         for (const item of [...salesCustomItems, ...customItems]) {
-          rows.push({ label: item.label, text: `${item.amount >= 0 ? '+' : ''}¥${item.amount.toLocaleString()}` })
+          itemRows.push({ label: item.label, text: `${item.amount >= 0 ? '+' : ''}¥${item.amount.toLocaleString()}` })
         }
         break
       case 'tax_breakdown':
         // 内税運用のため、小計は今回お支払額と同額（消費税は加算せず、内訳として表示するのみ）
-        rows.push({ label: '小計', text: `¥${totalReward.toLocaleString()}` })
-        rows.push({ label: entry.label, text: `¥${taxAmount.toLocaleString()}` })
+        subtotalRows.push({ label: '小計', text: `¥${totalReward.toLocaleString()}` })
+        subtotalRows.push({ label: entry.label, text: `¥${taxAmount.toLocaleString()}` })
         break
       case 'daily_settled':
         if (dailySettledAmount > 0) settlementRows.push({ label: entry.label, text: `¥${dailySettledAmount.toLocaleString()}` })
         break
     }
   }
-  return { rows, settlementRows }
+  return { itemRows, subtotalRows, settlementRows }
 }
 
 // 例: 20260801-20260815_55000_山田太郎_支払通知書.pdf（対象期間(開始日-終了日)_支払額_本名(または源氏名)）

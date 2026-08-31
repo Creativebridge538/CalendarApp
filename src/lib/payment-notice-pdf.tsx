@@ -39,15 +39,21 @@ const styles = StyleSheet.create({
   totalLabel: { fontSize: 12, fontWeight: 700, width: 70 },
   totalAmount: { fontSize: 20, fontWeight: 700 },
   taxNote: { fontSize: 9, color: '#555', marginBottom: 16 },
-  summaryTable: { marginBottom: 20 },
+  summaryTable: { marginBottom: 8 },
   summaryRow: {
     flexDirection: 'row', justifyContent: 'space-between',
     paddingVertical: 5, borderBottomWidth: 1, borderBottomColor: '#ccc',
   },
+  // 小計・消費税は報酬明細（項目一覧）ではなく集計結果のため、視覚的に分離する
+  subtotalBlock: { marginBottom: 8, paddingTop: 4 },
+  subtotalRow: {
+    flexDirection: 'row', justifyContent: 'space-between',
+    paddingVertical: 3, fontSize: 10, color: '#555',
+  },
   summaryFinalRow: {
     flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 7,
     borderTopWidth: 1.5, borderTopColor: '#1a1a1a', borderBottomWidth: 1.5, borderBottomColor: '#1a1a1a',
-    fontWeight: 700, fontSize: 12,
+    fontWeight: 700, fontSize: 12, marginBottom: 20,
   },
   breakdownTitle: {
     fontSize: 10, fontWeight: 700, borderBottomWidth: 1, borderBottomColor: '#ccc',
@@ -83,7 +89,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   const hasFxRow = salesRows.some(s => s.fxRate != null)
-  const { rows: summaryRows, settlementRows } = buildNoticeSummaryRows(content)
+  const { itemRows, subtotalRows, settlementRows } = buildNoticeSummaryRows(content)
 
   return (
     <Document>
@@ -109,12 +115,21 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
         <Text style={styles.taxNote}>※上記金額には消費税10%が含まれています。</Text>
 
         <View style={styles.summaryTable}>
-          {summaryRows.map((row, i) => (
+          {itemRows.map((row, i) => (
             <View key={i} style={styles.summaryRow}><Text>{row.label}</Text><Text>{row.text}</Text></View>
           ))}
-          <View style={styles.summaryFinalRow}>
-            <Text>今回お支払額</Text><Text>¥{totalReward.toLocaleString()}</Text>
+        </View>
+
+        {subtotalRows.length > 0 && (
+          <View style={styles.subtotalBlock}>
+            {subtotalRows.map((row, i) => (
+              <View key={i} style={styles.subtotalRow}><Text>{row.label}</Text><Text>{row.text}</Text></View>
+            ))}
           </View>
+        )}
+
+        <View style={styles.summaryFinalRow}>
+          <Text>今回お支払額</Text><Text>¥{totalReward.toLocaleString()}</Text>
         </View>
 
         {settlementRows.length > 0 && (
