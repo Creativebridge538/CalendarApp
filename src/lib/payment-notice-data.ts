@@ -65,11 +65,12 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
   // その行だけ別の率で計算する（それ以外は通常の報酬率）。後で日払い精算済み分の内訳表示にも
   // 使えるよう、行ごとの報酬額も保持しておく
+  // 基本報酬は売上×報酬率のみの純粋な金額とし、追加項目（ボーナス・控除・カスタム項目）は含めない
   const salesRows = rawSalesRows.map(s => {
     const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
     return {
       date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
-      amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate) + customItemsTotal(s.custom_items),
+      amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate),
       isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
       fxRate: s.fx_rate_snapshot != null ? Number(s.fx_rate_snapshot) : null,
       usdAmount: s.usd_amount != null ? Number(s.usd_amount) : null,
@@ -82,7 +83,6 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   // 発行前（プレビュー等）の時点では手動追加のカスタム項目はまだ存在しない。発行後に個別編集で追加する
   const customItems: CustomItem[] = []
   // 売上入力時に登録した追加項目は、同じラベルの行同士を合算し内訳表示専用の項目として保持する
-  // （金額自体は既にbaseReward側の各行reward計算に含まれているため、totalRewardには重複加算しない）
   const salesCustomItemsMap = new Map<string, number>()
   for (const s of rawSalesRows) {
     for (const item of parseCustomItems(s.custom_items)) {
@@ -90,7 +90,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     }
   }
   const salesCustomItems: CustomItem[] = Array.from(salesCustomItemsMap, ([label, amount]) => ({ label, amount }))
-  const totalReward = baseReward + bonus - deduction
+  const totalReward = baseReward + bonus - deduction + customItemsTotal(salesCustomItems)
 
   return {
     id: null,

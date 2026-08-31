@@ -840,7 +840,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   <div className="grid grid-cols-2 gap-3">
                     {form.custom_items.map((item, i) => item.templateId && (
                       <div key={item.templateId} className="space-y-1.5">
-                        <Label className="text-xs text-muted-foreground font-normal">{item.label}</Label>
+                        <Label className="text-xs text-muted-foreground font-normal">
+                          {item.label}（{NOTICE_ITEM_UNIT_LABEL[item.unit] ?? item.unit}）
+                        </Label>
                         {item.unit === 'jpy' ? (
                           <Input
                             type="number" placeholder="0" value={item.amount}
