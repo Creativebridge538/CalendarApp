@@ -19,7 +19,7 @@ import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit, R
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
-import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, includedInSalesTotal } from '@/lib/reward-rate'
+import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, includedInSalesTotal, parseCustomItems } from '@/lib/reward-rate'
 import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
 import { parseNoticeItemConfig } from '@/lib/notice-template'
 import { usePagination } from '@/hooks/use-pagination'
@@ -803,13 +803,16 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 <TableHead className="text-right">為替</TableHead>
                 <TableHead className="text-right">売上</TableHead>
                 <TableHead className="text-right">女子給</TableHead>
+                {itemTemplates.map(t => (
+                  <TableHead key={t.id} className="text-right whitespace-nowrap">{t.label}</TableHead>
+                ))}
                 <TableHead>備考</TableHead>
                 <TableHead className="text-right">操作</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {filteredSales.length === 0 && (
-                <TableRow><TableCell colSpan={10} className="text-center text-muted-foreground py-8">
+                <TableRow><TableCell colSpan={10 + itemTemplates.length} className="text-center text-muted-foreground py-8">
                   {filtersActive ? '絞り込み条件に一致する売上がありません' : '売上データがありません'}
                 </TableCell></TableRow>
               )}
@@ -818,6 +821,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 const customTotal = customItemsTotal(sale.custom_items)
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction) + customTotal
                 const salesAmount = Number(sale.amount) + includedInSalesTotal(sale.custom_items, includedInSalesLabels)
+                const rowCustomItems = parseCustomItems(sale.custom_items)
                 return (
                   <TableRow key={sale.id}>
                     <TableCell>
@@ -851,15 +855,22 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                     <TableCell className="text-right">¥{salesAmount.toLocaleString()}</TableCell>
                     <TableCell className="text-right">
                       ¥{reward.toLocaleString()}
-                      {(Number(sale.bonus) > 0 || Number(sale.deduction) > 0 || customTotal !== 0) && (
+                      {(Number(sale.bonus) > 0 || Number(sale.deduction) > 0) && (
                         <span className="block text-[10px] text-muted-foreground">
                           {Number(sale.bonus) > 0 && `+¥${Number(sale.bonus).toLocaleString()}`}
                           {Number(sale.bonus) > 0 && Number(sale.deduction) > 0 && ' '}
                           {Number(sale.deduction) > 0 && `-¥${Number(sale.deduction).toLocaleString()}`}
-                          {customTotal !== 0 && ` ${customTotal > 0 ? '+' : ''}¥${customTotal.toLocaleString()}`}
                         </span>
                       )}
                     </TableCell>
+                    {itemTemplates.map(t => {
+                      const item = rowCustomItems.find(i => i.label === t.label)
+                      return (
+                        <TableCell key={t.id} className="text-right text-xs text-muted-foreground whitespace-nowrap">
+                          {item ? `¥${item.amount.toLocaleString()}` : '—'}
+                        </TableCell>
+                      )
+                    })}
                     <TableCell>{sale.notes ?? '—'}</TableCell>
                     <TableCell className="text-right space-x-1">
                       <Button size="icon" variant="ghost" onClick={() => startEdit(sale)}><Pencil className="h-3.5 w-3.5" /></Button>

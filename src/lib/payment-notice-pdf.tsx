@@ -160,7 +160,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
                 ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
                 : '（日払い済み）')}
             </Text>
-            <Text style={hasFxRow ? styles.colAmountWithFx : styles.colAmount}>¥{s.reward.toLocaleString()}</Text>
+            <Text style={hasFxRow ? styles.colAmountWithFx : styles.colAmount}>¥{s.rowTotal.toLocaleString()}</Text>
             {hasFxRow && (
               <Text style={styles.colFx}>
                 {s.fxRate != null ? `¥${s.fxRate.toFixed(2)}/$${s.usdAmount != null ? ` ($${s.usdAmount.toFixed(2)})` : ''}` : '—'}

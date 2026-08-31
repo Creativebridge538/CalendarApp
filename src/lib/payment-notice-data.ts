@@ -23,7 +23,7 @@ export interface NoticeContent {
   from: string
   to: string
   rewardRate: number
-  salesRows: { date: string; platformLabel: string; amount: number; reward: number; isDailyPayment: boolean; dailyPaymentAt: string | null; fxRate: number | null; usdAmount: number | null }[]
+  salesRows: { date: string; platformLabel: string; amount: number; reward: number; rowTotal: number; isDailyPayment: boolean; dailyPaymentAt: string | null; fxRate: number | null; usdAmount: number | null }[]
   salesTotal: number
   baseReward: number
   bonus: number
@@ -68,12 +68,15 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
   // その行だけ別の率で計算する（それ以外は通常の報酬率）。後で日払い精算済み分の内訳表示にも
   // 使えるよう、行ごとの報酬額も保持しておく
-  // 基本報酬は売上×報酬率のみの純粋な金額とし、追加項目（ボーナス・控除・カスタム項目）は含めない
+  // rewardは売上×報酬率のみの純粋な金額とし、baseReward集計に使う（追加項目の二重加算を防ぐため）。
+  // rowTotalはその行で実際に支払われる金額（ボーナス・控除・追加項目を含む）で、「売上内訳」表示専用
   const salesRows = rawSalesRows.map(s => {
     const rate = effectiveRewardRate(s, rewardRate, platformRates, cast.daily_payment_reward_rate, platformDailyRates)
+    const reward = Math.floor(Number(s.amount) * rate)
     return {
       date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
-      amount: Number(s.amount), reward: Math.floor(Number(s.amount) * rate),
+      amount: Number(s.amount), reward,
+      rowTotal: reward + Number(s.bonus) - Number(s.deduction) + customItemsTotal(s.custom_items),
       isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
       fxRate: s.fx_rate_snapshot != null ? Number(s.fx_rate_snapshot) : null,
       usdAmount: s.usd_amount != null ? Number(s.usd_amount) : null,
@@ -128,9 +131,10 @@ function mapNoticeRow(data: {
   item_config: unknown; header_text: string | null; footer_text: string | null
   manually_edited: boolean
 }): NoticeContent {
-  // 古い発行済み通知書には fxRate/usdAmount が保存されていないため、欠けている場合はnull扱いにする
+  // 古い発行済み通知書には fxRate/usdAmount/rowTotal が保存されていないため、欠けている場合はフォールバックする
+  // （rowTotalが無い場合はボーナス・控除・追加項目を含まないrewardをそのまま使う）
   const salesRows = (data.sales_rows as NoticeContent['salesRows']).map(s => ({
-    ...s, fxRate: s.fxRate ?? null, usdAmount: s.usdAmount ?? null,
+    ...s, fxRate: s.fxRate ?? null, usdAmount: s.usdAmount ?? null, rowTotal: s.rowTotal ?? s.reward,
   }))
   return {
     id: data.id,
