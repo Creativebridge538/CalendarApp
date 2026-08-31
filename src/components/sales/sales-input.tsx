@@ -98,7 +98,7 @@ function saveRateTemplate(storeId: string, value: number): number[] {
   return next
 }
 
-// スプレッドシートからのコピペを想定した一括登録行。列の並びはBULK_COLUMNSと対応させる
+// スプレッドシートからのコピペを想定した一括登録行。列の並びは可視の表の並び（pasteColumns）と対応させる
 // （プラットフォームは行ごとに個別設定するため、貼り付け列の対応には含めない）
 interface BulkRow {
   id: string
@@ -106,13 +106,14 @@ interface BulkRow {
   castName: string
   platform: 'manual' | PlatformKey
   amount: string
+  // テンプレートID -> 入力値（円単位ならそのまま金額、プラットフォーム単位なら数量）
+  customItems: Record<string, string>
   worked_hours: string
   bonus: string
   deduction: string
   notes: string
 }
-const BULK_COLUMNS = ['date', 'castName', 'amount', 'worked_hours', 'bonus', 'deduction', 'notes'] as const
-type BulkColumn = typeof BULK_COLUMNS[number]
+type BulkFixedColumn = 'date' | 'castName' | 'platform' | 'amount' | 'worked_hours' | 'bonus' | 'deduction' | 'notes'
 
 export function SalesInput({ casts, sales: initialSales, storeId, userId, storeSettings, year, month, stageNamesByCastId, itemTemplates }: Props) {
   const emptyForm = useMemo(() => ({
@@ -125,7 +126,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   }), [year, month])
   const emptyBulkRow = (date?: string): BulkRow => ({
     id: crypto.randomUUID(), date: date ?? defaultDateFor(year, month),
-    castName: '', platform: 'manual', amount: '', worked_hours: '', bonus: '', deduction: '', notes: '',
+    castName: '', platform: 'manual', amount: '',
+    customItems: Object.fromEntries(itemTemplates.map(t => [t.id, ''])),
+    worked_hours: '', bonus: '', deduction: '', notes: '',
   })
   // その月の全日分の行を用意する（まとめて登録は「1ヶ月分を一気に埋める」用途が中心のため）
   const daysInMonthRows = (): BulkRow[] => {
@@ -256,6 +259,20 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       castPlatformRatesById[form.cast_id],
       castDailyRateById[form.cast_id],
       castPlatformDailyRatesById[form.cast_id]
+    )
+    return Math.floor(calcSalesAmount(unit, rawUnits) * rate)
+  }
+
+  // まとめて登録用: 1件ずつ登録のcalcItemAmountと同じ計算だが、対象キャストをform.cast_idではなく引数で受け取る
+  // （まとめて登録の日払い扱いは常にfalseのため、reward_rate_overrideも常にnull）
+  function calcBulkItemAmount(cast: { id: string }, unit: string, rawUnits: string): number {
+    if (unit === 'jpy') return calcSalesAmount(unit, rawUnits)
+    const rate = effectiveRewardRate(
+      { platform: unit, is_daily_payment: false, reward_rate_override: null },
+      castRewardRateById[cast.id] ?? 0,
+      castPlatformRatesById[cast.id],
+      castDailyRateById[cast.id],
+      castPlatformDailyRatesById[cast.id]
     )
     return Math.floor(calcSalesAmount(unit, rawUnits) * rate)
   }
@@ -568,8 +585,38 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     toast.success('削除しました')
   }
 
-  function updateBulkCell(rowId: string, col: BulkColumn | 'platform', value: string) {
-    setBulkRows(rows => rows.map(r => r.id === rowId ? { ...r, [col]: value } : r))
+  // 貼り付け・入力欄の列の並び（可視の表と同じ順序）。ボーナス・控除欄は店舗設定で非表示の場合は含めない
+  const pasteColumns = useMemo(() => [
+    'date', 'castName', 'amount',
+    ...itemTemplates.map(t => `item:${t.id}`),
+    'worked_hours',
+    ...(bonusFieldVisible ? ['bonus'] : []),
+    ...(deductionFieldVisible ? ['deduction'] : []),
+    'notes',
+  ], [itemTemplates, bonusFieldVisible, deductionFieldVisible])
+  function pasteColIndex(key: string): number {
+    return pasteColumns.indexOf(key)
+  }
+
+  function applyFieldValue(row: BulkRow, col: string, value: string): BulkRow {
+    if (col.startsWith('item:')) {
+      return { ...row, customItems: { ...row.customItems, [col.slice(5)]: value } }
+    }
+    switch (col as BulkFixedColumn) {
+      case 'date': return { ...row, date: value }
+      case 'castName': return { ...row, castName: value }
+      case 'platform': return { ...row, platform: value as 'manual' | PlatformKey }
+      case 'amount': return { ...row, amount: value }
+      case 'worked_hours': return { ...row, worked_hours: value }
+      case 'bonus': return { ...row, bonus: value }
+      case 'deduction': return { ...row, deduction: value }
+      case 'notes': return { ...row, notes: value }
+      default: return row
+    }
+  }
+
+  function updateBulkCell(rowId: string, col: BulkFixedColumn | `item:${string}`, value: string) {
+    setBulkRows(rows => rows.map(r => r.id === rowId ? applyFieldValue(r, col, value) : r))
   }
 
   function addBulkRow() {
@@ -594,10 +641,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       grid.forEach((cols, i) => {
         const targetIndex = rowIndex + i
         while (next.length <= targetIndex) next.push(emptyBulkRow())
-        const row = { ...next[targetIndex] }
+        let row = next[targetIndex]
         cols.forEach((val, j) => {
-          const col = BULK_COLUMNS[colIndex + j]
-          if (col) row[col] = val.trim()
+          const col = pasteColumns[colIndex + j]
+          if (col) row = applyFieldValue(row, col, val.trim())
         })
         next[targetIndex] = row
       })
@@ -621,6 +668,17 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       const rowPlatform = row.platform
       const isPlatform = rowPlatform !== 'manual'
       const converted = rowPlatform !== 'manual' ? calcPlatformAmount(rowPlatform, amountVal, platformSettings[rowPlatform], usdJpyRate, null) : null
+      // 1件ずつ登録と同様、テンプレート項目に入力があれば追加項目として保存する
+      // （unit/rawUnitsも保存し、編集時に円換算前の入力値をそのまま復元できるようにする。
+      // salesAmountは報酬率を掛ける前の売上ベースの金額）
+      const customItemsPayload = itemTemplates
+        .map(t => {
+          const rawUnits = row.customItems[t.id] ?? ''
+          if (!rawUnits.trim()) return null
+          const amount = t.unit === 'jpy' ? (parseFloat(rawUnits) || 0) : calcBulkItemAmount(cast, t.unit, rawUnits)
+          return { label: t.label, unit: t.unit, rawUnits, amount, salesAmount: calcSalesAmount(t.unit, rawUnits) }
+        })
+        .filter((i): i is NonNullable<typeof i> => i !== null && i.amount !== 0)
       payloads.push({
         cast_id: cast.id, date: row.date, platform: row.platform,
         amount: isPlatform ? (converted?.jpy ?? 0) : Math.round(amountVal),
@@ -630,8 +688,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
         is_daily_payment: false, rate_override: null, reward_rate_override: null,
         notes: row.notes || null,
         worked_hours: row.worked_hours ? parseFloat(row.worked_hours) : null,
-        bonus: row.bonus ? parseInt(row.bonus) : 0,
-        deduction: row.deduction ? parseInt(row.deduction) : 0,
+        bonus: bonusFieldVisible && row.bonus ? parseInt(row.bonus) : 0,
+        deduction: deductionFieldVisible && row.deduction ? parseInt(row.deduction) : 0,
+        custom_items: customItemsPayload,
         store_id: storeId, created_by: userId,
       })
     })
@@ -1090,22 +1149,37 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
                       {enabledPlatforms.length > 0 && <th className="text-left font-medium px-2 py-1.5 border-b w-28">プラットフォーム</th>}
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
+                      {itemTemplates.map(t => (
+                        <th key={t.id} className="text-left font-medium px-2 py-1.5 border-b w-24">
+                          {t.label}（{NOTICE_ITEM_UNIT_LABEL[t.unit] ?? t.unit}）
+                        </th>
+                      ))}
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">売上</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">{bonusFieldLabel}</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">{deductionFieldLabel}</th>
+                      {bonusFieldVisible && <th className="text-left font-medium px-2 py-1.5 border-b w-20">{bonusFieldLabel}</th>}
+                      {deductionFieldVisible && <th className="text-left font-medium px-2 py-1.5 border-b w-20">{deductionFieldLabel}</th>}
                       <th className="text-left font-medium px-2 py-1.5 border-b min-w-[12rem]">備考</th>
                       <th className="w-8 border-b" />
                     </tr>
                   </thead>
                   <tbody>
-                    {bulkRows.map((row, rowIndex) => (
+                    {bulkRows.map((row, rowIndex) => {
+                      const rowIncludedSalesTotal = itemTemplates.reduce((sum, t) => {
+                        if (!includedInSalesLabels.has(t.label)) return sum
+                        const rawUnits = row.customItems[t.id] ?? ''
+                        if (!rawUnits.trim()) return sum
+                        return sum + calcSalesAmount(t.unit, rawUnits)
+                      }, 0)
+                      const baseSalesAmount = row.platform !== 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount))
+                        ? calcPlatformAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate, null).jpy
+                        : (row.platform === 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount)) ? parseFloat(row.amount) : null)
+                      return (
                       <tr key={row.id}>
                         <td className="p-0.5 border-b">
                           <input
                             type="date" value={row.date}
                             onChange={e => updateBulkCell(row.id, 'date', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 0)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('date'))}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
@@ -1113,7 +1187,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                           <input
                             list="cast-name-options" value={row.castName} placeholder="キャスト名"
                             onChange={e => updateBulkCell(row.id, 'castName', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 1)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('castName'))}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
@@ -1136,46 +1210,59 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                             type="number" value={row.amount}
                             placeholder={row.platform === 'manual' ? '円' : row.platform === 'stripchat' ? 'TK数' : 'pt数'}
                             onChange={e => updateBulkCell(row.id, 'amount', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 2)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('amount'))}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
+                        {itemTemplates.map(t => (
+                          <td key={t.id} className="p-0.5 border-b">
+                            <input
+                              type="number" value={row.customItems[t.id] ?? ''}
+                              placeholder={t.unit === 'jpy' ? '円' : `数量(${NOTICE_ITEM_UNIT_LABEL[t.unit] ?? t.unit})`}
+                              onChange={e => updateBulkCell(row.id, `item:${t.id}`, e.target.value)}
+                              onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex(`item:${t.id}`))}
+                              className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                          </td>
+                        ))}
                         <td className="p-0.5 border-b">
                           <div className="w-full h-8 px-1.5 flex items-center text-xs text-muted-foreground whitespace-nowrap">
-                            {row.platform !== 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount))
-                              ? `¥${calcPlatformAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate, null).jpy.toLocaleString()}`
-                              : '—'}
+                            {baseSalesAmount != null ? `¥${(baseSalesAmount + rowIncludedSalesTotal).toLocaleString()}` : '—'}
                           </div>
                         </td>
                         <td className="p-0.5 border-b">
                           <input
                             type="number" step="0.25" value={row.worked_hours} placeholder="0"
                             onChange={e => updateBulkCell(row.id, 'worked_hours', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 3)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('worked_hours'))}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
-                        <td className="p-0.5 border-b">
-                          <input
-                            type="number" value={row.bonus} placeholder="0"
-                            onChange={e => updateBulkCell(row.id, 'bonus', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 4)}
-                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                          />
-                        </td>
-                        <td className="p-0.5 border-b">
-                          <input
-                            type="number" value={row.deduction} placeholder="0"
-                            onChange={e => updateBulkCell(row.id, 'deduction', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 5)}
-                            className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
-                          />
-                        </td>
+                        {bonusFieldVisible && (
+                          <td className="p-0.5 border-b">
+                            <input
+                              type="number" value={row.bonus} placeholder="0"
+                              onChange={e => updateBulkCell(row.id, 'bonus', e.target.value)}
+                              onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('bonus'))}
+                              className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                          </td>
+                        )}
+                        {deductionFieldVisible && (
+                          <td className="p-0.5 border-b">
+                            <input
+                              type="number" value={row.deduction} placeholder="0"
+                              onChange={e => updateBulkCell(row.id, 'deduction', e.target.value)}
+                              onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('deduction'))}
+                              className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
+                            />
+                          </td>
+                        )}
                         <td className="p-0.5 border-b">
                           <input
                             value={row.notes} placeholder="備考"
                             onChange={e => updateBulkCell(row.id, 'notes', e.target.value)}
-                            onPaste={e => handleBulkPaste(e, rowIndex, 6)}
+                            onPaste={e => handleBulkPaste(e, rowIndex, pasteColIndex('notes'))}
                             className="w-full h-8 px-1.5 rounded border-0 bg-transparent text-xs focus:outline-none focus:ring-1 focus:ring-ring"
                           />
                         </td>
@@ -1185,7 +1272,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                           </button>
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>
