@@ -1,8 +1,8 @@
-# CalendarApp 仕様書
+# ShiftMate 仕様書
 
-最終更新: 2026-08-23
+最終更新: 2026-08-31
 
-このドキュメントはCalendarAppの現在の仕様をまとめたもの。個別の詳細は `docs/` 配下の他ドキュメントに分かれているので、必要に応じて参照すること。
+このドキュメントはShiftMateの現在の仕様をまとめたもの。個別の詳細は `docs/` 配下の他ドキュメントに分かれているので、必要に応じて参照すること。
 
 - [`docs/DATABASE.md`](DATABASE.md) — テーブル運用・マイグレーションフロー
 - [`docs/PERMISSIONS.md`](PERMISSIONS.md) — RLSが実際に強制している権限の一覧
@@ -85,10 +85,14 @@ stores 1─┬─1 store_settings
          ├─* reward_calculations（未使用。5.3参照）
          ├─* shift_checklist_items
          ├─* cast_profile_fields
+         ├─* notice_item_templates
+         ├─* payment_notices
          └─* notifications
 
-users(cast) 1─* shifts, sales, vacant_slot_applications,
-             notifications, push_subscriptions
+users(cast) 1─┬─* shifts, sales, vacant_slot_applications,
+              │   notifications, push_subscriptions
+              ├─* cast_platform_profiles
+              └─* cast_stage_names
 ```
 
 `auth.users`（Supabase Auth管理）と`public.users`は1:1（`id`が同じ）。`handle_new_user()`トリガーが`auth.users`へのINSERT時に`public.users`へ最小限の行（id, email）を自動作成し、その後アプリ側（admin API）で`role`/`store_id`/`display_name`等を更新する2段階構成。
@@ -113,15 +117,18 @@ users(cast) 1─* shifts, sales, vacant_slot_applications,
 | `id` | uuid PK | |
 | `store_id` | uuid FK→stores | |
 | `deadline_type` | enum `deadline_type`（`monthly`/`weekly`/`none`） | シフト締切ルールの種別 |
-| `deadline_day` | int | 月次=日付(1-31) / 週次=曜日 |
-| `deadline_week_start_day` | int | 週次締切の起算曜日 |
-| `require_approval_after_deadline` | boolean | 締切後修正に承認が必要か |
+| `deadline_day` | int | 月次=日付(1-31) / 週次=曜日。締切ルールは「提出可能な期間」ベースで判定する（`cast-shift-view.tsx`参照）。週次は締切曜日の**翌日**から7日間が提出可能期間になる |
 | `location_mode` | text | `area`/`room`/`both`/`none`など、場所管理の単位切り替え |
 | `area_label` / `room_label` | text | 画面上の表示ラベルのカスタム文言 |
 | `theme` | text | 管理画面の配色テーマ（`default`/`rose`/`midnight`/`emerald`/`gold`/`violet`） |
 | `logo_url` | text? | 支払通知書等に表示するロゴ |
-| `usd_jpy_rate` | numeric? | 海外プラットフォーム売上の円換算に使うUSD/JPYレート |
+| `usd_jpy_rate` | numeric? | 為替レート自動取得OFF時に使うUSD/JPY参考レート |
+| `usd_jpy_auto_fetch` | boolean（既定true） | ONの場合、売上入力のたびに実勢レートを自動取得して使う |
+| `usd_jpy_adjustment` | numeric（既定0） | 自動取得レートに加える調整額（円） |
 | `platform_settings` | jsonb（既定`{}`） | プラットフォーム別（stripchat/fc2/dxlive）の換算方式設定。`src/lib/platform-earnings.ts`参照 |
+| `enabled_platforms` | text[]（既定`{stripchat,fc2,dxlive}`） | この店舗が採用しているライブ配信プラットフォーム。売上入力・キャスト管理・店舗設定のプラットフォーム関連UIをこの配列でフィルタする（6.2節参照）。設定はSaaS運営者側（`/internal/stores`）で行う |
+| `notice_item_config` | jsonb | 支払通知書の項目（売上合計/報酬率/基本報酬/ボーナス/控除/追加項目/消費税内訳/精算済み金額）の並び順・表示ON/OFF・ラベルのテンプレート設定。今後発行する通知書のデフォルトとして使われる（6.2節参照） |
+| `notice_header_text` / `notice_footer_text` | text? | 支払通知書のヘッダー追加メッセージ／フッター文言。未設定時は既定文言を使用 |
 | `created_at` / `updated_at` | timestamptz | |
 
 **注意**: `store_settings`のSELECTポリシーは店舗所属の全ユーザー（castも含む）に開いている。秘匿情報（トークン等）をこのテーブルに追加してはいけない（→`store_google_drive_tokens`が別テーブルになっている理由）。
@@ -141,6 +148,9 @@ users(cast) 1─* shifts, sales, vacant_slot_applications,
 | `phone` | text? | |
 | `notes` | text? | |
 | `reward_rate` | numeric(5,4)（既定0.4） | 基本報酬率 |
+| `daily_payment_reward_rate` | numeric(5,4)? | 日払い時の報酬率（キャスト共通）。個別上書き・プラットフォーム別より優先度は低い |
+| `platform_reward_rates` | jsonb（既定`{}`） | プラットフォーム別（stripchat/fc2/dxlive）の報酬率上書き |
+| `platform_daily_payment_reward_rates` | jsonb（既定`{}`） | プラットフォーム別・日払い時の報酬率上書き。優先順位は「個別上書き ＞ プラットフォーム別の前払い率 ＞ キャスト共通の前払い率 ＞ プラットフォーム別報酬率 ＞ 基本報酬率」（`src/lib/reward-rate.ts`の`effectiveRewardRate()`参照） |
 | `is_active` | boolean（既定true） | |
 | `birthdate` | date? | |
 | `show_birthdate` | boolean | プロフィール上での公開可否 |
@@ -211,11 +221,51 @@ users(cast) 1─* shifts, sales, vacant_slot_applications,
 | `daily_payment_at` | timestamptz? | |
 | `worked_hours` | numeric? | 稼働時間（登録された行のみ報酬ダッシュボードの時給計算対象になる） |
 | `bonus` / `deduction` | numeric(12,0)（既定0） | |
+| `custom_items` | jsonb（既定`[]`） | `{label, amount}[]`形式の追加項目（ボーナス・ドリンクバックなど）。マイナス値で控除としても使える。`notice_item_templates`で店舗ごとに項目名・入力単位をテンプレ登録しておける |
 | `notes` | text? | |
 | `created_by` | uuid? FK→users | |
 | `created_at` / `updated_at` | timestamptz | |
 
 換算式（`src/lib/platform-earnings.ts`）: STRIPCHAT = TK ÷ 10 ÷ 2（USD）、DXライブ = ポイント × 2ドル × 0.3、FC2 = ポイントがそのまま円（USDレート不使用）。店舗ごとに`store_settings.platform_settings`で計算式/固定単価モードを上書き可能。
+
+#### `cast_platform_profiles` — キャストのプラットフォーム別ID・源氏名
+
+`id`, `store_id` FK, `cast_id` FK→users, `platform`（`stripchat`/`fc2`/`dxlive`）, `platform_user_id`?, `platform_display_name`?, `created_at`, `updated_at`
+
+同一キャストがプラットフォームごとに違うID・表示名を使っている場合の紐付け。`platform_display_name`が設定されていると、支払通知書・売上一覧のプラットフォーム表示名に`（表示名）`の形で付記される。報酬・支払通知書はこのキャスト1人に合算される（プラットフォームをまたいだ集計は分割されない）。
+
+#### `cast_stage_names` — キャストの追加の源氏名
+
+`id`, `store_id` FK, `cast_id` FK→users, `name`, `created_at`
+
+キャストが複数の源氏名を使い分けている場合の登録。売上登録のキャスト選択欄には、本来の`display_name`と登録した追加の源氏名がそれぞれ別の選択肢として表示されるが、選ぶとどれも同じ`cast_id`に紐づく（`sales-input.tsx`の`castOptions`）。
+
+#### `notice_item_templates` — 支払通知書の追加項目テンプレート
+
+`id`, `store_id` FK, `label`, `unit`（`jpy`/`stripchat`/`fc2`/`dxlive`）, `sort_order`, `is_active`, `created_at`
+
+店舗ごとに事前登録しておける追加項目（例: ドリンクバック、イベント報酬）。`unit`が円以外の場合、支払通知書の発行・編集画面で数量を入力すると、その時点のプラットフォーム換算式で自動的に円換算される。ここで登録したテンプレートを選ばず自由入力で追加項目を作ることもできる。
+
+#### `payment_notices` — 発行済み支払通知書のスナップショット
+
+| カラム | 型 | 説明 |
+|---|---|---|
+| `id` | uuid PK | |
+| `store_id` | uuid FK→stores | |
+| `cast_id` | uuid FK→users | |
+| `period_from` / `period_to` | date | |
+| `issued_by` | uuid? FK→users | |
+| `issued_at` | timestamptz | |
+| `cast_name` / `cast_real_name` / `bank_name` / `bank_branch` / `bank_account_number` / `bank_account_holder` / `store_name` / `logo_url`? | text | 発行時点の値をそのままコピーして保持する（後日キャスト情報や店舗名を変更しても、発行済み通知書の内容は変わらない） |
+| `reward_rate` | numeric | |
+| `sales_rows` | jsonb | 売上内訳の配列 |
+| `sales_total` / `base_reward` / `bonus` / `deduction` / `total_reward` | numeric | |
+| `custom_items` | jsonb | `sales.custom_items`と同形式 |
+| `item_config` | jsonb | 発行時点の`store_settings.notice_item_config`のコピー（発行後に店舗側の設定を変更しても、この通知書の表示には影響しない） |
+| `header_text` / `footer_text` | text? | 発行時点の`store_settings.notice_header_text` / `notice_footer_text`のコピー |
+| `manually_edited` | boolean（既定false） | 発行後に管理者が「編集」機能で内容を補正したかどうか（一覧のバッジ表示用） |
+
+**設計方針**: 同じキャスト・同じ期間で何度発行しても、発行のたびに独立した新しい行がINSERTされる（UPSERTではない）。過去に発行した通知書は、後から同じ期間を再発行しても内容が変わらない。書き込みは`service_role`専用（RLSに一般ユーザー向けのポリシーがない）で、`/api/rewards/notices/snapshot`（PATCH）が個別編集用のAPI。読み取り関連のロジックは`src/lib/payment-notice-data.ts`に集約（`fetchNoticeContent()`＝未発行時のライブ計算、`getNoticeSnapshotById()`/`getLatestNoticeSnapshot()`＝発行済みスナップショットの取得）。
 
 #### `reward_calculations` — 未使用テーブル
 
@@ -285,9 +335,14 @@ RLSポリシーなし＝`service_role`専用（`/api/store-signup`と`/api/inter
 
 ### 6.2 売上・報酬・支払通知書
 
-- 売上は手入力またはプラットフォーム別（STRIPCHAT/FC2/DXライブ）入力。プラットフォーム分はUSD/JPYレートで円換算して保存
+- 売上は手入力またはプラットフォーム別（STRIPCHAT/FC2/DXライブ）入力。プラットフォーム分はUSD/JPYレートで円換算して保存。店舗が採用しているプラットフォームは`store_settings.enabled_platforms`で店舗ごとに絞り込める（未採用のプラットフォームは、売上入力・キャスト管理・店舗設定のプラットフォーム関連UIから丸ごと非表示になる。「手入力」は常に選択可能）
+- キャスト1人に対し、プラットフォームごとに別のID・表示名を紐付けられる（`cast_platform_profiles`）。また源氏名を複数登録でき（`cast_stage_names`）、売上登録のキャスト選択欄にはどの源氏名で選んでも同一キャストとして扱われる
+- 報酬率は「個別上書き（`sales.reward_rate_override`） ＞ プラットフォーム別の前払い率 ＞ キャスト共通の前払い率 ＞ プラットフォーム別報酬率 ＞ 基本報酬率」の優先順位で決定される（`effectiveRewardRate()`）。日払い時のみ前払い系の率が候補に入る
 - 日払い機能: 個別の報酬率上書き・単価上書き。テンプレ機能で過去に使った報酬率上書き値をワンタップ選択可能。チェックボックスで複数選択し一括で日払い済みに変更する機能あり
 - 為替レート一括変更: 既に登録済みの売上について、絞り込み条件に一致するプラットフォーム売上の金額を新しいレートで再計算・更新する機能（`sales-input.tsx`の「為替を一括変更」）
+- 追加項目（`sales.custom_items`）: ボーナス・ドリンクバックのように項目名付きの金額を複数追加できる。店舗ごとに`notice_item_templates`で項目名・入力単位（円 or プラットフォーム単位）をテンプレ登録しておける。円以外の単位は入力時にその場のプラットフォーム換算式で円換算される
+- **支払通知書テンプレート設定**（`/admin/notice-template`）: 支払通知書に載せる項目（売上合計/報酬率/基本報酬/ボーナス/控除/追加項目/消費税内訳/精算済み金額）の並び順・表示ON/OFF・ラベル、ヘッダー/フッターの自由記述を店舗ごとにカスタマイズできる（`store_settings.notice_item_config`等）。合計お支払額は常に最後・非表示不可
+- 支払通知書は**発行のたびに独立したスナップショット**として`payment_notices`にINSERTされる（同じキャスト・同じ期間を再発行しても過去の発行内容は変わらない）。項目テンプレート設定・ヘッダー/フッターも発行時点の内容がそのままコピーされるため、後から店舗側の設定を変えても発行済みの通知書には影響しない
 - 支払通知書PDF: `src/lib/payment-notice-pdf.tsx`（react-pdf）でサーバー生成。ファイル名は`{開始日}-{終了日}_{支払額}_{本名}_支払通知書.pdf`形式に統一（`noticeFileName()` in `payment-notice-data.ts`）
 - 発行済み支払通知書の一括ダウンロード（ZIP）、および個別のPDFダウンロード（ブラウザ印刷は使わない。共有時にレイアウトが崩れる問題があったため撤去済み）
 - **Google Drive連携**: 発行済み支払通知書を選択してGoogle Driveへ直接アップロード保存できる。年月フォルダに自動整理される（`src/lib/google-drive.ts`、`src/app/api/google-drive/*`）
@@ -300,5 +355,5 @@ RLSポリシーなし＝`service_role`専用（`/api/store-signup`と`/api/inter
 
 ### 6.4 マルチテナント管理（owner）
 
-- `/internal/stores`: 全店舗の一覧・利用停止/再開
+- `/internal/stores`: 全店舗の一覧・利用停止/再開・編集。店舗の新規作成・編集時に、その店舗が採用するライブ配信プラットフォーム（Stripchat/FC2/DXライブ）を個別にON/OFFできる（`store_settings.enabled_platforms`）。既存店舗は作成時点で全プラットフォームが有効な状態を維持する
 - `/internal/signups`: `/apply`から届いた新規店舗申込のレビュー・承認（承認すると店舗・管理者アカウント作成、招待メール送信）
