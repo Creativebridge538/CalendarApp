@@ -48,8 +48,12 @@ interface Props {
 
 export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssuedAt, noticeItemConfig, includedInSalesLabels: includedInSalesLabelsProp }: Props) {
   const itemConfig = useMemo(() => parseNoticeItemConfig(noticeItemConfig), [noticeItemConfig])
-  const bonusLabel = itemConfig.find(e => e.key === 'bonus')?.label || 'ボーナス'
-  const deductionLabel = itemConfig.find(e => e.key === 'deduction')?.label || '控除'
+  const bonusEntry = itemConfig.find(e => e.key === 'bonus')
+  const deductionEntry = itemConfig.find(e => e.key === 'deduction')
+  const bonusLabel = bonusEntry?.label || 'ボーナス'
+  const deductionLabel = deductionEntry?.label || '控除'
+  const bonusVisible = bonusEntry?.visible ?? true
+  const deductionVisible = deductionEntry?.visible ?? true
   const includedInSalesLabels = useMemo(() => new Set(includedInSalesLabelsProp ?? []), [includedInSalesLabelsProp])
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
@@ -236,8 +240,8 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
               <TableHead className="text-right">売上合計</TableHead>
               <TableHead className="text-right">報酬率</TableHead>
               <TableHead className="text-right">基本報酬</TableHead>
-              <TableHead className="text-right">{bonusLabel}</TableHead>
-              <TableHead className="text-right">{deductionLabel}</TableHead>
+              {bonusVisible && <TableHead className="text-right">{bonusLabel}</TableHead>}
+              {deductionVisible && <TableHead className="text-right">{deductionLabel}</TableHead>}
               <TableHead className="text-right">支払合計</TableHead>
               <TableHead>ステータス</TableHead>
               <TableHead className="text-right">プレビュー</TableHead>
@@ -245,7 +249,7 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
           </TableHeader>
           <TableBody>
             {filteredRows.length === 0 && (
-              <TableRow><TableCell colSpan={11} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
+              <TableRow><TableCell colSpan={9 + (bonusVisible ? 1 : 0) + (deductionVisible ? 1 : 0)} className="text-center text-muted-foreground py-8">対象のキャストがいません</TableCell></TableRow>
             )}
             {paged.map(r => (
               <TableRow key={r.cast.id}>
@@ -262,8 +266,8 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
                 <TableCell className="text-right">¥{r.salesTotal.toLocaleString()}</TableCell>
                 <TableCell className="text-right">{(r.rewardRate * 100).toFixed(1)}%</TableCell>
                 <TableCell className="text-right">¥{r.baseReward.toLocaleString()}</TableCell>
-                <TableCell className="text-right">{r.bonus > 0 ? `+¥${r.bonus.toLocaleString()}` : '—'}</TableCell>
-                <TableCell className="text-right">{r.deduction > 0 ? `-¥${r.deduction.toLocaleString()}` : '—'}</TableCell>
+                {bonusVisible && <TableCell className="text-right">{r.bonus > 0 ? `+¥${r.bonus.toLocaleString()}` : '—'}</TableCell>}
+                {deductionVisible && <TableCell className="text-right">{r.deduction > 0 ? `-¥${r.deduction.toLocaleString()}` : '—'}</TableCell>}
                 <TableCell className="text-right font-bold">¥{r.totalReward.toLocaleString()}</TableCell>
                 <TableCell>
                   {issuedAt[r.cast.id] ? (
