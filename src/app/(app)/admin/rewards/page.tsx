@@ -20,11 +20,12 @@ export default async function RewardsPage({
   const from = fromParam || format(startOfMonth(now), 'yyyy-MM-dd')
   const to = toParam || format(endOfMonth(now), 'yyyy-MM-dd')
 
-  const [{ data: allCasts }, { data: sales }] = await Promise.all([
+  const [{ data: allCasts }, { data: sales }, { data: settings }] = await Promise.all([
     supabase.from('users').select('id, display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, is_active')
       .eq('store_id', storeId).eq('role', 'cast').order('display_name'),
     supabase.from('sales').select('cast_id, amount, platform, is_daily_payment, reward_rate_override, bonus, deduction, custom_items')
       .eq('store_id', storeId).gte('date', from).lte('date', to),
+    supabase.from('store_settings').select('notice_item_config').eq('store_id', storeId).single(),
   ])
 
   // 在籍中のキャストに加え、退店済みでもこの期間に売上実績があるキャストは一覧に残す
@@ -65,6 +66,7 @@ export default async function RewardsPage({
         from={from}
         to={to}
         issuedAt={issuedAt}
+        noticeItemConfig={settings?.notice_item_config}
       />
     </div>
   )

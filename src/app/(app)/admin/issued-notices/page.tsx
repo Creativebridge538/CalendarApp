@@ -66,7 +66,7 @@ export default async function IssuedNoticesPage() {
   const [{ data: itemTemplates }, { data: storeSettings }] = await Promise.all([
     supabase.from('notice_item_templates').select('id, label, unit')
       .eq('store_id', profile.store_id!).eq('is_active', true).order('sort_order'),
-    supabase.from('store_settings').select('platform_settings, usd_jpy_auto_fetch, usd_jpy_adjustment, usd_jpy_rate')
+    supabase.from('store_settings').select('platform_settings, usd_jpy_auto_fetch, usd_jpy_adjustment, usd_jpy_rate, notice_item_config')
       .eq('store_id', profile.store_id!).single(),
   ])
 

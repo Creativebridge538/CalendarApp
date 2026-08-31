@@ -20,7 +20,7 @@ import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
-import { DEFAULT_NOTICE_ITEM_CONFIG, type NoticeItemConfigEntry } from '@/lib/notice-template'
+import { DEFAULT_NOTICE_ITEM_CONFIG, parseNoticeItemConfig, type NoticeItemConfigEntry } from '@/lib/notice-template'
 
 interface Notice {
   id: string
@@ -46,10 +46,14 @@ interface Props {
     usd_jpy_auto_fetch: boolean
     usd_jpy_adjustment: number
     usd_jpy_rate: number | null
+    notice_item_config: unknown
   } | null
 }
 
 export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTemplates, storeSettings }: Props) {
+  const itemConfig = useMemo(() => parseNoticeItemConfig(storeSettings?.notice_item_config), [storeSettings])
+  const bonusLabel = itemConfig.find(e => e.key === 'bonus')?.label || 'ボーナス'
+  const deductionLabel = itemConfig.find(e => e.key === 'deduction')?.label || '控除'
   const router = useRouter()
   const searchParams = useSearchParams()
   const [selected, setSelected] = useState<Set<string>>(new Set())
@@ -404,11 +408,11 @@ export function IssuedNoticesList({ notices, casts, googleDriveConnected, itemTe
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground font-normal">ボーナス</Label>
+                  <Label className="text-xs text-muted-foreground font-normal">{bonusLabel}</Label>
                   <Input type="number" value={editForm.bonus} onChange={e => setEditForm({ ...editForm, bonus: e.target.value })} />
                 </div>
                 <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground font-normal">控除</Label>
+                  <Label className="text-xs text-muted-foreground font-normal">{deductionLabel}</Label>
                   <Input type="number" value={editForm.deduction} onChange={e => setEditForm({ ...editForm, deduction: e.target.value })} />
                 </div>
               </div>

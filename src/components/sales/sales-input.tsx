@@ -162,10 +162,14 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
   // 支払通知書のテンプレート設定でボーナス・控除を非表示にしている店舗では、
-  // 使わない項目として売上登録フォームからも欄を隠す
+  // 使わない項目として売上登録フォームからも欄を隠す。項目名を変更している場合はその名称を使う
   const noticeItemConfig = useMemo(() => parseNoticeItemConfig(storeSettings?.notice_item_config), [storeSettings])
-  const bonusFieldVisible = noticeItemConfig.find(e => e.key === 'bonus')?.visible ?? true
-  const deductionFieldVisible = noticeItemConfig.find(e => e.key === 'deduction')?.visible ?? true
+  const bonusEntry = noticeItemConfig.find(e => e.key === 'bonus')
+  const deductionEntry = noticeItemConfig.find(e => e.key === 'deduction')
+  const bonusFieldVisible = bonusEntry?.visible ?? true
+  const deductionFieldVisible = deductionEntry?.visible ?? true
+  const bonusFieldLabel = bonusEntry?.label || 'ボーナス'
+  const deductionFieldLabel = deductionEntry?.label || '控除'
   const autoFetchFx = storeSettings?.usd_jpy_auto_fetch ?? false
   const [liveFxRate, setLiveFxRate] = useState<number | null>(null)
 
@@ -829,13 +833,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 </div>
                 {bonusFieldVisible && (
                   <div className="space-y-1.5">
-                    <Label>ボーナス（円）</Label>
+                    <Label>{bonusFieldLabel}（円）</Label>
                     <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
                   </div>
                 )}
                 {deductionFieldVisible && (
                   <div className="space-y-1.5">
-                    <Label>控除（円）</Label>
+                    <Label>{deductionFieldLabel}（円）</Label>
                     <Input type="number" min="0" value={form.deduction} onChange={e => setForm({ ...form, deduction: e.target.value })} placeholder="0" />
                   </div>
                 )}
@@ -1020,8 +1024,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">金額/数量</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-24">換算金額</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-20">時間</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">ボーナス</th>
-                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">控除</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">{bonusFieldLabel}</th>
+                      <th className="text-left font-medium px-2 py-1.5 border-b w-20">{deductionFieldLabel}</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b min-w-[12rem]">備考</th>
                       <th className="w-8 border-b" />
                     </tr>

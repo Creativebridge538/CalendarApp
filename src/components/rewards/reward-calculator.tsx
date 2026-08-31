@@ -19,6 +19,7 @@ import { sendPushNotification } from '@/lib/push'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
+import { parseNoticeItemConfig } from '@/lib/notice-template'
 
 interface CastUser {
   id: string; display_name: string | null; real_name: string | null
@@ -40,9 +41,13 @@ interface Props {
   to: string
   /** cast_id -> この期間ですでに発行済みの通知の作成日時（ISO文字列） */
   issuedAt: Record<string, string>
+  noticeItemConfig?: unknown
 }
 
-export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssuedAt }: Props) {
+export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssuedAt, noticeItemConfig }: Props) {
+  const itemConfig = useMemo(() => parseNoticeItemConfig(noticeItemConfig), [noticeItemConfig])
+  const bonusLabel = itemConfig.find(e => e.key === 'bonus')?.label || 'ボーナス'
+  const deductionLabel = itemConfig.find(e => e.key === 'deduction')?.label || '控除'
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [sending, setSending] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
@@ -228,8 +233,8 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
               <TableHead className="text-right">売上合計</TableHead>
               <TableHead className="text-right">報酬率</TableHead>
               <TableHead className="text-right">基本報酬</TableHead>
-              <TableHead className="text-right">ボーナス</TableHead>
-              <TableHead className="text-right">控除</TableHead>
+              <TableHead className="text-right">{bonusLabel}</TableHead>
+              <TableHead className="text-right">{deductionLabel}</TableHead>
               <TableHead className="text-right">支払合計</TableHead>
               <TableHead>ステータス</TableHead>
               <TableHead className="text-right">プレビュー</TableHead>
