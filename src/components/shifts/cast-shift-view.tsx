@@ -596,7 +596,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     if (editing) {
       const wasRejected = editing.status === 'rejected'
       const { error } = await supabase.from('shifts').update(payload).eq('id', editing.id)
-      if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました')); return }
+      if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました', roomLabel)); return }
       setShifts(shifts.map(s => s.id === editing.id ? {
         ...s, ...payload,
         rooms: rooms.find(r => r.id === form.room_id) ?? null,
@@ -616,7 +616,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
       }
     } else {
       const { data, error } = await supabase.from('shifts').insert({ ...payload, store_id: storeId }).select('*, rooms(name), areas(name)').single()
-      if (error) { toast.error(shiftConflictMessage(error, '提出に失敗しました')); return }
+      if (error) { toast.error(shiftConflictMessage(error, '提出に失敗しました', roomLabel)); return }
       setShifts([{ ...data, checklist_answers: (data.checklist_answers ?? {}) as ChecklistAnswers }, ...shifts])
       toast.success('シフトを提出しました')
     }
@@ -652,7 +652,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
     })
     const { data, error } = await supabase.from('shifts').insert(payload).select('*, rooms(name), areas(name)')
     setBulkSaving(false)
-    if (error) { toast.error(shiftConflictMessage(error, 'まとめての提出に失敗しました')); return }
+    if (error) { toast.error(shiftConflictMessage(error, 'まとめての提出に失敗しました', roomLabel)); return }
     setShifts([
       ...(data ?? []).map(d => ({ ...d, checklist_answers: (d.checklist_answers ?? {}) as ChecklistAnswers })),
       ...shifts,

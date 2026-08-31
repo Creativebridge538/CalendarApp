@@ -89,7 +89,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
   async function handleCreate() {
     const capacity = Math.max(1, parseInt(form.capacity) || 1)
     if (selectedRoom?.capacity != null && capacity > selectedRoom.capacity) {
-      toast.error(`このルームの定員は${selectedRoom.capacity}人です`)
+      toast.error(`この${roomLabel}の定員は${selectedRoom.capacity}人です`)
       return
     }
     if (form.room_id) {
@@ -126,7 +126,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
     if (capacity === slot.capacity || capacity < 1) return
     const room = rooms.find(r => r.id === slot.room_id)
     if (room?.capacity != null && capacity > room.capacity) {
-      toast.error(`このルームの定員は${room.capacity}人です`)
+      toast.error(`この${roomLabel}の定員は${room.capacity}人です`)
       return
     }
     setSavingSlotId(slot.id)
@@ -225,7 +225,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
       if (approvedCount >= slot.capacity) { toast.error(`募集人数（${slot.capacity}人）に達しています`); return }
       if (slot.room_id) {
         const conflict = await hasRoomConflict(slot.room_id, slot.date, slot.start_time, slot.end_time, app?.shift_id ?? undefined)
-        if (conflict) { toast.error('この時間帯は同じルームに既に確定シフトがあります'); return }
+        if (conflict) { toast.error(`この時間帯は同じ${roomLabel}に既に確定シフトがあります`); return }
       }
     }
 
@@ -247,7 +247,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
         : { error: null }
       if (e2) {
         setSavingAppId(null)
-        toast.error(shiftConflictMessage(e2, '承認に失敗しました'))
+        toast.error(shiftConflictMessage(e2, '承認に失敗しました', roomLabel))
         return
       }
     } else if (nextStatus === 'rejected' && app?.shift_id) {
@@ -404,7 +404,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
               <Label>募集人数</Label>
               <Input type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
               {selectedRoom?.capacity != null && (
-                <p className="text-xs text-muted-foreground">このルームの定員は{selectedRoom.capacity}人です</p>
+                <p className="text-xs text-muted-foreground">この{roomLabel}の定員は{selectedRoom.capacity}人です</p>
               )}
             </div>
             {(locationMode === 'area_only' || locationMode === 'area_and_room') && areas.length > 0 && (

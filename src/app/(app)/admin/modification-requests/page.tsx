@@ -9,11 +9,14 @@ export default async function ModificationRequestsPage() {
   if (!user) redirect('/login')
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const { data: requests } = await supabase
-    .from('shift_modification_requests')
-    .select('*, shifts(date, start_time, end_time, store_id, cast:users!shifts_cast_id_fkey(display_name))')
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false })
+  const [{ data: requests }, { data: settings }] = await Promise.all([
+    supabase
+      .from('shift_modification_requests')
+      .select('*, shifts(date, start_time, end_time, store_id, cast:users!shifts_cast_id_fkey(display_name))')
+      .eq('status', 'pending')
+      .order('created_at', { ascending: false }),
+    supabase.from('store_settings').select('room_label').eq('store_id', profile.store_id!).single(),
+  ])
 
   const storeRequests = (requests ?? []).filter(
     r => (r.shifts as { store_id: string } | null)?.store_id === profile.store_id
@@ -21,7 +24,7 @@ export default async function ModificationRequestsPage() {
 
   return (
     <div className="p-6">
-      <ModificationRequestList requests={storeRequests} />
+      <ModificationRequestList requests={storeRequests} roomLabel={settings?.room_label || 'ルーム'} />
     </div>
   )
 }

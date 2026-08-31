@@ -39,7 +39,7 @@ interface Request {
   } | null
 }
 
-export function ModificationRequestList({ requests: initialRequests }: { requests: Request[] }) {
+export function ModificationRequestList({ requests: initialRequests, roomLabel }: { requests: Request[]; roomLabel: string }) {
   const [requests, setRequests] = useState(initialRequests)
   const [rejectTarget, setRejectTarget] = useState<Request | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -87,7 +87,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
     if (e1 || e2) {
       setProcessingId(null)
       // 23P01 = exclusion_violation。変更後の時間帯に別の確定シフトが割り込んでいた場合
-      toast.error((e2 as { code?: string } | null)?.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '承認に失敗しました')
+      toast.error((e2 as { code?: string } | null)?.code === '23P01' ? `この時間帯は同じ${roomLabel}に既に確定シフトがあります` : '承認に失敗しました')
       return
     }
     setRequests(requests.filter(r => r.id !== req.id))
@@ -133,7 +133,7 @@ export function ModificationRequestList({ requests: initialRequests }: { request
     if (error || statusError) {
       setProcessingId(null)
       // 23P01 = exclusion_violation。元の時間帯に別の確定シフトが割り込んでいた場合
-      toast.error(statusError?.code === '23P01' ? 'この時間帯は同じルームに既に確定シフトがあります' : '却下に失敗しました')
+      toast.error(statusError?.code === '23P01' ? `この時間帯は同じ${roomLabel}に既に確定シフトがあります` : '却下に失敗しました')
       return
     }
     setRequests(requests.filter(r => r.id !== rejectTarget.id))

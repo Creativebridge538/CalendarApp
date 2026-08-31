@@ -240,7 +240,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     const notes = castNoteInput || null
 
     const { error } = await supabase.from('shifts').update({ date: scheduleForm.date, start_time, end_time, area_id, room_id, notes }).eq('id', detailShift.id)
-    if (error) { toast.error(shiftConflictMessage(error, '変更に失敗しました')); return }
+    if (error) { toast.error(shiftConflictMessage(error, '変更に失敗しました', roomLabel)); return }
 
     const room = rooms.find(r => r.id === room_id)
     const area = areas.find(a => a.id === area_id)
@@ -278,7 +278,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     const { error } = await supabase.from('shifts')
       .update({ date: scheduleForm.date, start_time, end_time, area_id, room_id, notes, admin_note: noteInput || null })
       .eq('id', detailShift.id)
-    if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました')); return }
+    if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました', roomLabel)); return }
 
     const room = rooms.find(r => r.id === room_id)
     const area = areas.find(a => a.id === area_id)
@@ -319,7 +319,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     else if (shift.status === 'confirmed') update.confirmed_at = null
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
     if (error) {
-      toast.error(shiftConflictMessage(error, '更新に失敗しました'))
+      toast.error(shiftConflictMessage(error, '更新に失敗しました', roomLabel))
       return
     }
     setShifts(shifts.map(s => s.id === shift.id ? { ...s, ...update } : s))
@@ -423,7 +423,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
           {conflicts.size > 0 && (
             <div className="flex items-center gap-1 text-sm text-destructive ml-2">
               <AlertCircle className="h-4 w-4" />
-              ルーム被り {conflicts.size} 件
+              {roomLabel}被り {conflicts.size} 件
             </div>
           )}
         </div>

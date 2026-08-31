@@ -284,14 +284,14 @@ export function StoreSettings({ store: initialStore, settings: initialSettings, 
             <Select value={locationMode} onValueChange={v => { if (v) setLocationMode(v) }}>
               <SelectTrigger>
                 <SelectValue>
-                  {{ none: 'なし（ロケーション選択なし）', room: 'ルームのみ', area_only: 'エリアのみ', area_and_room: 'エリア → ルーム' }[locationMode] ?? locationMode}
+                  {{ none: 'なし（ロケーション選択なし）', room: `${roomLabel}のみ`, area_only: `${areaLabel}のみ`, area_and_room: `${areaLabel} → ${roomLabel}` }[locationMode] ?? locationMode}
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">なし（ロケーション選択なし）</SelectItem>
-                <SelectItem value="room">ルームのみ</SelectItem>
-                <SelectItem value="area_only">エリアのみ</SelectItem>
-                <SelectItem value="area_and_room">エリア → ルーム</SelectItem>
+                <SelectItem value="room">{roomLabel}のみ</SelectItem>
+                <SelectItem value="area_only">{areaLabel}のみ</SelectItem>
+                <SelectItem value="area_and_room">{areaLabel} → {roomLabel}</SelectItem>
               </SelectContent>
             </Select>
             <p className="text-xs text-muted-foreground">シフト提出時にキャストが選択するロケーションの種類</p>
