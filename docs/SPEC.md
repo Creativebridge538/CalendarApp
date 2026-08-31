@@ -91,7 +91,6 @@ stores 1─┬─1 store_settings
 
 users(cast) 1─┬─* shifts, sales, vacant_slot_applications,
               │   notifications, push_subscriptions
-              ├─* cast_platform_profiles
               └─* cast_stage_names
 ```
 
@@ -228,12 +227,6 @@ users(cast) 1─┬─* shifts, sales, vacant_slot_applications,
 
 換算式（`src/lib/platform-earnings.ts`）: STRIPCHAT = TK ÷ 10 ÷ 2（USD）、DXライブ = ポイント × 2ドル × 0.3、FC2 = ポイントがそのまま円（USDレート不使用）。店舗ごとに`store_settings.platform_settings`で計算式/固定単価モードを上書き可能。
 
-#### `cast_platform_profiles` — キャストのプラットフォーム別ID・源氏名
-
-`id`, `store_id` FK, `cast_id` FK→users, `platform`（`stripchat`/`fc2`/`dxlive`）, `platform_user_id`?, `platform_display_name`?, `created_at`, `updated_at`
-
-同一キャストがプラットフォームごとに違うID・表示名を使っている場合の紐付け。`platform_display_name`が設定されていると、支払通知書・売上一覧のプラットフォーム表示名に`（表示名）`の形で付記される。報酬・支払通知書はこのキャスト1人に合算される（プラットフォームをまたいだ集計は分割されない）。
-
 #### `cast_stage_names` — キャストの追加の源氏名
 
 `id`, `store_id` FK, `cast_id` FK→users, `name`, `created_at`
@@ -336,7 +329,7 @@ RLSポリシーなし＝`service_role`専用（`/api/store-signup`と`/api/inter
 ### 6.2 売上・報酬・支払通知書
 
 - 売上は手入力またはプラットフォーム別（STRIPCHAT/FC2/DXライブ）入力。プラットフォーム分はUSD/JPYレートで円換算して保存。店舗が採用しているプラットフォームは`store_settings.enabled_platforms`で店舗ごとに絞り込める（未採用のプラットフォームは、売上入力・キャスト管理・店舗設定のプラットフォーム関連UIから丸ごと非表示になる。「手入力」は常に選択可能）
-- キャスト1人に対し、プラットフォームごとに別のID・表示名を紐付けられる（`cast_platform_profiles`）。また源氏名を複数登録でき（`cast_stage_names`）、売上登録のキャスト選択欄にはどの源氏名で選んでも同一キャストとして扱われる
+- キャスト1人に源氏名を複数登録でき（`cast_stage_names`）、売上登録のキャスト選択欄にはどの源氏名で選んでも同一キャストとして扱われる
 - 報酬率は「個別上書き（`sales.reward_rate_override`） ＞ プラットフォーム別の前払い率 ＞ キャスト共通の前払い率 ＞ プラットフォーム別報酬率 ＞ 基本報酬率」の優先順位で決定される（`effectiveRewardRate()`）。日払い時のみ前払い系の率が候補に入る
 - 日払い機能: 個別の報酬率上書き・単価上書き。テンプレ機能で過去に使った報酬率上書き値をワンタップ選択可能。チェックボックスで複数選択し一括で日払い済みに変更する機能あり
 - 為替レート一括変更: 既に登録済みの売上について、絞り込み条件に一致するプラットフォーム売上の金額を新しいレートで再計算・更新する機能（`sales-input.tsx`の「為替を一括変更」）
