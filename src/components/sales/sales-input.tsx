@@ -1149,9 +1149,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 {castOptions.map(o => <option key={o.key} value={o.label} />)}
               </datalist>
 
-              <div className="overflow-x-auto border rounded-lg">
+              <div className="overflow-auto border rounded-lg max-h-[45vh]">
                 <table className="w-full text-sm border-collapse">
-                  <thead>
+                  <thead className="sticky top-0 z-10 bg-muted">
                     <tr className="bg-muted/50">
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">日付</th>
                       <th className="text-left font-medium px-2 py-1.5 border-b w-32">キャスト</th>
