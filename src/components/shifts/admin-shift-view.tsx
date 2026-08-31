@@ -5,7 +5,7 @@ import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'sonner'
-import { format, addDays } from 'date-fns'
+import { format, addDays, startOfMonth, endOfMonth } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -73,7 +73,7 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const [shifts, setShifts] = useState(initialShifts)
   const [filterStatus, setFilterStatus] = useState<string>('all')
   const [filterCast, setFilterCast] = useState<string>('all')
-  const [periodMode, setPeriodMode] = useState<'all' | 'day' | 'week'>('all')
+  const [periodMode, setPeriodMode] = useState<'all' | 'day' | 'week' | 'month'>('all')
   const [periodDate, setPeriodDate] = useState<string>(() => format(new Date(), 'yyyy-MM-dd'))
   const [view, setView] = useState<'calendar' | 'timeline' | 'list'>('list')
   const [dayDetailDate, setDayDetailDate] = useState<string | null>(null)
@@ -152,6 +152,10 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
   const periodRange = useMemo(() => {
     if (periodMode === 'all') return null
     if (periodMode === 'day') return { from: periodDate, to: periodDate }
+    if (periodMode === 'month') {
+      const anchor = new Date(`${periodDate}T00:00:00`)
+      return { from: format(startOfMonth(anchor), 'yyyy-MM-dd'), to: format(endOfMonth(anchor), 'yyyy-MM-dd') }
+    }
     // 週の始まりは月曜固定ではなく、選んだ日をそのまま開始日として+6日
     const anchor = new Date(`${periodDate}T00:00:00`)
     const to = format(addDays(anchor, 6), 'yyyy-MM-dd')
@@ -398,17 +402,24 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
               {casts.map(c => <SelectItem key={c.id} value={c.id}>{c.display_name ?? c.id}</SelectItem>)}
             </SelectContent>
           </Select>
-          <Select value={periodMode} onValueChange={v => { if (v) { setPeriodMode(v as 'all' | 'day' | 'week'); setListPage(1) } }}>
+          <Select value={periodMode} onValueChange={v => { if (v) { setPeriodMode(v as 'all' | 'day' | 'week' | 'month'); setListPage(1) } }}>
             <SelectTrigger className="w-28">
-              <SelectValue>{{ all: '全期間', day: '日で絞る', week: '週で絞る' }[periodMode]}</SelectValue>
+              <SelectValue>{{ all: '全期間', day: '日で絞る', week: '週で絞る', month: '月で絞る' }[periodMode]}</SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">全期間</SelectItem>
               <SelectItem value="day">日で絞る</SelectItem>
               <SelectItem value="week">週で絞る</SelectItem>
+              <SelectItem value="month">月で絞る</SelectItem>
             </SelectContent>
           </Select>
-          {periodMode !== 'all' && (
+          {periodMode === 'month' && (
+            <Input
+              type="month" className="w-40" value={periodDate.slice(0, 7)}
+              onChange={e => { if (e.target.value) { setPeriodDate(`${e.target.value}-01`); setListPage(1) } }}
+            />
+          )}
+          {periodMode !== 'all' && periodMode !== 'month' && (
             <Input
               type="date" className="w-40" value={periodDate}
               onChange={e => { if (e.target.value) { setPeriodDate(e.target.value); setListPage(1) } }}
