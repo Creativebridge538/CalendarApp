@@ -168,8 +168,10 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
             )}
           </View>
         ))}
-        {hasFxRow && (
-          <Text style={styles.taxNote}>※為替レートはあくまで参考値です。実際の精算金額とは異なる場合があります。</Text>
+        {/* 発行済み（content.id !== null）の通知書は為替レートが確定済みのスナップショットのため、
+            未発行のプレビュー時点でのみ「参考値」の注意書きを表示する */}
+        {hasFxRow && content.id === null && (
+          <Text style={styles.taxNote}>※為替換算額は参考値です。精算時の金額と異なる場合があります。</Text>
         )}
 
         {(bankName || bankBranch || bankAccountNumber || bankAccountHolder) && (

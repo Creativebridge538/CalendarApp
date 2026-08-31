@@ -1262,13 +1262,18 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                     </div>
 
                     {salesByShiftId[shift.id] && (
-                      <div className="border-t px-4 py-3 flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">売上 / 女子給</span>
-                        <span className="tabular-nums">
-                          ¥{salesByShiftId[shift.id].amount.toLocaleString()}
-                          <span className="text-muted-foreground"> / </span>
-                          ¥{salesByShiftId[shift.id].reward.toLocaleString()}
-                        </span>
+                      <div className="border-t px-4 py-3">
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-muted-foreground">売上 / 女子給</span>
+                          <span className="tabular-nums">
+                            ¥{salesByShiftId[shift.id].amount.toLocaleString()}
+                            <span className="text-muted-foreground"> / </span>
+                            ¥{salesByShiftId[shift.id].reward.toLocaleString()}
+                          </span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          ※為替換算額は参考値です。精算時の金額と異なる場合があります。
+                        </p>
                       </div>
                     )}
 

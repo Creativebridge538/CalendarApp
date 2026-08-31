@@ -184,6 +184,11 @@ export function CastRewardDashboard({
             </button>
           </div>
 
+          {/* このページの円換算額は日払い精算前後が混在する集計のため、常に注意書きを表示する
+              （精算済み・未精算を厳密に切り分けて出し分けるのが難しいため） */}
+          <p className="text-[10px] text-muted-foreground pt-1">
+            ※為替換算額は参考値です。精算時の金額と異なる場合があります。
+          </p>
         </CardContent>
       </Card>
 
