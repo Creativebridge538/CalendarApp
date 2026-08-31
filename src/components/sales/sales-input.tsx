@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils'
 import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal } from '@/lib/reward-rate'
 import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
+import { parseNoticeItemConfig } from '@/lib/notice-template'
 import { usePagination } from '@/hooks/use-pagination'
 import type { Database } from '@/lib/supabase/database.types'
 
@@ -56,6 +57,7 @@ interface Props {
     usd_jpy_adjustment: number
     platform_settings: unknown
     enabled_platforms: string[]
+    notice_item_config: unknown
   } | null
   year: number
   month: number
@@ -159,6 +161,11 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   const supabase = createClient()
 
   const platformSettings = useMemo(() => parsePlatformSettings(storeSettings?.platform_settings), [storeSettings])
+  // 支払通知書のテンプレート設定でボーナス・控除を非表示にしている店舗では、
+  // 使わない項目として売上登録フォームからも欄を隠す
+  const noticeItemConfig = useMemo(() => parseNoticeItemConfig(storeSettings?.notice_item_config), [storeSettings])
+  const bonusFieldVisible = noticeItemConfig.find(e => e.key === 'bonus')?.visible ?? true
+  const deductionFieldVisible = noticeItemConfig.find(e => e.key === 'deduction')?.visible ?? true
   const autoFetchFx = storeSettings?.usd_jpy_auto_fetch ?? false
   const [liveFxRate, setLiveFxRate] = useState<number | null>(null)
 
@@ -820,14 +827,18 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                   <Label>稼働時間（時間）</Label>
                   <Input type="number" min="0" step="0.25" value={form.worked_hours} onChange={e => setForm({ ...form, worked_hours: e.target.value })} placeholder="0" />
                 </div>
-                <div className="space-y-1.5">
-                  <Label>ボーナス（円）</Label>
-                  <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
-                </div>
-                <div className="space-y-1.5">
-                  <Label>控除（円）</Label>
-                  <Input type="number" min="0" value={form.deduction} onChange={e => setForm({ ...form, deduction: e.target.value })} placeholder="0" />
-                </div>
+                {bonusFieldVisible && (
+                  <div className="space-y-1.5">
+                    <Label>ボーナス（円）</Label>
+                    <Input type="number" min="0" value={form.bonus} onChange={e => setForm({ ...form, bonus: e.target.value })} placeholder="0" />
+                  </div>
+                )}
+                {deductionFieldVisible && (
+                  <div className="space-y-1.5">
+                    <Label>控除（円）</Label>
+                    <Input type="number" min="0" value={form.deduction} onChange={e => setForm({ ...form, deduction: e.target.value })} placeholder="0" />
+                  </div>
+                )}
                 <div className="space-y-1.5 col-span-2">
                   <Label>備考</Label>
                   <Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} />

@@ -21,8 +21,10 @@ export const NOTICE_ITEM_DEFAULT_LABEL: Record<NoticeItemKey, string> = {
 
 export const NOTICE_ITEM_KEYS = Object.keys(NOTICE_ITEM_DEFAULT_LABEL) as NoticeItemKey[]
 
+// ボーナス・控除は使わない店舗が多いため、新規店舗のデフォルトでは非表示にしておく
+// （それ以外の項目は初期状態から見せておきたいため表示のまま）
 export const DEFAULT_NOTICE_ITEM_CONFIG: NoticeItemConfigEntry[] = NOTICE_ITEM_KEYS.map(key => ({
-  key, label: NOTICE_ITEM_DEFAULT_LABEL[key], visible: true,
+  key, label: NOTICE_ITEM_DEFAULT_LABEL[key], visible: key !== 'bonus' && key !== 'deduction',
 }))
 
 export const DEFAULT_NOTICE_FOOTER_TEXT =
