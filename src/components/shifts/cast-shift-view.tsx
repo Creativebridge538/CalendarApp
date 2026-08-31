@@ -381,15 +381,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
   const viewedMonthTotal = Object.entries(amountByDate)
     .filter(([date]) => date.startsWith(viewedMonthKey))
     .reduce((sum, [, amount]) => sum + amount, 0)
-  const prevMonthKey = format(subMonths(calAnchor, 1), 'yyyy-MM')
-  const prevMonthTotal = Object.entries(amountByDate)
-    .filter(([date]) => date.startsWith(prevMonthKey))
-    .reduce((sum, [, amount]) => sum + amount, 0)
-  const rewardDelta = isViewingCurrentMonth
-    ? (rewardSummary.prevMonthToDateTotal > 0
-      ? ((rewardSummary.thisMonthTotal - rewardSummary.prevMonthToDateTotal) / rewardSummary.prevMonthToDateTotal) * 100
-      : null)
-    : (prevMonthTotal > 0 ? ((viewedMonthTotal - prevMonthTotal) / prevMonthTotal) * 100 : null)
   const rewardGoalProgress = rewardSummary.monthlyGoal && rewardSummary.monthlyGoal > 0
     ? Math.min(100, (viewedMonthTotal / rewardSummary.monthlyGoal) * 100)
     : null
@@ -926,14 +917,6 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
                   <p className="text-[10px] text-muted-foreground">{isViewingCurrentMonth ? `${viewedMonthLabel}ここまでの売上` : `${viewedMonthLabel}の売上`}</p>
                   <div className="flex items-baseline gap-1.5 flex-wrap">
                     <p className="text-base font-bold tabular-nums">¥{viewedMonthTotal.toLocaleString()}</p>
-                    {rewardDelta != null && (
-                      <span className={cn(
-                        'text-[10px] font-semibold',
-                        rewardDelta > 0.5 ? 'text-positive' : rewardDelta < -0.5 ? 'text-destructive' : 'text-muted-foreground'
-                      )}>
-                        {rewardDelta > 0 ? '+' : ''}{rewardDelta.toFixed(1)}%
-                      </span>
-                    )}
                   </div>
                   <p className="text-[10px] text-muted-foreground mt-0.5 tabular-nums">
                     提出済み {submittedCountThisMonth}件・確定{confirmedCountThisMonth}件
