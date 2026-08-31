@@ -365,8 +365,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return calcPlatformAmount(form.platform, rawUnits, platformSettings[form.platform], usdJpyRate, override)
   }, [form.platform, form.raw_units, form.is_daily_payment, form.rate_override, platformSettings, usdJpyRate])
 
+  // テンプレート登録済みの追加項目を、値未入力の状態でデフォルト項目としてあらかじめ並べておく
+  function defaultCustomItemsFromTemplates() {
+    return itemTemplates.map(t => ({ templateId: t.id, label: t.label, unit: t.unit, rawUnits: '', amount: '' }))
+  }
+
   function openCreate() {
-    setForm(emptyForm)
+    setForm({ ...emptyForm, custom_items: defaultCustomItemsFromTemplates() })
     setCastOptionKey('')
     setEditing(null)
     setMode('single')
@@ -387,14 +392,24 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
   function startEdit(sale: Sale) {
     setEditing(sale)
     setCastOptionKey(sale.cast_id)
+    // 既存の追加項目のうち、テンプレートと項目名が一致するものはそのテンプレートのデフォルト欄に値を復元し、
+    // 一致しないもの（テンプレート削除後や自由入力分）はその他の項目として残す
+    const existingItems = (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number }[] : [])
+    const usedLabels = new Set<string>()
+    const templateItems = itemTemplates.map(t => {
+      const match = existingItems.find(i => i.label === t.label)
+      if (match) usedLabels.add(match.label)
+      return { templateId: t.id, label: t.label, unit: t.unit, rawUnits: '', amount: match ? String(match.amount) : '' }
+    })
+    const extraItems = existingItems.filter(i => !usedLabels.has(i.label))
+      .map(i => ({ templateId: '', label: i.label, unit: 'jpy', rawUnits: '', amount: String(i.amount) }))
     setForm({
       cast_id: sale.cast_id,
       date: sale.date,
       platform: (sale.platform as 'manual' | PlatformKey) ?? 'manual',
       amount: String(sale.amount),
       raw_units: sale.raw_units != null ? String(sale.raw_units) : '',
-      custom_items: (Array.isArray(sale.custom_items) ? sale.custom_items as { label: string; amount: number }[] : [])
-        .map(i => ({ templateId: '', label: i.label, unit: 'jpy', rawUnits: '', amount: String(i.amount) })),
+      custom_items: [...templateItems, ...extraItems],
       is_daily_payment: sale.is_daily_payment,
       rate_override: sale.rate_override != null ? String(sale.rate_override) : '',
       reward_rate_override: sale.reward_rate_override != null ? String(Number(sale.reward_rate_override) * 100) : '',
@@ -439,7 +454,9 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       deduction: form.deduction ? parseInt(form.deduction) : 0,
       custom_items: form.custom_items
         .filter(i => i.label.trim() !== '')
-        .map(i => ({ label: i.label.trim(), amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits) })),
+        .map(i => ({ label: i.label.trim(), amount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcItemAmount(i.unit, i.rawUnits) }))
+        // デフォルト項目は未入力のまま保存しないよう、金額が0の行は除外する
+        .filter(i => i.amount !== 0),
       store_id: storeId,
       created_by: userId,
     }
@@ -819,60 +836,53 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
               <div className="space-y-1.5 pt-2 border-t">
                 <Label className="text-xs text-muted-foreground font-normal">追加項目（指名料など・マイナス値で控除も可）</Label>
-                {form.custom_items.map((item, i) => (
-                  <div key={i} className="flex items-center gap-2 flex-wrap">
-                    <Select
-                      value={item.templateId || '__free__'}
-                      onValueChange={v => {
-                        if (!v) return
-                        const template = itemTemplates.find(t => t.id === v)
-                        setForm({
-                          ...form,
-                          custom_items: form.custom_items.map((it, idx) => idx === i ? (
-                            template
-                              ? { ...it, templateId: template.id, label: template.label, unit: template.unit, rawUnits: '', amount: '' }
-                              : { ...it, templateId: '', unit: 'jpy', rawUnits: '' }
-                          ) : it),
-                        })
-                      }}
-                    >
-                      <SelectTrigger className="w-36">
-                        <SelectValue>{item.templateId ? item.label : '自由入力'}</SelectValue>
-                      </SelectTrigger>
-                      <SelectContent alignItemWithTrigger={false}>
-                        <SelectItem value="__free__">自由入力</SelectItem>
-                        {itemTemplates.map(t => <SelectItem key={t.id} value={t.id}>{t.label}</SelectItem>)}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      placeholder="項目名（例: 指名料）" className="w-40" value={item.label}
-                      disabled={!!item.templateId}
-                      onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, label: e.target.value } : it) })}
-                    />
-                    {item.unit === 'jpy' ? (
-                      <Input
-                        type="number" className="w-28" placeholder="金額" value={item.amount}
-                        onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
-                      />
-                    ) : (
-                      <>
-                        <Input
-                          type="number" className="w-24" placeholder={`数量（${NOTICE_ITEM_UNIT_LABEL[item.unit] ?? item.unit}）`}
-                          value={item.rawUnits}
-                          onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, rawUnits: e.target.value } : it) })}
-                        />
-                        <span className="text-xs text-muted-foreground whitespace-nowrap">
-                          → ¥{calcItemAmount(item.unit, item.rawUnits).toLocaleString()}
-                        </span>
-                      </>
-                    )}
-                    <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, custom_items: form.custom_items.filter((_, idx) => idx !== i) })}>
-                      <X className="h-3.5 w-3.5" />
-                    </Button>
+                {form.custom_items.some(it => it.templateId) && (
+                  <div className="grid grid-cols-2 gap-3">
+                    {form.custom_items.map((item, i) => item.templateId && (
+                      <div key={item.templateId} className="space-y-1.5">
+                        <Label className="text-xs text-muted-foreground font-normal">{item.label}</Label>
+                        {item.unit === 'jpy' ? (
+                          <Input
+                            type="number" placeholder="0" value={item.amount}
+                            onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
+                          />
+                        ) : (
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number" placeholder={`数量（${NOTICE_ITEM_UNIT_LABEL[item.unit] ?? item.unit}）`}
+                              value={item.rawUnits}
+                              onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, rawUnits: e.target.value } : it) })}
+                            />
+                            <span className="text-xs text-muted-foreground whitespace-nowrap">
+                              → ¥{calcItemAmount(item.unit, item.rawUnits).toLocaleString()}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                ))}
+                )}
+                {form.custom_items.some(it => !it.templateId) && (
+                  <div className="space-y-2">
+                    {form.custom_items.map((item, i) => !item.templateId && (
+                      <div key={i} className="flex items-center gap-2">
+                        <Input
+                          placeholder="項目名（例: 指名料）" value={item.label}
+                          onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, label: e.target.value } : it) })}
+                        />
+                        <Input
+                          type="number" className="w-28" placeholder="金額" value={item.amount}
+                          onChange={e => setForm({ ...form, custom_items: form.custom_items.map((it, idx) => idx === i ? { ...it, amount: e.target.value } : it) })}
+                        />
+                        <Button size="icon" variant="ghost" onClick={() => setForm({ ...form, custom_items: form.custom_items.filter((_, idx) => idx !== i) })}>
+                          <X className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                )}
                 <Button size="sm" variant="outline" onClick={() => setForm({ ...form, custom_items: [...form.custom_items, { templateId: '', label: '', unit: 'jpy', rawUnits: '', amount: '' }] })}>
-                  <Plus className="h-3.5 w-3.5 mr-1" />項目を追加
+                  <Plus className="h-3.5 w-3.5 mr-1" />その他の項目を追加
                 </Button>
               </div>
 
