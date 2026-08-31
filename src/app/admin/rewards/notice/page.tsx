@@ -6,7 +6,7 @@ import { ja } from 'date-fns/locale'
 import { DownloadPdfButton } from './download-button'
 import { fetchNoticeContent, getNoticeSnapshotById, getLatestNoticeSnapshot, buildNoticeSummaryRows } from '@/lib/payment-notice-data'
 import { DEFAULT_NOTICE_FOOTER_TEXT } from '@/lib/notice-template'
-import { nowJST } from '@/lib/jst'
+import { nowJST, toJSTWallClock } from '@/lib/jst'
 
 export default async function PaymentNoticePage({
   searchParams,
@@ -201,7 +201,7 @@ export default async function PaymentNoticePage({
                 <td>
                   {s.platformLabel}
                   {s.isDailyPayment && (s.dailyPaymentAt
-                    ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
+                    ? `（日払い済み ${format(toJSTWallClock(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
                     : '（日払い済み）')}
                 </td>
                 <td className="right">¥{s.rowTotal.toLocaleString()}</td>

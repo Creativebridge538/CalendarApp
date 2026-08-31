@@ -158,7 +158,7 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
             <Text style={hasFxRow ? styles.colPlatformWithFx : styles.colPlatform}>
               {s.platformLabel}
               {s.isDailyPayment && (s.dailyPaymentAt
-                ? `（日払い済み ${format(new Date(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
+                ? `（日払い済み ${format(toJSTWallClock(s.dailyPaymentAt), 'M/d', { locale: ja })}）`
                 : '（日払い済み）')}
             </Text>
             <Text style={hasFxRow ? styles.colAmountWithFx : styles.colAmount}>¥{s.rowTotal.toLocaleString()}</Text>

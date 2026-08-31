@@ -83,7 +83,9 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     }
   })
   const baseReward = salesRows.reduce((sum, s) => sum + s.reward, 0)
-  const dailySettledAmount = salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + s.reward, 0)
+  // 精算済み金額はその日にボーナス・控除・追加項目まで含めて実際に支払われた金額（rowTotal）を使う
+  // （基本報酬（reward）だけだと、追加項目分の女子給が日払い精算に含まれず金額がズレるため）
+  const dailySettledAmount = salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + s.rowTotal, 0)
   const bonus = rawSalesRows.reduce((sum, s) => sum + Number(s.bonus), 0)
   const deduction = rawSalesRows.reduce((sum, s) => sum + Number(s.deduction), 0)
   // 発行前（プレビュー等）の時点では手動追加のカスタム項目はまだ存在しない。発行後に個別編集で追加する
@@ -148,7 +150,7 @@ function mapNoticeRow(data: {
     salesRows,
     salesTotal: Number(data.sales_total), baseReward: Number(data.base_reward),
     bonus: Number(data.bonus), deduction: Number(data.deduction),
-    dailySettledAmount: salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + (s.reward ?? 0), 0),
+    dailySettledAmount: salesRows.filter(s => s.isDailyPayment).reduce((sum, s) => sum + (s.rowTotal ?? s.reward ?? 0), 0),
     customItems: (data.custom_items as CustomItem[] | null) ?? [],
     salesCustomItems: (data.sales_custom_items as CustomItem[] | null) ?? [],
     totalReward: Number(data.total_reward),
