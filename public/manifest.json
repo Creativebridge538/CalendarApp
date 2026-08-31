@@ -1,6 +1,6 @@
 {
-  "name": "CalendarApp",
-  "short_name": "CalendarApp",
+  "name": "ShiftMate",
+  "short_name": "ShiftMate",
   "description": "多店舗対応シフト・報酬・キャスト管理",
   "start_url": "/cast/shifts",
   "scope": "/",

@@ -271,7 +271,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
         <div className={cn('px-4 py-4 border-b', s.border)}>
           <div className="flex items-center gap-2.5" style={s.logo}>
             <Logo className="h-7 w-7 shrink-0" />
-            <p className="font-bold text-lg tracking-tight">CalendarApp</p>
+            <p className="font-bold text-lg tracking-tight">ShiftMate</p>
           </div>
           <p className="text-xs mt-0.5" style={s.subtext}>
             {role === 'admin' ? '管理者' : 'キャスト'}
@@ -353,7 +353,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
               <Menu className="h-5 w-5" />
             </button>
             <Logo className="h-5 w-5 shrink-0" />
-            <span className="font-bold tracking-tight">CalendarApp</span>
+            <span className="font-bold tracking-tight">ShiftMate</span>
           </div>
 
           {/* 管理者: モバイル ドロワー */}
@@ -368,7 +368,7 @@ export function AppNav({ role, userEmail, theme = 'default' }: AppNavProps) {
                   <div>
                     <div className="flex items-center gap-2.5" style={s.logo}>
                       <Logo className="h-6 w-6 shrink-0" />
-                      <p className="font-bold text-lg tracking-tight">CalendarApp</p>
+                      <p className="font-bold text-lg tracking-tight">ShiftMate</p>
                     </div>
                     <p className="text-xs mt-0.5" style={s.subtext}>管理者</p>
                   </div>

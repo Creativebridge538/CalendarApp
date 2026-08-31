@@ -130,9 +130,9 @@ export default function LoginPage() {
         <Card elevated className="w-full">
           <CardHeader className="space-y-1">
             <div className="flex items-center justify-center gap-1.5 mb-2">
-              <Logo className="h-5 w-5" style={{ color: 'var(--brand-accent)' }} />
+              <Logo className="h-5 w-5" />
               <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--brand-accent)' }}>
-                CalendarApp
+                ShiftMate
               </span>
             </div>
             <CardTitle className="text-2xl font-bold text-center">ログイン</CardTitle>

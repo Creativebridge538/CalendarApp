@@ -1,4 +1,4 @@
-# CalendarApp
+# ShiftMate
 
 キャバクラ／ラウンジ等の店舗向け、シフト・売上・報酬管理SaaS。Next.js（App Router）+ Supabase（Postgres / Auth / RLS）構成。
 

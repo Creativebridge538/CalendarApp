@@ -20,7 +20,7 @@ const accentFontVars = [notoSansJP, zenMaruGothic, mplusRounded, kosugiMaru, moc
   .join(' ')
 
 export const metadata: Metadata = {
-  title: 'CalendarApp - 業務管理システム',
+  title: 'ShiftMate - 業務管理システム',
   description: '多店舗対応シフト・報酬・キャスト管理',
   manifest: '/manifest.json',
 }

@@ -35,7 +35,7 @@ export async function POST(request: Request) {
 
   try {
     await resend.emails.send({
-      from: 'CalendarApp <onboarding@resend.dev>',
+      from: 'ShiftMate <onboarding@resend.dev>',
       to: cast.email,
       subject: `${periodLabel}分の支払通知書が届いています`,
       html: `

@@ -47,7 +47,7 @@ export async function POST(request: Request) {
 
     let rootFolderId = tokenRow.root_folder_id
     if (!rootFolderId) {
-      rootFolderId = await ensureFolder(accessToken, `CalendarApp 支払通知書${store?.name ? `（${store.name}）` : ''}`)
+      rootFolderId = await ensureFolder(accessToken, `ShiftMate 支払通知書${store?.name ? `（${store.name}）` : ''}`)
       await admin.from('store_google_drive_tokens').update({ root_folder_id: rootFolderId }).eq('store_id', storeId)
     }
 

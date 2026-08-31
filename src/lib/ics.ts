@@ -38,7 +38,7 @@ export function buildIcsCalendar(calendarName: string, events: IcsEvent[]): stri
   const lines: string[] = [
     'BEGIN:VCALENDAR',
     'VERSION:2.0',
-    'PRODID:-//CalendarApp//Shifts//JA',
+    'PRODID:-//ShiftMate//Shifts//JA',
     'CALSCALE:GREGORIAN',
     'METHOD:PUBLISH',
     `X-WR-CALNAME:${escapeText(calendarName)}`,
