@@ -24,7 +24,7 @@ export default async function RewardsPage({
   const [{ data: allCasts }, { data: sales }, { data: settings }, { data: includedInSalesTemplates }] = await Promise.all([
     supabase.from('users').select('id, display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, is_active')
       .eq('store_id', storeId).eq('role', 'cast').order('display_name'),
-    supabase.from('sales').select('cast_id, amount, platform, is_daily_payment, reward_rate_override, bonus, deduction, custom_items')
+    supabase.from('sales').select('cast_id, amount, sales_amount, platform, is_daily_payment, reward_rate_override, bonus, deduction, custom_items')
       .eq('store_id', storeId).gte('date', from).lte('date', to),
     supabase.from('store_settings').select('notice_item_config').eq('store_id', storeId).single(),
     supabase.from('notice_item_templates').select('label').eq('store_id', storeId).eq('include_in_sales', true),

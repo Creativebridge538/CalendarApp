@@ -28,7 +28,7 @@ export default async function CastShiftsPage() {
       reward_rate: profile.reward_rate, platform_reward_rates: profile.platform_reward_rates,
       daily_payment_reward_rate: profile.daily_payment_reward_rate, platform_daily_payment_reward_rates: profile.platform_daily_payment_reward_rates,
     }),
-    supabase.from('sales').select('date, amount, platform, shift_id, is_daily_payment, reward_rate_override, bonus, deduction, custom_items').eq('cast_id', user.id),
+    supabase.from('sales').select('date, amount, sales_amount, platform, shift_id, is_daily_payment, reward_rate_override, bonus, deduction, custom_items').eq('cast_id', user.id),
     supabase.from('notice_item_templates').select('label').eq('store_id', profile.store_id).eq('include_in_sales', true),
   ])
   const includedInSalesLabels = new Set((includedInSalesTemplates ?? []).map(t => t.label))
@@ -61,8 +61,9 @@ export default async function CastShiftsPage() {
     const rewardAmount = Math.floor(Number(s.amount) * rate) + Number(s.bonus) - Number(s.deduction) + customItemsTotal(s.custom_items)
     amountByDate[s.date] = (amountByDate[s.date] ?? 0) + rewardAmount
     if (s.shift_id) {
-      // 「売上に反映する」設定がオンのテンプレート項目は、管理画面の売上合計と同様にその分も加算する
-      const salesAmount = Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
+      // 「売上に反映する」設定がオンのテンプレート項目は、管理画面の売上合計と同様にその分も加算する。
+      // 固定単価モードでも売上は常に計算式モードの換算結果（sales_amount）を使う
+      const salesAmount = Number(s.sales_amount ?? s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
       const prev = salesByShiftId[s.shift_id] ?? { amount: 0, reward: 0 }
       salesByShiftId[s.shift_id] = {
         amount: prev.amount + salesAmount,

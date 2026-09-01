@@ -27,7 +27,7 @@ interface CastUser {
   platform_daily_payment_reward_rates: unknown
 }
 interface SaleRow {
-  cast_id: string; amount: number | string; platform: string
+  cast_id: string; amount: number | string; sales_amount: number | string | null; platform: string
   is_daily_payment: boolean; reward_rate_override: number | string | null
   bonus: number | string; deduction: number | string
   custom_items: unknown
@@ -79,7 +79,8 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     const platformRates = parsePlatformRewardRates(cast.platform_reward_rates)
     const platformDailyRates = parsePlatformRewardRates(cast.platform_daily_payment_reward_rates)
     const castSales = salesByCast.get(cast.id) ?? []
-    const salesTotal = castSales.reduce((sum, s) => sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
+    // 売上は固定単価モードでも常に計算式モードの換算結果（sales_amount）を使う。女子給側（baseReward）はamountのまま
+    const salesTotal = castSales.reduce((sum, s) => sum + Number(s.sales_amount ?? s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
     // 日払いの個別上書き・プラットフォーム別報酬率が設定されている行はその率で計算する（それ以外は通常の報酬率）。
     // 実際の発行処理（payment-notice-data.ts）と同じく行ごとにfloorしてから合計する
     // （合計してから1回だけfloorすると、行数が多いキャストほど発行後の金額と数円ズレることがあるため）

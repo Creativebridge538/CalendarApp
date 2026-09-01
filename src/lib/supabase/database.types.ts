@@ -522,6 +522,7 @@ export type Database = {
           rate_override: number | null
           raw_units: number | null
           reward_rate_override: number | null
+          sales_amount: number | null
           shift_id: string | null
           store_id: string
           updated_at: string
@@ -546,6 +547,7 @@ export type Database = {
           rate_override?: number | null
           raw_units?: number | null
           reward_rate_override?: number | null
+          sales_amount?: number | null
           shift_id?: string | null
           store_id: string
           updated_at?: string
@@ -570,6 +572,7 @@ export type Database = {
           rate_override?: number | null
           raw_units?: number | null
           reward_rate_override?: number | null
+          sales_amount?: number | null
           shift_id?: string | null
           store_id?: string
           updated_at?: string
@@ -1441,4 +1444,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -18,7 +18,7 @@ import { Pagination } from '@/components/ui/pagination'
 import { Plus, Pencil, Trash2, ChevronLeft, ChevronRight, X, Table2, FileEdit, RefreshCw } from 'lucide-react'
 import Link from 'next/link'
 import { cn } from '@/lib/utils'
-import { calcPlatformAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
+import { calcPlatformAmount, calcPlatformFormulaAmount, parsePlatformSettings, type PlatformKey } from '@/lib/platform-earnings'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, includedInSalesTotal, parseCustomItems } from '@/lib/reward-rate'
 import { NOTICE_ITEM_UNIT_LABEL } from '@/components/settings/notice-item-templates'
 import { parseNoticeItemConfig } from '@/lib/notice-template'
@@ -29,6 +29,9 @@ type SaleInsert = Database['public']['Tables']['sales']['Insert']
 
 interface Sale {
   id: string; cast_id: string; date: string; amount: number | string; notes: string | null
+  // 「固定単価を使う」設定でも売上は計算式モードの換算結果を使うための専用カラム。
+  // null（過去データ）はamountをそのまま売上として扱う
+  sales_amount: number | string | null
   platform: string; raw_units: number | string | null
   is_daily_payment: boolean; rate_override: number | string | null; reward_rate_override: number | string | null
   daily_payment_at: string | null
@@ -69,6 +72,12 @@ interface Props {
 
 const PLATFORM_LABEL: Record<string, string> = {
   manual: '手入力', stripchat: 'STRIPCHAT', fc2: 'FC2', dxlive: 'DXライブ',
+}
+
+// 「固定単価を使う」設定の行はsales_amountが女子給計算用のamountと異なる（売上は計算式ベース）。
+// null（過去データ）はamountをそのまま売上として扱うフォールバック
+function salesAmountOf(s: { amount: number | string; sales_amount: number | string | null }): number {
+  return s.sales_amount != null ? Number(s.sales_amount) : Number(s.amount)
 }
 
 function defaultDateFor(year: number, month: number): string {
@@ -247,6 +256,14 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return calcPlatformAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate, null).jpy
   }
 
+  // 売上合計に使う専用の換算。固定単価モードでも「売上」は常に計算式モードの換算結果を使う
+  // （女子給側はcalcSalesAmount/calcItemAmountのまま、実際のモード設定を使い続ける）
+  function calcSalesAmountForTotal(unit: string, rawUnits: string): number {
+    const units = parseFloat(rawUnits) || 0
+    if (unit === 'jpy') return units
+    return calcPlatformFormulaAmount(unit as PlatformKey, units, platformSettings[unit as PlatformKey], usdJpyRate)
+  }
+
   // プラットフォーム単位（トークン・ポイント）の追加項目は、換算後の売上額をそのまま使うのではなく、
   // このキャストの報酬率を掛けた女子給ベースの金額にする（通知書には売上ではなく女子給を載せるため）
   function calcItemAmount(unit: string, rawUnits: string): number {
@@ -400,8 +417,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       const converted = calcPlatformAmount(platform, rawUnits, platformSettings[platform], newRate, null)
       // RLSの条件に一致しない場合、Supabaseはerrorを返さず0件更新のまま成功扱いになることがあるため、
       // 実際に更新された行をselectで確認する（他の保存処理と同じパターン）
+      // fxTargetsはusesFxRate()で固定単価モードの行を除外済みのため、常にformulaモードの換算値。
+      // 売上（sales_amount）も同じ値でよい
       const { data, error } = await supabase.from('sales')
-        .update({ amount: converted.jpy, usd_amount: converted.usd, fx_rate_snapshot: newRate })
+        .update({ amount: converted.jpy, sales_amount: converted.jpy, usd_amount: converted.usd, fx_rate_snapshot: newRate })
         .eq('id', s.id)
         .select('id')
       const ok = !error && !!data && data.length > 0
@@ -414,7 +433,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     const failed = results.filter(r => !r.ok)
     if (succeeded.length > 0) {
       const amountById = new Map(succeeded.map(r => [r.id, r.after]))
-      setSales(prev => prev.map(s => amountById.has(s.id) ? { ...s, amount: amountById.get(s.id)! } : s))
+      setSales(prev => prev.map(s => amountById.has(s.id) ? { ...s, amount: amountById.get(s.id)!, sales_amount: amountById.get(s.id)! } : s))
     }
     if (failed.length > 0) {
       const reason = failed[0].errorMessage ?? '更新条件に一致しませんでした（権限設定をご確認ください）'
@@ -441,7 +460,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     [includedInSalesLabelsProp]
   )
   const monthlyTotal = useMemo(() => filteredSales.reduce((sum, s) =>
-    sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0
+    sum + salesAmountOf(s) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0
   ), [filteredSales, includedInSalesLabels])
   const monthlyRewardTotal = useMemo(() => filteredSales.reduce((sum, s) => {
     const rate = effectiveRewardRate(s, castRewardRateById[s.cast_id] ?? 0, castPlatformRatesById[s.cast_id], castDailyRateById[s.cast_id], castPlatformDailyRatesById[s.cast_id])
@@ -458,11 +477,20 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
     return calcPlatformAmount(form.platform, rawUnits, platformSettings[form.platform], usdJpyRate, override)
   }, [form.platform, form.raw_units, form.is_daily_payment, form.rate_override, platformSettings, usdJpyRate])
 
+  // 売上プレビュー: 固定単価モードでも売上は常に計算式モードの換算結果を見せる（handleSaveのsalesAmountと同じロジック）
+  const previewSalesAmount = useMemo(() => {
+    if (form.platform === 'manual') return null
+    const hasRateOverride = form.is_daily_payment && !!form.rate_override
+    if (hasRateOverride) return preview?.jpy ?? 0
+    const rawUnits = parseFloat(form.raw_units) || 0
+    return calcPlatformFormulaAmount(form.platform, rawUnits, platformSettings[form.platform], usdJpyRate)
+  }, [form.platform, form.raw_units, form.is_daily_payment, form.rate_override, platformSettings, usdJpyRate, preview])
+
   // 「売上に反映する」設定がオンの追加項目は、プレビューの売上額にもその場で加算して見せる
   const formIncludedSalesTotal = useMemo(() => form.custom_items.reduce((sum, item) => {
     if (!includedInSalesLabels.has(item.label)) return sum
-    return sum + (item.unit === 'jpy' ? (parseFloat(item.amount) || 0) : calcSalesAmount(item.unit, item.rawUnits))
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- calcSalesAmountはplatformSettings/usdJpyRateに依存する関数のため、それらをdepsに含める
+    return sum + (item.unit === 'jpy' ? (parseFloat(item.amount) || 0) : calcSalesAmountForTotal(item.unit, item.rawUnits))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- calcSalesAmountForTotalはplatformSettings/usdJpyRateに依存する関数のため、それらをdepsに含める
   }, 0), [form.custom_items, includedInSalesLabels, platformSettings, usdJpyRate])
 
   // テンプレート登録済みの追加項目を、値未入力の状態でデフォルト項目としてあらかじめ並べておく
@@ -537,12 +565,19 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
     const isPlatform = form.platform !== 'manual'
     const amount = isPlatform ? (preview?.jpy ?? 0) : parseInt(form.amount)
+    // 日払いのレート上書きがある行は上書き後の金額をそのまま売上としても扱う。
+    // それ以外のプラットフォーム行は、固定単価モードでも売上は常に計算式モードの換算結果を使う
+    const hasRateOverride = form.is_daily_payment && isPlatform && !!form.rate_override
+    const salesAmount = form.platform !== 'manual' && !hasRateOverride
+      ? calcPlatformFormulaAmount(form.platform, parseFloat(form.raw_units) || 0, platformSettings[form.platform], usdJpyRate)
+      : amount
 
     const payload = {
       cast_id: form.cast_id,
       date: form.date,
       platform: form.platform,
       amount,
+      sales_amount: salesAmount,
       raw_units: isPlatform ? parseFloat(form.raw_units) : null,
       usd_amount: isPlatform ? preview?.usd ?? null : null,
       fx_rate_snapshot: isPlatform ? usdJpyRate : null,
@@ -568,7 +603,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           amount: i.unit === 'jpy'
             ? calcJpyItemReward(parseFloat(i.amount) || 0, form.cast_id, includedInSalesLabels.has(i.label.trim()))
             : calcItemAmount(i.unit, i.rawUnits),
-          salesAmount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcSalesAmount(i.unit, i.rawUnits),
+          salesAmount: i.unit === 'jpy' ? (parseFloat(i.amount) || 0) : calcSalesAmountForTotal(i.unit, i.rawUnits),
         }))
         // デフォルト項目は未入力のまま保存しないよう、金額が0の行は除外する
         .filter(i => i.amount !== 0),
@@ -689,6 +724,8 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
       const rowPlatform = row.platform
       const isPlatform = rowPlatform !== 'manual'
       const converted = rowPlatform !== 'manual' ? calcPlatformAmount(rowPlatform, amountVal, platformSettings[rowPlatform], usdJpyRate, null) : null
+      // まとめて登録は日払いレート上書きの概念がないため、固定単価モードでも売上は常に計算式モードで換算する
+      const salesAmount = isPlatform ? calcPlatformFormulaAmount(rowPlatform, amountVal, platformSettings[rowPlatform], usdJpyRate) : Math.round(amountVal)
       // 1件ずつ登録と同様、テンプレート項目に入力があれば追加項目として保存する
       // （unit/rawUnitsも保存し、編集時に円換算前の入力値をそのまま復元できるようにする。
       // salesAmountは報酬率を掛ける前の売上ベースの金額）
@@ -699,12 +736,13 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
           const amount = t.unit === 'jpy'
             ? calcJpyItemReward(parseFloat(rawUnits) || 0, cast.id, includedInSalesLabels.has(t.label))
             : calcBulkItemAmount(cast, t.unit, rawUnits)
-          return { label: t.label, unit: t.unit, rawUnits, amount, salesAmount: calcSalesAmount(t.unit, rawUnits) }
+          return { label: t.label, unit: t.unit, rawUnits, amount, salesAmount: calcSalesAmountForTotal(t.unit, rawUnits) }
         })
         .filter((i): i is NonNullable<typeof i> => i !== null && i.amount !== 0)
       payloads.push({
         cast_id: cast.id, date: row.date, platform: row.platform,
         amount: isPlatform ? (converted?.jpy ?? 0) : Math.round(amountVal),
+        sales_amount: salesAmount,
         raw_units: isPlatform ? amountVal : null,
         usd_amount: isPlatform ? converted?.usd ?? null : null,
         fx_rate_snapshot: isPlatform ? usdJpyRate : null,
@@ -843,7 +881,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                 const baseReward = Math.floor(Number(sale.amount) * effectiveRewardRate(sale, castRewardRateById[sale.cast_id] ?? 0, castPlatformRatesById[sale.cast_id], castDailyRateById[sale.cast_id], castPlatformDailyRatesById[sale.cast_id]))
                 const customTotal = customItemsTotal(sale.custom_items)
                 const reward = baseReward + Number(sale.bonus) - Number(sale.deduction) + customTotal
-                const salesAmount = Number(sale.amount) + includedInSalesTotal(sale.custom_items, includedInSalesLabels)
+                const salesAmount = salesAmountOf(sale) + includedInSalesTotal(sale.custom_items, includedInSalesLabels)
                 const rowCustomItems = parseCustomItems(sale.custom_items)
                 return (
                   <TableRow key={sale.id}>
@@ -1075,7 +1113,7 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
 
               {(preview || formIncludedSalesTotal !== 0 || (form.platform === 'manual' && form.amount.trim() !== '')) && (
                 <p className="text-sm text-muted-foreground">
-                  売上: <span className="font-medium text-foreground">¥{((form.platform === 'manual' ? (parseFloat(form.amount) || 0) : (preview?.jpy ?? 0)) + formIncludedSalesTotal).toLocaleString()}</span>
+                  売上: <span className="font-medium text-foreground">¥{((form.platform === 'manual' ? (parseFloat(form.amount) || 0) : (previewSalesAmount ?? 0)) + formIncludedSalesTotal).toLocaleString()}</span>
                   {preview?.usd != null && ` （$${preview.usd.toFixed(2)}）`}
                   {preview?.usd != null && usdJpyRate != null && ` ・ 為替レート: ¥${usdJpyRate.toFixed(2)}/$`}
                 </p>
@@ -1211,10 +1249,10 @@ export function SalesInput({ casts, sales: initialSales, storeId, userId, storeS
                         if (!includedInSalesLabels.has(t.label)) return sum
                         const rawUnits = row.customItems[t.id] ?? ''
                         if (!rawUnits.trim()) return sum
-                        return sum + calcSalesAmount(t.unit, rawUnits)
+                        return sum + calcSalesAmountForTotal(t.unit, rawUnits)
                       }, 0)
                       const baseSalesAmount = row.platform !== 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount))
-                        ? calcPlatformAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate, null).jpy
+                        ? calcPlatformFormulaAmount(row.platform, parseFloat(row.amount), platformSettings[row.platform], usdJpyRate)
                         : (row.platform === 'manual' && row.amount.trim() && !Number.isNaN(parseFloat(row.amount)) ? parseFloat(row.amount) : null)
                       return (
                       <tr key={row.id}>

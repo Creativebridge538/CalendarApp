@@ -49,7 +49,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     supabase.from('stores').select('name').eq('id', storeId).single(),
     supabase.from('store_settings').select('logo_url, notice_item_config, notice_header_text, notice_footer_text').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
-    supabase.from('sales').select('date, platform, amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction, fx_rate_snapshot, usd_amount, custom_items')
+    supabase.from('sales').select('date, platform, amount, sales_amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction, fx_rate_snapshot, usd_amount, custom_items')
       .eq('cast_id', castId).eq('store_id', storeId)
       .gte('date', from).lte('date', to)
       .order('date'),
@@ -64,7 +64,9 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
   const rawSalesRows = sales ?? []
   // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する
   const includedInSalesLabels = new Set((itemTemplates ?? []).map(t => t.label))
-  const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
+  // 売上（salesTotal・各行のamount表示）は「固定単価を使う」設定でも常に計算式モードの換算結果（sales_amount）を使う。
+  // 女子給側のreward/baseReward計算はamount（実際のモード設定に基づく金額）のまま変更しない
+  const salesTotal = rawSalesRows.reduce((sum, s) => sum + Number(s.sales_amount ?? s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels), 0)
   // 日払いで報酬率が上書きされている行や、プラットフォーム別の報酬率が設定されている行は
   // その行だけ別の率で計算する（それ以外は通常の報酬率）。後で日払い精算済み分の内訳表示にも
   // 使えるよう、行ごとの報酬額も保持しておく
@@ -75,7 +77,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     const reward = Math.floor(Number(s.amount) * rate)
     return {
       date: s.date, platformLabel: PLATFORM_LABEL[s.platform] ?? s.platform,
-      amount: Number(s.amount), reward,
+      amount: Number(s.sales_amount ?? s.amount), reward,
       rowTotal: reward + Number(s.bonus) - Number(s.deduction) + customItemsTotal(s.custom_items),
       isDailyPayment: s.is_daily_payment, dailyPaymentAt: s.daily_payment_at,
       fxRate: s.fx_rate_snapshot != null ? Number(s.fx_rate_snapshot) : null,

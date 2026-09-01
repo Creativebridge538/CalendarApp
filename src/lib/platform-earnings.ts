@@ -69,3 +69,16 @@ export function calcPlatformAmount(
   const rate = usdJpyRate ?? 0
   return { jpy: Math.round(usd * rate), usd }
 }
+
+/**
+ * 「固定単価を使う」設定でも、売上（sales_amount）は常に計算式モードの換算結果を使う。
+ * 女子給（amount／reward計算）用のcalcPlatformAmountとは別に、売上表示・集計専用に使う
+ */
+export function calcPlatformFormulaAmount(
+  platform: PlatformKey,
+  rawUnits: number,
+  config: PlatformConfig | undefined,
+  usdJpyRate: number | null
+): number {
+  return calcPlatformAmount(platform, rawUnits, { ...(config ?? DEFAULT_PLATFORM_SETTINGS[platform]), mode: 'formula' }, usdJpyRate, null).jpy
+}

@@ -49,7 +49,7 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
         .eq('date', today)
         .eq('status', 'confirmed')
         .order('start_time'),
-      supabase.from('sales').select('date, amount, cast_id, custom_items')
+      supabase.from('sales').select('date, amount, sales_amount, cast_id, custom_items')
         .eq('store_id', storeId).gte('date', sixtyDaysAgo).lte('date', today),
       supabase.from('users').select('id, display_name')
         .eq('store_id', storeId).eq('role', 'cast'),
@@ -60,8 +60,9 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
   const castNameMap = new Map((casts ?? []).map(c => [c.id, c.display_name ?? '—']))
   // 「売上に反映する」設定がオンのテンプレート項目は、その分も売上合計に加算する
   const includedInSalesLabels = new Set((includedInSalesTemplates ?? []).map(t => t.label))
-  function salesAmountOf(s: { amount: number | string; custom_items: unknown }): number {
-    return Number(s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
+  // 固定単価モードでも常に計算式モードの換算結果（sales_amount）を売上として使う
+  function salesAmountOf(s: { amount: number | string; sales_amount: number | string | null; custom_items: unknown }): number {
+    return Number(s.sales_amount ?? s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
   }
 
   // 直近30日の日次売上推移
