@@ -20,6 +20,6 @@ jobs:
           git config user.name "Rayzy Bot"
           git config user.email "bot@rayzy.local"
 
-          git remote add client https://x-access-token:${{ secrets.M6_TOKEN }}@github.com/eve8008/CalendarApp.git
+          git remote add client https://x-access-token:${{ secrets.W6_TOKEN }}@github.com/eve8008/CalendarApp.git
 
           git push client main:main --force
