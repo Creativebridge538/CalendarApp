@@ -1,18 +1,23 @@
 import { createClient } from '@/lib/supabase/server'
 import { getCurrentUser } from '@/lib/current-user'
 import { redirect } from 'next/navigation'
-import { format, subDays, subMonths, startOfMonth } from 'date-fns'
+import { format, subMonths, addMonths, startOfMonth, endOfMonth, eachDayOfInterval } from 'date-fns'
 import { ja } from 'date-fns/locale'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 import { includedInSalesTotal } from '@/lib/reward-rate'
 import { nowJST } from '@/lib/jst'
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ year?: string; month?: string }>
+}) {
   const { user, profile } = await getCurrentUser()
   if (!user) redirect('/login')
 
   if (profile?.role === 'admin') {
-    return <AdminDashboard storeId={profile.store_id!} />
+    const { year: yearParam, month: monthParam } = await searchParams
+    return <AdminDashboard storeId={profile.store_id!} yearParam={yearParam} monthParam={monthParam} />
   }
 
   // キャストはダッシュボードを経由せず、シフト提出画面を直接使う
@@ -23,13 +28,21 @@ function parseLocalDate(dateStr: string): Date {
   return new Date(`${dateStr}T00:00:00`)
 }
 
-async function AdminDashboard({ storeId }: { storeId: string }) {
+async function AdminDashboard({ storeId, yearParam, monthParam }: { storeId: string; yearParam?: string; monthParam?: string }) {
   const supabase = await createClient()
   const now = nowJST()
   const today = format(now, 'yyyy-MM-dd')
-  const sixtyDaysAgo = format(subDays(now, 59), 'yyyy-MM-dd')
-  const monthStart = format(startOfMonth(now), 'yyyy-MM-dd')
-  const prevMonthStart = format(startOfMonth(subMonths(now, 1)), 'yyyy-MM-dd')
+
+  const year = parseInt(yearParam ?? '') || now.getFullYear()
+  const month = parseInt(monthParam ?? '') || now.getMonth() + 1
+  const targetMonthDate = new Date(year, month - 1, 1)
+  const isCurrentMonth = year === now.getFullYear() && month === now.getMonth() + 1
+
+  const monthStart = format(startOfMonth(targetMonthDate), 'yyyy-MM-dd')
+  const monthEnd = format(endOfMonth(targetMonthDate), 'yyyy-MM-dd')
+  const prevMonthDate = subMonths(targetMonthDate, 1)
+  const prevMonthStart = format(startOfMonth(prevMonthDate), 'yyyy-MM-dd')
+  const nextMonthDate = addMonths(targetMonthDate, 1)
 
   const [{ count: pendingShifts }, { count: pendingRequests }, { count: pendingVacantApplications }, { data: todayShifts }, { data: sales }, { data: casts }, { data: includedInSalesTemplates }] =
     await Promise.all([
@@ -49,8 +62,9 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
         .eq('date', today)
         .eq('status', 'confirmed')
         .order('start_time'),
+      // 表示対象月と、先月比の算出に必要な前月分をまとめて取得する
       supabase.from('sales').select('date, amount, sales_amount, cast_id, custom_items')
-        .eq('store_id', storeId).gte('date', sixtyDaysAgo).lte('date', today),
+        .eq('store_id', storeId).gte('date', prevMonthStart).lte('date', monthEnd),
       supabase.from('users').select('id, display_name')
         .eq('store_id', storeId).eq('role', 'cast'),
       supabase.from('notice_item_templates').select('label').eq('store_id', storeId).eq('include_in_sales', true),
@@ -65,33 +79,32 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
     return Number(s.sales_amount ?? s.amount) + includedInSalesTotal(s.custom_items, includedInSalesLabels)
   }
 
-  // 直近30日の日次売上推移
-  const trend = Array.from({ length: 30 }, (_, idx) => {
-    const i = 29 - idx
-    const d = format(subDays(now, i), 'yyyy-MM-dd')
-    const amount = salesList.filter(s => s.date === d).reduce((sum, s) => sum + salesAmountOf(s), 0)
-    return { date: d, amount }
+  // 対象月の日次売上推移（月の日数分。今月の場合は今日以降も0円のまま表示される）
+  const trend = eachDayOfInterval({ start: parseLocalDate(monthStart), end: parseLocalDate(monthEnd) }).map(d => {
+    const dateStr = format(d, 'yyyy-MM-dd')
+    const amount = salesList.filter(s => s.date === dateStr).reduce((sum, s) => sum + salesAmountOf(s), 0)
+    return { date: dateStr, amount }
   })
 
-  // 今月・先月の合計
-  const thisMonthSales = salesList.filter(s => s.date >= monthStart)
+  // 対象月・前月の合計
+  const targetMonthSales = salesList.filter(s => s.date >= monthStart && s.date <= monthEnd)
   const prevMonthSales = salesList.filter(s => s.date >= prevMonthStart && s.date < monthStart)
-  const totalThisMonth = thisMonthSales.reduce((sum, s) => sum + salesAmountOf(s), 0)
+  const totalThisMonth = targetMonthSales.reduce((sum, s) => sum + salesAmountOf(s), 0)
   const totalPrevMonth = prevMonthSales.reduce((sum, s) => sum + salesAmountOf(s), 0)
 
-  // キャスト別ランキング（今月）
+  // キャスト別ランキング（対象月）
   const castTotals = new Map<string, number>()
-  thisMonthSales.forEach(s => castTotals.set(s.cast_id, (castTotals.get(s.cast_id) ?? 0) + salesAmountOf(s)))
+  targetMonthSales.forEach(s => castTotals.set(s.cast_id, (castTotals.get(s.cast_id) ?? 0) + salesAmountOf(s)))
   const castRanking = [...castTotals.entries()]
     .map(([castId, amount]) => ({ name: castNameMap.get(castId) ?? '—', amount }))
     .sort((a, b) => b.amount - a.amount)
     .slice(0, 6)
 
-  // 曜日別平均売上（直近60日）
+  // 曜日別平均売上（対象月内のみ）
   const weekdayLabels = ['日', '月', '火', '水', '木', '金', '土']
   const weekdaySums = new Array(7).fill(0)
   const weekdayCounts = new Array(7).fill(0)
-  salesList.forEach(s => {
+  targetMonthSales.forEach(s => {
     const dow = parseLocalDate(s.date).getDay()
     weekdaySums[dow] += salesAmountOf(s)
     weekdayCounts[dow] += 1
@@ -101,10 +114,11 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
     amount: weekdayCounts[i] > 0 ? Math.round(weekdaySums[i] / weekdayCounts[i]) : 0,
   }))
 
-  // 追加KPI: 稼働キャスト数・平均日商（今月）
-  const activeCastCount = new Set(thisMonthSales.map(s => s.cast_id)).size
-  const daysElapsedThisMonth = now.getDate()
-  const avgDailySales = daysElapsedThisMonth > 0 ? Math.round(totalThisMonth / daysElapsedThisMonth) : 0
+  // 追加KPI: 稼働キャスト数・平均日商（対象月）。今月分は経過日数、過去月は月の日数で割る
+  const activeCastCount = new Set(targetMonthSales.map(s => s.cast_id)).size
+  const daysInTargetMonth = trend.length
+  const daysDivisor = isCurrentMonth ? now.getDate() : daysInTargetMonth
+  const avgDailySales = daysDivisor > 0 ? Math.round(totalThisMonth / daysDivisor) : 0
 
   return (
     <AdminAnalytics
@@ -119,6 +133,11 @@ async function AdminDashboard({ storeId }: { storeId: string }) {
         roomName: (s.rooms as { name: string } | null)?.name ?? null,
       }))}
       todayLabel={format(now, 'M月d日(E)', { locale: ja })}
+      monthLabel={`${year}年${month}月`}
+      isCurrentMonth={isCurrentMonth}
+      prevMonthHref={`/dashboard?year=${prevMonthDate.getFullYear()}&month=${prevMonthDate.getMonth() + 1}`}
+      nextMonthHref={`/dashboard?year=${nextMonthDate.getFullYear()}&month=${nextMonthDate.getMonth() + 1}`}
+      currentMonthHref="/dashboard"
       totalThisMonth={totalThisMonth}
       totalPrevMonth={totalPrevMonth}
       trend={trend}

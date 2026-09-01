@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { format } from 'date-fns'
 import { ja } from 'date-fns/locale'
-import { Calendar, FileEdit, Users, TrendingUp, TrendingDown, Minus, Trophy, Wallet, Briefcase } from 'lucide-react'
+import { Calendar, FileEdit, Users, TrendingUp, TrendingDown, Minus, Trophy, Wallet, Briefcase, ChevronLeft, ChevronRight } from 'lucide-react'
 
 interface TodayShift {
   id: string
@@ -20,6 +20,11 @@ interface Props {
   pendingVacantApplications: number
   todayShifts: TodayShift[]
   todayLabel: string
+  monthLabel: string
+  isCurrentMonth: boolean
+  prevMonthHref: string
+  nextMonthHref: string
+  currentMonthHref: string
   totalThisMonth: number
   totalPrevMonth: number
   trend: { date: string; amount: number }[]
@@ -77,6 +82,7 @@ function StatTile({
 
 export function AdminAnalytics({
   pendingShifts, pendingRequests, pendingVacantApplications, todayShifts, todayLabel,
+  monthLabel, isCurrentMonth, prevMonthHref, nextMonthHref, currentMonthHref,
   totalThisMonth, totalPrevMonth, trend, castRanking, weekday,
   activeCastCount, avgDailySales,
 }: Props) {
@@ -109,9 +115,25 @@ export function AdminAnalytics({
         }
         @media (min-width: 768px) { .admin-analytics { padding: 32px; } }
 
-        .aa-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 22px; }
+        .aa-head { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px; margin-bottom: 14px; }
         .aa-title { font-size: 20px; font-weight: 700; letter-spacing: -0.01em; }
         .aa-subtitle { font-size: 12px; color: var(--ink-muted); font-variant-numeric: tabular-nums; }
+
+        .aa-month-nav { display: flex; align-items: center; gap: 6px; margin-bottom: 18px; }
+        .aa-month-btn {
+          display: inline-flex; align-items: center; justify-content: center;
+          width: 28px; height: 28px; border-radius: 8px;
+          border: 1px solid var(--line-border); background: var(--surface-card); color: var(--ink-primary);
+          transition: background-color .15s;
+        }
+        .aa-month-btn:hover { background: var(--surface-card-hover); }
+        .aa-month-btn svg { width: 15px; height: 15px; }
+        .aa-month-label { font-size: 13.5px; font-weight: 600; min-width: 88px; text-align: center; font-variant-numeric: tabular-nums; }
+        .aa-month-today {
+          font-size: 11px; color: var(--ink-muted); border: 1px solid var(--line-border); border-radius: 999px;
+          padding: 3px 10px; margin-left: 4px; transition: background-color .15s;
+        }
+        .aa-month-today:hover { background: var(--surface-card-hover); }
 
         @keyframes aa-rise {
           from { opacity: 0; transform: translateY(8px); }
@@ -200,9 +222,22 @@ export function AdminAnalytics({
         <span className="aa-subtitle">{format(new Date(), 'yyyy.MM.dd (E)', { locale: ja })}</span>
       </div>
 
+      <div className="aa-month-nav aa-animate">
+        <Link href={prevMonthHref} className="aa-month-btn" aria-label="前月">
+          <ChevronLeft />
+        </Link>
+        <span className="aa-month-label">{monthLabel}</span>
+        <Link href={nextMonthHref} className="aa-month-btn" aria-label="翌月">
+          <ChevronRight />
+        </Link>
+        {!isCurrentMonth && (
+          <Link href={currentMonthHref} className="aa-month-today">今月に戻る</Link>
+        )}
+      </div>
+
       <div className="hero-card" style={{ animationDelay: '40ms' }}>
         <div>
-          <p className="hero-label">今月の売上合計</p>
+          <p className="hero-label">{monthLabel}の売上合計</p>
           <div className="hero-row">
             <span className="hero-value">¥{animatedTotal.toLocaleString()}</span>
             {delta != null && (
@@ -219,8 +254,8 @@ export function AdminAnalytics({
       </div>
 
       <div className="stat-grid">
-        <StatTile icon={Wallet} label="平均1日売上" value={avgDailySales} prefix="¥" sub="今月・日割り" delay={60} />
-        <StatTile icon={Users} label="稼働キャスト" value={activeCastCount} sub="今月・実績あり" delay={90} href="/admin/casts" />
+        <StatTile icon={Wallet} label="平均1日売上" value={avgDailySales} prefix="¥" sub={isCurrentMonth ? '今月・日割り' : `${monthLabel}・日割り`} delay={60} />
+        <StatTile icon={Users} label="稼働キャスト" value={activeCastCount} sub={isCurrentMonth ? '今月・実績あり' : `${monthLabel}・実績あり`} delay={90} href="/admin/casts" />
         <StatTile icon={Calendar} label="未確定シフト" value={pendingShifts} sub="要確認" delay={120} href="/admin/shifts" />
         <StatTile icon={FileEdit} label="修正申請" value={pendingRequests} sub="未処理" delay={150} href="/admin/modification-requests" />
         <StatTile icon={Briefcase} label="空き枠申請" value={pendingVacantApplications} sub="未処理" delay={165} href="/admin/vacant-slots" />
@@ -228,10 +263,10 @@ export function AdminAnalytics({
       </div>
 
       <div className="chart-grid">
-        <TrendChart data={trend} />
+        <TrendChart data={trend} monthLabel={monthLabel} />
         <div className="panel" style={{ animationDelay: '160ms' }}>
           <p className="panel-title">キャスト別売上ランキング</p>
-          <p className="panel-sub">今月</p>
+          <p className="panel-sub">{monthLabel}</p>
           {castRanking.length === 0 ? (
             <p style={{ fontSize: 12, color: 'var(--ink-muted)', textAlign: 'center', padding: '24px 0' }}>データがありません</p>
           ) : (
@@ -255,7 +290,7 @@ export function AdminAnalytics({
       </div>
 
       <div className="chart-grid">
-        <WeekdayChart data={weekday} />
+        <WeekdayChart data={weekday} monthLabel={monthLabel} />
         <div className="panel" style={{ animationDelay: '240ms' }}>
           <p className="panel-title">本日のシフト</p>
           <p className="panel-sub">{todayLabel}</p>
@@ -301,7 +336,7 @@ function Sparkline({ data }: { data: number[] }) {
   )
 }
 
-function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
+function TrendChart({ data, monthLabel }: { data: { date: string; amount: number }[]; monthLabel: string }) {
   const [hover, setHover] = useState<number | null>(null)
   const svgRef = useRef<SVGSVGElement>(null)
   const width = 640
@@ -340,7 +375,7 @@ function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
   return (
     <div className="panel" style={{ animationDelay: '120ms', position: 'relative' }}>
       <p className="panel-title">売上推移</p>
-      <p className="panel-sub">直近30日</p>
+      <p className="panel-sub">{monthLabel}・日別</p>
       <svg
         ref={svgRef}
         viewBox={`0 0 ${width} ${height}`}
@@ -387,13 +422,13 @@ function TrendChart({ data }: { data: { date: string; amount: number }[] }) {
   )
 }
 
-function WeekdayChart({ data }: { data: { label: string; amount: number }[] }) {
+function WeekdayChart({ data, monthLabel }: { data: { label: string; amount: number }[]; monthLabel: string }) {
   const [hover, setHover] = useState<number | null>(null)
   const max = Math.max(1, ...data.map(d => d.amount))
   return (
     <div className="panel" style={{ animationDelay: '280ms' }}>
       <p className="panel-title">曜日別 平均売上</p>
-      <p className="panel-sub">直近60日の平均（時間帯データが無いため曜日単位で集計）</p>
+      <p className="panel-sub">{monthLabel}の平均（時間帯データが無いため曜日単位で集計）</p>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: 140, marginTop: 8 }}>
         {data.map((d, i) => {
           const h = Math.max(3, (d.amount / max) * 110)
