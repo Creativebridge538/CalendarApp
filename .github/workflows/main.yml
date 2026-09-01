@@ -14,11 +14,12 @@ jobs:
         uses: actions/checkout@v4
         with:
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Push to Client
         run: |
-          git config user.name "Rayzy Bot"
-          git config user.email "bot@rayzy.local"
+          git config user.name "Razy Bot"
+          git config user.email "bot@razy.local"
 
           git remote add client https://x-access-token:${{ secrets.W6_TOKEN }}@github.com/eve8008/CalendarApp.git
 
