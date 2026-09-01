@@ -1,0 +1,25 @@
+name: Sync to Client
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Push to Client
+        run: |
+          git config user.name "Rayzy Bot"
+          git config user.email "bot@rayzy.local"
+
+          git remote add client https://x-access-token:${{ secrets.M6_TOKEN }}@github.com/eve8008/CalendarApp.git
+
+          git push client main:main --force
