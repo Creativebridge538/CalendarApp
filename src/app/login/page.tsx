@@ -82,7 +82,7 @@ export default function LoginPage() {
   if (storeOptions) {
     return (
       <div
-        className="h-screen overflow-hidden flex items-center justify-center p-4"
+        className="fixed inset-0 overflow-hidden flex items-center justify-center p-4"
         style={{ background: 'var(--cast-mobile-bg, #f7f7f8)' }}
       >
         <div className="relative w-full max-w-md">
@@ -123,7 +123,7 @@ export default function LoginPage() {
 
   return (
     <div
-      className="h-screen overflow-hidden flex items-center justify-center p-4"
+      className="fixed inset-0 overflow-hidden flex items-center justify-center p-4"
       style={{ background: 'var(--cast-mobile-bg, #f7f7f8)' }}
     >
       <div className="relative w-full max-w-md">

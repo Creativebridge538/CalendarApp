@@ -167,6 +167,30 @@
       color: #333;
     }
 
+    .cred-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 6px;
+      font-size: 11px;
+    }
+    .cred-table td {
+      padding: 3px 8px 3px 0;
+      vertical-align: top;
+    }
+    .cred-table td.cred-label {
+      width: 110px;
+      color: #666;
+      white-space: nowrap;
+    }
+    .cred-table td.cred-value {
+      font-family: "SFMono-Regular", Consolas, Menlo, monospace;
+    }
+    .cred-note {
+      font-size: 10.5px;
+      color: #b91c1c;
+      margin-top: 4px;
+    }
+
     .footer-note {
       font-size: 11px;
       color: #555;
@@ -196,7 +220,7 @@
   <div class="header-grid">
     <div class="client-section">
       <div class="client-name-row">
-        <span class="client-name">[宛先会社名]</span>
+        <span class="client-name">合同会社ダブルシックス</span>
         <span class="client-honorific">御中</span>
       </div>
       <div class="client-greeting">下記の通り納品物をご報告いたします。</div>
@@ -219,7 +243,7 @@
     </div>
     <div class="meta-row">
       <span class="meta-label">対象範囲</span>
-      <span>ソースコード／動作環境／仕様書／説明書</span>
+      <span>ソースコード／動作環境／アクセス情報／仕様書／説明書</span>
     </div>
   </div>
 
@@ -237,6 +261,7 @@
         <td>GitHub<br>リポジトリ</td>
         <td>
           本システムのソースコード一式（Next.jsアプリケーション + Supabaseマイグレーション）をGitHubリポジトリで納品。
+          <div class="item-desc">https://github.com/eve8008/CalendarApp.git</div>
         </td>
       </tr>
 
@@ -245,6 +270,34 @@
         <td>技術構成</td>
         <td>
           Next.jsアプリケーションをVercelに、データベース（PostgreSQL / Auth）をSupabaseにデプロイして運用します。
+          <div class="item-desc">本番URL: https://shiftmate-studio.com</div>
+        </td>
+      </tr>
+
+      <tr class="cat-row"><td colspan="2">アクセス情報</td></tr>
+      <tr class="item-row">
+        <td>オーナー<br>アカウント</td>
+        <td>
+          新しい店舗の追加や、既存店舗の利用停止／再開など、システム全体の管理を行うアカウントです。
+          <table class="cred-table">
+            <tr><td class="cred-label">ログインURL</td><td class="cred-value">https://shiftmate-studio.com/login</td></tr>
+            <tr><td class="cred-label">ユーザーID</td><td class="cred-value">owner</td></tr>
+            <tr><td class="cred-label">パスワード</td><td class="cred-value">BnpYJYQn2t8nQw</td></tr>
+            <tr><td class="cred-label">メールアドレス</td><td class="cred-value">eve.p.impact@gmail.com</td></tr>
+          </table>
+        </td>
+      </tr>
+      <tr class="item-row">
+        <td>W6店舗<br>管理者アカウント</td>
+        <td>
+          日々のシフト・売上・キャスト・支払通知書の管理に使用する、店舗「W6」の管理者アカウントです。
+          <table class="cred-table">
+            <tr><td class="cred-label">ログインURL</td><td class="cred-value">https://shiftmate-studio.com/login</td></tr>
+            <tr><td class="cred-label">ユーザーID</td><td class="cred-value">w6_admin</td></tr>
+            <tr><td class="cred-label">パスワード</td><td class="cred-value">pAod7EbGoHBrQL</td></tr>
+            <tr><td class="cred-label">連絡先メール</td><td class="cred-value">w6@shiftmate-studio.com</td></tr>
+          </table>
+          <div class="cred-note">※ 上記パスワードは初回発行時の自動生成パスワードです。初回ログイン後、設定画面から変更してください。</div>
         </td>
       </tr>
 
