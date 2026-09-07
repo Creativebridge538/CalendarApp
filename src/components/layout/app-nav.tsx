@@ -14,6 +14,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { Logo } from '@/components/logo'
+import { APP_NAME } from '@/lib/app-config'
 
 // エリア・ルームの呼び名は店舗設定でカスタマイズできるため、サイドバーの項目名にもそれを反映する
 function getAdminNav(areaLabel: string, roomLabel: string) {
@@ -276,7 +277,7 @@ export function AppNav({ role, userEmail, theme = 'default', areaLabel = 'エリ
         <div className={cn('px-4 py-4 border-b', s.border)}>
           <div className="flex items-center gap-2.5" style={s.logo}>
             <Logo className="h-7 w-7 shrink-0" />
-            <p className="font-bold text-lg tracking-tight">ShiftMate</p>
+            <p className="font-bold text-lg tracking-tight">{APP_NAME}</p>
           </div>
           <p className="text-xs mt-0.5" style={s.subtext}>
             {role === 'admin' ? '管理者' : 'キャスト'}
@@ -358,7 +359,7 @@ export function AppNav({ role, userEmail, theme = 'default', areaLabel = 'エリ
               <Menu className="h-5 w-5" />
             </button>
             <Logo className="h-5 w-5 shrink-0" />
-            <span className="font-bold tracking-tight">ShiftMate</span>
+            <span className="font-bold tracking-tight">{APP_NAME}</span>
           </div>
 
           {/* 管理者: モバイル ドロワー */}
@@ -373,7 +374,7 @@ export function AppNav({ role, userEmail, theme = 'default', areaLabel = 'エリ
                   <div>
                     <div className="flex items-center gap-2.5" style={s.logo}>
                       <Logo className="h-6 w-6 shrink-0" />
-                      <p className="font-bold text-lg tracking-tight">ShiftMate</p>
+                      <p className="font-bold text-lg tracking-tight">{APP_NAME}</p>
                     </div>
                     <p className="text-xs mt-0.5" style={s.subtext}>管理者</p>
                   </div>

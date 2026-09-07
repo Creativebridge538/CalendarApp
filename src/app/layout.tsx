@@ -2,6 +2,7 @@ import type { Metadata } from 'next'
 import { Geist, Noto_Sans_JP, Zen_Maru_Gothic, M_PLUS_Rounded_1c, Kosugi_Maru, Mochiy_Pop_One, Kiwi_Maru, Hachi_Maru_Pop } from 'next/font/google'
 import './globals.css'
 import { Toaster } from '@/components/ui/sonner'
+import { APP_NAME } from '@/lib/app-config'
 
 const geist = Geist({ subsets: ['latin'] })
 
@@ -20,9 +21,8 @@ const accentFontVars = [notoSansJP, zenMaruGothic, mplusRounded, kosugiMaru, moc
   .join(' ')
 
 export const metadata: Metadata = {
-  title: 'ShiftMate - 業務管理システム',
+  title: `${APP_NAME} - 業務管理システム`,
   description: '多店舗対応シフト・報酬・キャスト管理',
-  manifest: '/manifest.json',
 }
 
 export const viewport = {

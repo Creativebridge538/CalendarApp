@@ -5,6 +5,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { getNoticeSnapshotById, noticeFileName } from '@/lib/payment-notice-data'
 import { NoticeDocument } from '@/lib/payment-notice-pdf'
 import { getAccessToken, ensureFolder, uploadFileToDrive } from '@/lib/google-drive'
+import { APP_NAME } from '@/lib/app-config'
 
 // PDF生成+Google API呼び出しを件数分行うため、デフォルトのタイムアウトでは
 // 選択件数が多いと打ち切られる可能性がある
@@ -47,7 +48,7 @@ export async function POST(request: Request) {
 
     let rootFolderId = tokenRow.root_folder_id
     if (!rootFolderId) {
-      rootFolderId = await ensureFolder(accessToken, `ShiftMate 支払通知書${store?.name ? `（${store.name}）` : ''}`)
+      rootFolderId = await ensureFolder(accessToken, `${APP_NAME} 支払通知書${store?.name ? `（${store.name}）` : ''}`)
       await admin.from('store_google_drive_tokens').update({ root_folder_id: rootFolderId }).eq('store_id', storeId)
     }
 

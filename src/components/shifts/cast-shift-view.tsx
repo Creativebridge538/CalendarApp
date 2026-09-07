@@ -25,6 +25,7 @@ import { sendPushNotification, getPushSubscriptionState, subscribeToPush, clearA
 import { ShiftCalendar } from './shift-calendar'
 import { MonthYearPicker } from './month-year-picker'
 import { Logo } from '@/components/logo'
+import { APP_NAME } from '@/lib/app-config'
 import { GoalRing } from '@/components/rewards/goal-ring'
 import type { MonthToDateSummary } from '@/lib/reward-summary'
 import { cn } from '@/lib/utils'
@@ -1107,7 +1108,7 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
             <div className="px-4 py-4 border-b flex items-center justify-between">
               <div className="flex items-center gap-2 min-w-0">
                 <Logo className="h-6 w-6 shrink-0" />
-                <p className="font-bold text-lg tracking-tight truncate">{storeName ?? 'ShiftMate'}</p>
+                <p className="font-bold text-lg tracking-tight truncate">{storeName ?? APP_NAME}</p>
               </div>
               <button type="button" onClick={() => setMenuOpen(false)} className="p-1 rounded-md hover:bg-muted shrink-0" aria-label="閉じる">
                 <X className="h-5 w-5" />

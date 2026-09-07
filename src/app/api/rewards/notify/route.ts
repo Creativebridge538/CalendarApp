@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { APP_NAME } from '@/lib/app-config'
 
 export async function POST(request: Request) {
   const supabase = await createClient()
@@ -35,7 +36,7 @@ export async function POST(request: Request) {
 
   try {
     await resend.emails.send({
-      from: 'ShiftMate <onboarding@resend.dev>',
+      from: `${APP_NAME} <onboarding@resend.dev>`,
       to: cast.email,
       subject: `${periodLabel}分の支払通知書が届いています`,
       html: `

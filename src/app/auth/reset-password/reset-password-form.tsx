@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Logo } from '@/components/logo'
+import { APP_NAME } from '@/lib/app-config'
 
 export function ResetPasswordForm() {
   const [password, setPassword] = useState('')
@@ -45,7 +46,7 @@ export function ResetPasswordForm() {
             <div className="flex items-center justify-center gap-1.5 mb-2">
               <Logo className="h-5 w-5" />
               <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--brand-accent)' }}>
-                ShiftMate
+                {APP_NAME}
               </span>
             </div>
             <CardTitle className="text-2xl font-bold text-center">新しいパスワードを設定</CardTitle>

@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import { Logo } from '@/components/logo'
+import { APP_NAME } from '@/lib/app-config'
 
 interface StoreOption { store_id: string; store_name: string }
 type ResolveResult = { email: string } | { ambiguous: true; stores: StoreOption[] } | null
@@ -132,7 +133,7 @@ export default function LoginPage() {
             <div className="flex items-center justify-center gap-1.5 mb-2">
               <Logo className="h-5 w-5" />
               <span className="font-bold text-sm tracking-tight" style={{ color: 'var(--brand-accent)' }}>
-                ShiftMate
+                {APP_NAME}
               </span>
             </div>
             <CardTitle className="text-2xl font-bold text-center">ログイン</CardTitle>
