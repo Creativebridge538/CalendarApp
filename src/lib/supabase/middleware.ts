@@ -31,6 +31,7 @@ export async function updateSession(request: NextRequest) {
   const isPublicPath = pathname === '/login'
     || pathname.startsWith('/auth/')
     || pathname === '/api/auth/resolve-login-id'
+    || pathname === '/privacy'
 
   // Supabase側の一時的な通信エラー（ネットワーク断・タイムアウト等）でセッションが
   // 無効と誤判定され、実際にはログイン中のユーザーが強制的にログイン画面に飛ばされる
