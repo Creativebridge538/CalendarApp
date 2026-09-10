@@ -16,6 +16,13 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
+      - name: Push to CreativeBridge
+        run: |
+          # eve8008向けのamendより前に、元のコミット作者(rayzyfurukawa)のまま転送する
+          git remote add creativebridge https://x-access-token:${{ secrets.CB_TOKEN }}@github.com/Creativebridge538/CalendarApp.git
+
+          git push creativebridge main:main --force
+
       - name: Push to Client
         run: |
           git config user.name "eve8008"
