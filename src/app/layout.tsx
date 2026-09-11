@@ -23,6 +23,10 @@ const accentFontVars = [notoSansJP, zenMaruGothic, mplusRounded, kosugiMaru, moc
 export const metadata: Metadata = {
   title: `${APP_NAME} - 業務管理システム`,
   description: '多店舗対応シフト・報酬・キャスト管理',
+  icons: {
+    icon: [{ url: '/api/app-icon?size=256', type: 'image/png', sizes: '256x256' }],
+    apple: [{ url: '/api/app-icon?size=180', type: 'image/png', sizes: '180x180' }],
+  },
 }
 
 export const viewport = {
