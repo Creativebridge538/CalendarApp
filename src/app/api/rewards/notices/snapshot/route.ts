@@ -50,11 +50,17 @@ export async function PATCH(request: Request) {
   const nextRewardRate = reward_rate != null ? Number(reward_rate) : existing.rewardRate
   // rowTotalはこの編集フォームでは個別に入力できない（行ごとのボーナス・控除・追加項目内訳を持たないため）。
   // 表示側のフォールバック（rowTotal ?? reward）と同じ扱いになるよう、reward自体をrowTotalとして明示的に保存する
+  //
+  // fxRate/usdAmountはこの編集フォームでは一切扱わない（取得も送信もしない）ため、送られてきた
+  // sales_rowsには含まれない。編集フォームは既存のsalesRowsを同じ順序・同じ件数のまま読み込んで
+  // 保存するため、同じ添字(index)の既存行からfxRate/usdAmountをそのまま引き継ぎ、編集のたびに
+  // 為替情報が失われないようにする（推測で値を補うのではなく、既存の保存値をそのまま保持するだけ）
   const nextSalesRows = Array.isArray(sales_rows)
     ? sales_rows
         .filter((r: unknown) => r && typeof r === 'object' && typeof (r as { date?: unknown }).date === 'string')
-        .map((r: { date: string; platformLabel?: unknown; amount: unknown; reward: unknown; isDailyPayment?: unknown; dailyPaymentAt?: unknown }) => {
+        .map((r: { date: string; platformLabel?: unknown; amount: unknown; reward: unknown; isDailyPayment?: unknown; dailyPaymentAt?: unknown }, index: number) => {
           const reward = Number(r.reward) || 0
+          const existingRow: { fxRate: number | null; usdAmount: number | null } | undefined = existing.salesRows[index]
           return {
             date: r.date,
             platformLabel: typeof r.platformLabel === 'string' ? r.platformLabel : '',
@@ -62,6 +68,8 @@ export async function PATCH(request: Request) {
             reward, rowTotal: reward,
             isDailyPayment: !!r.isDailyPayment,
             dailyPaymentAt: typeof r.dailyPaymentAt === 'string' ? r.dailyPaymentAt : null,
+            fxRate: existingRow?.fxRate ?? null,
+            usdAmount: existingRow?.usdAmount ?? null,
           }
         })
     : existing.salesRows

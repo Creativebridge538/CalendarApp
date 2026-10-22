@@ -15,7 +15,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Pagination } from '@/components/ui/pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Send, ChevronLeft, ChevronRight } from 'lucide-react'
-import { sendPushNotification } from '@/lib/push'
+import { dispatchPush } from '@/lib/push'
+import { describeOperationPushResult } from '@/lib/push-dispatch'
 import { PaymentNoticeButton } from '@/components/rewards/payment-notice-modal'
 import { usePagination } from '@/hooks/use-pagination'
 import { effectiveRewardRate, parsePlatformRewardRates, customItemsTotal, includedInSalesTotal } from '@/lib/reward-rate'
@@ -150,11 +151,19 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
     const resultByCastId = new Map((json.results as { cast_id: string; ok: boolean; noticeId?: string }[]).map(r => [r.cast_id, r]))
     const succeededTargets = targets.filter(t => resultByCastId.get(t.cast.id)?.ok)
 
-    const periodLabel = `${format(new Date(`${from}T00:00:00`), 'M/d', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M/d', { locale: ja })}`
+    // 発行自体の結果（一部失敗を含む）を先に確定して表示する。一部失敗はエラー表示のままとし、
+    // 成功表示へは格上げしない（業務処理自体が失敗した対象がある場合、成功表示は出さない）
+    const issuedPartiallyFailed = json.failed > 0
+    const successMessage = issuedPartiallyFailed
+      ? `${json.issued}人に発行しました（${json.failed}人は失敗）`
+      : `${succeededTargets.length}人に支払通知書を発行しました`
+    let dismissed = false
+    const toastId = issuedPartiallyFailed
+      ? toast.error(successMessage)
+      : toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+
     for (const t of succeededTargets) {
       const noticeId = resultByCastId.get(t.cast.id)?.noticeId
-      const link = `/admin/rewards/notice?cast_id=${t.cast.id}&from=${from}&to=${to}${noticeId ? `&notice_id=${noticeId}` : ''}`
-      sendPushNotification(t.cast.id, '支払通知書が届きました', `${periodLabel} の支払通知書: ¥${t.totalReward.toLocaleString()}`, link)
       // メール通知は任意送信。失敗しても発行処理自体はすでに成功しているので握りつぶす
       fetch('/api/rewards/notify', {
         method: 'POST',
@@ -163,10 +172,15 @@ export function RewardCalculator({ casts, sales, from, to, issuedAt: initialIssu
       }).catch(() => {})
     }
 
-    if (json.failed > 0) {
-      toast.error(`${json.issued}人に発行しました（${json.failed}人は失敗）`)
-    } else {
-      toast.success(`${succeededTargets.length}人に支払通知書を発行しました`)
+    // 支払通知書のアプリ内通知は、発行API（サーバー）が宛先・文面・リンクを決めて作成済み。Web Pushだけをサーバーへ依頼する
+    // （自分が作成した未送信の通知が送られる。ブラウザから宛先・文面は指定しない）。
+    // 発行が全員成功した場合のみ、Push結果を同じトースト（id指定）に反映する。一部失敗の場合は
+    // 発行結果のエラー表示を維持し、Pushの結果で上書きしない
+    const push = await dispatchPush()
+    if (!issuedPartiallyFailed && !dismissed) {
+      const outcome = describeOperationPushResult(successMessage, push)
+      if (outcome.level === 'warning') toast.warning(outcome.message, { id: toastId, duration: 5000 })
+      else toast.success(outcome.message, { id: toastId, duration: 5000 })
     }
     const now = new Date().toISOString()
     setIssuedAt(prev => {

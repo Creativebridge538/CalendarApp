@@ -86,10 +86,12 @@ export function NoticeDocument({ content, issuedAt }: { content: NoticeContent; 
   ensureFont()
   const {
     castName, castRealName, storeName, from, to, salesRows, totalReward,
-    bankName, bankBranch, bankAccountNumber, bankAccountHolder, headerText, footerText,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder, headerText, footerText, fxVisible,
   } = content
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
-  const hasFxRow = salesRows.some(s => s.fxRate != null)
+  // fxVisibleは発行時点の店舗設定のスナップショット（店舗設定を後から変更しても過去の発行済み通知書は変わらない）。
+  // 為替データが無い行しか無ければ、設定がONでも従来どおり列自体を出さない
+  const hasFxRow = fxVisible && salesRows.some(s => s.fxRate != null)
   const { itemRows, subtotalRows, settlementRows } = buildNoticeSummaryRows(content)
 
   return (

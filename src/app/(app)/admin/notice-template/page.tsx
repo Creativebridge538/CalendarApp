@@ -13,7 +13,7 @@ export default async function NoticeTemplatePage() {
   const storeId = profile.store_id!
   const [{ data: settings }, { data: noticeItemTemplates }] = await Promise.all([
     supabase.from('store_settings')
-      .select('id, notice_item_config, notice_header_text, notice_footer_text')
+      .select('id, notice_item_config, notice_header_text, notice_footer_text, notice_fx_visible')
       .eq('store_id', storeId).single(),
     supabase.from('notice_item_templates').select('*').eq('store_id', storeId).order('sort_order'),
   ])
@@ -24,6 +24,7 @@ export default async function NoticeTemplatePage() {
         settingsId={settings?.id ?? null} storeId={storeId}
         itemConfig={settings?.notice_item_config} headerText={settings?.notice_header_text ?? null}
         footerText={settings?.notice_footer_text ?? null}
+        fxVisible={settings?.notice_fx_visible ?? true}
       />
       <NoticeItemTemplates templates={noticeItemTemplates ?? []} storeId={storeId} />
     </div>

@@ -169,21 +169,59 @@ describe('権限昇格の防止', () => {
   })
 })
 
-describe('ダブルブッキング防止（DB制約）', () => {
-  it('同じ店舗・同じルーム・重なる時間帯の確定シフトは作成できない', async () => {
-    await service.from('shifts').update({ status: 'confirmed' }).eq('id', shiftA1Id) // 18:00-23:00 2099-01-01
-    const { error } = await service.from('shifts').insert({
-      cast_id: castA2Id, store_id: storeAId, room_id: roomAId,
-      date: '2099-01-01', start_time: '20:00', end_time: '22:00', status: 'confirmed',
+// 同じルーム・同じ時間帯の確定シフトの重複は、ルームの収容人数(rooms.capacity)で判定される
+// （migration 20260819070000。収容人数が設定されていればその人数まで重複して確定でき、超えると拒否。
+//   収容人数が未設定(NULL)のルームは人数無制限＝重複を許可。店舗設定画面の説明文・シフト管理画面の
+//   競合表示も同じ仕様）。そのため、重複を拒否するテストは収容人数を設定したルームで行う。
+describe('ダブルブッキング防止（DB制約・ルームの収容人数）', () => {
+  async function makeRoom(capacity: number | null) {
+    const { data, error } = await service
+      .from('rooms')
+      .insert({ store_id: storeAId, name: `収容人数テストルーム-${capacity ?? 'null'}-${suffix}`, capacity })
+      .select('id')
+      .single()
+    if (error || !data) throw error
+    return data.id
+  }
+  const confirmedShift = (castId: string, roomId: string, date: string, start: string, end: string) =>
+    service.from('shifts').insert({
+      cast_id: castId, store_id: storeAId, room_id: roomId, date, start_time: start, end_time: end, status: 'confirmed',
     })
+
+  it('同じ店舗・同じルーム・重なる時間帯の確定シフトは、収容人数を超える場合は作成できない（収容人数1）', async () => {
+    const roomId = await makeRoom(1)
+    const first = await confirmedShift(castA1Id, roomId, '2099-01-15', '18:00', '23:00')
+    expect(first.error).toBeNull()
+    const { error } = await confirmedShift(castA2Id, roomId, '2099-01-15', '20:00', '22:00')
     expect(error?.code).toBe('23P01')
   })
 
-  it('時間帯が重ならなければ同じルームでも作成できる（23:00〜翌01:00、日またぎ）', async () => {
-    const { error } = await service.from('shifts').insert({
-      cast_id: castA2Id, store_id: storeAId, room_id: roomAId,
-      date: '2099-01-01', start_time: '23:00', end_time: '01:00', status: 'confirmed',
-    })
-    expect(error).toBeNull()
+  it('収容人数2のルームは2人まで重複して確定でき、3人目は拒否される', async () => {
+    const roomId = await makeRoom(2)
+    expect((await confirmedShift(castA1Id, roomId, '2099-01-16', '18:00', '23:00')).error).toBeNull()
+    expect((await confirmedShift(castA2Id, roomId, '2099-01-16', '19:00', '22:00')).error).toBeNull()
+    // 3人目（同一キャストの時間帯重複は別制約(shifts_no_self_overlap)なので、別ユーザーとして店舗の管理者アカウントを使う）
+    const { data: adminA } = await service.from('users').select('id').eq('email', `admin-a-${suffix}@test.local`).single()
+    const third = await confirmedShift(adminA!.id, roomId, '2099-01-16', '20:00', '21:00')
+    expect(third.error?.code).toBe('23P01')
+  })
+
+  it('収容人数が未設定(NULL)のルームは人数無制限で、重なる時間帯でも確定シフトを作成できる（正式仕様）', async () => {
+    const roomId = await makeRoom(null)
+    expect((await confirmedShift(castA1Id, roomId, '2099-01-17', '18:00', '23:00')).error).toBeNull()
+    expect((await confirmedShift(castA2Id, roomId, '2099-01-17', '20:00', '22:00')).error).toBeNull()
+  })
+
+  it('時間帯が重ならなければ、収容人数1のルームでも作成できる（23:00〜翌01:00、日またぎ）', async () => {
+    const roomId = await makeRoom(1)
+    expect((await confirmedShift(castA1Id, roomId, '2099-01-18', '18:00', '23:00')).error).toBeNull()
+    expect((await confirmedShift(castA2Id, roomId, '2099-01-18', '23:00', '01:00')).error).toBeNull()
+  })
+
+  it('日またぎ（23:00〜翌01:00）の確定シフトと、翌日側（00:00〜02:00）の確定シフトの重なりも、収容人数1では拒否される', async () => {
+    const roomId = await makeRoom(1)
+    expect((await confirmedShift(castA1Id, roomId, '2099-01-19', '23:00', '01:00')).error).toBeNull()
+    const { error } = await confirmedShift(castA2Id, roomId, '2099-01-20', '00:00', '02:00')
+    expect(error?.code).toBe('23P01')
   })
 })

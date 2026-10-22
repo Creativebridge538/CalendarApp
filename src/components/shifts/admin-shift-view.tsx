@@ -20,7 +20,9 @@ import { Pagination } from '@/components/ui/pagination'
 import { AlertCircle, Check, X, CalendarDays, List, GanttChart, StickyNote, Trash2 } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
 import { cn } from '@/lib/utils'
-import { sendPushNotification } from '@/lib/push'
+import { dispatchPush } from '@/lib/push'
+import { vacantSlotRpcErrorMessage } from '@/lib/vacant-slot-errors'
+import { describeOperationPushResult } from '@/lib/push-dispatch'
 import { shiftConflictMessage } from '@/lib/shift-conflict'
 import { usePagination } from '@/hooks/use-pagination'
 import { ShiftCalendar } from './shift-calendar'
@@ -235,8 +237,6 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     if (!detailShift) return
     const start_time = normalizeTime(scheduleForm.start_time)
     const end_time = normalizeTime(scheduleForm.end_time)
-    const oldStart = detailShift.start_time.slice(0, 5)
-    const oldEnd = detailShift.end_time.slice(0, 5)
     if (!scheduleFormHasChanges()) return
 
     const area_id = (locationMode === 'area_only' || locationMode === 'area_and_room') ? (scheduleForm.area_id || null) : detailShift.area_id
@@ -247,19 +247,20 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     if (error) { toast.error(shiftConflictMessage(error, '変更に失敗しました', roomLabel)); return }
 
     const room = rooms.find(r => r.id === room_id)
-    const area = areas.find(a => a.id === area_id)
-    const oldLabel = `${format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} ${oldStart}〜${oldEnd}`
-    const newLabel = `${format(new Date(scheduleForm.date), 'M/d(E)', { locale: ja })} ${start_time}〜${end_time}`
     const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, notes, rooms: room ? { name: room.name } : null }
     setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
     setDetailShift(updated)
-    toast.success('シフトを変更しました')
 
-    const title = 'シフト内容が変更されました'
-    const locationNote = [area?.name, room?.name].filter(Boolean).join(' / ')
-    const body = `${oldLabel} から ${newLabel}${locationNote ? `（${locationNote}）` : ''} に変更されました`
-    await supabase.from('notifications').insert({ user_id: detailShift.cast_id, title, body, link: '/cast/shifts' })
-    sendPushNotification(detailShift.cast_id, title, body, '/cast/shifts')
+    // 通知（宛先・文面）はDBトリガーが変更と同じトランザクションで作成済み。Web Pushだけをサーバーへ依頼する
+    const successMessage = 'シフトを変更しました'
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
+    }
   }
 
   // 確定済みシフトは「確定する」ボタンが無効化されていて、日時/ルーム変更や管理者メモの更新を
@@ -273,8 +274,6 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     const noteChanged = noteInput !== (detailShift.admin_note ?? '')
     if (!scheduleChanged && !noteChanged) return
 
-    const oldStart = detailShift.start_time.slice(0, 5)
-    const oldEnd = detailShift.end_time.slice(0, 5)
     const area_id = (locationMode === 'area_only' || locationMode === 'area_and_room') ? (scheduleForm.area_id || null) : detailShift.area_id
     const room_id = (locationMode === 'room' || locationMode === 'area_and_room') ? (scheduleForm.room_id || null) : detailShift.room_id
     const notes = castNoteInput || null
@@ -285,20 +284,21 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     if (error) { toast.error(shiftConflictMessage(error, '更新に失敗しました', roomLabel)); return }
 
     const room = rooms.find(r => r.id === room_id)
-    const area = areas.find(a => a.id === area_id)
     const updated = { ...detailShift, date: scheduleForm.date, start_time, end_time, area_id, room_id, notes, admin_note: noteInput || null, rooms: room ? { name: room.name } : null }
     setShifts(shifts.map(s => s.id === detailShift.id ? updated : s))
-    toast.success('変更を保存しました')
     setDetailShift(null)
 
-    if (scheduleChanged) {
-      const oldLabel = `${format(new Date(detailShift.date), 'M/d(E)', { locale: ja })} ${oldStart}〜${oldEnd}`
-      const newLabel = `${format(new Date(scheduleForm.date), 'M/d(E)', { locale: ja })} ${start_time}〜${end_time}`
-      const locationNote = [area?.name, room?.name].filter(Boolean).join(' / ')
-      const title = 'シフト内容が変更されました'
-      const body = `${oldLabel} から ${newLabel}${locationNote ? `（${locationNote}）` : ''} に変更されました`
-      await supabase.from('notifications').insert({ user_id: detailShift.cast_id, title, body, link: '/cast/shifts' })
-      sendPushNotification(detailShift.cast_id, title, body, '/cast/shifts')
+    // 通知はDBトリガーが作成済み。Web Pushだけをサーバーへ依頼する（日時変更が無ければ通知自体が
+    // 作られないため、Pushも試みない）
+    const successMessage = '変更を保存しました'
+    if (!scheduleChanged) { toast.success(successMessage); return }
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
     }
   }
 
@@ -308,13 +308,17 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     if (error) { toast.error('削除に失敗しました'); return }
     setShifts(shifts.filter(s => s.id !== shift.id))
     setDetailShift(null)
-    toast.success('シフトを削除しました')
 
-    const dateLabel = format(new Date(shift.date), 'M/d(E)', { locale: ja })
-    const title = 'シフトが削除されました'
-    const body = `${dateLabel} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフトが管理者によって削除されました`
-    await supabase.from('notifications').insert({ user_id: shift.cast_id, title, body, link: '/cast/shifts' })
-    sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
+    // 通知はDBトリガーが作成済み。Web Pushだけをサーバーへ依頼する
+    const successMessage = 'シフトを削除しました'
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
+    }
   }
 
   async function changeStatus(shift: Shift, status: ShiftStatus, note: string, castNote: string | null = shift.notes) {
@@ -323,19 +327,24 @@ export function AdminShiftView({ shifts: initialShifts, casts, rooms, areas, sto
     else if (shift.status === 'confirmed') update.confirmed_at = null
     const { error } = await supabase.from('shifts').update(update).eq('id', shift.id)
     if (error) {
-      toast.error(shiftConflictMessage(error, '更新に失敗しました', roomLabel))
+      // 空き枠申請に紐づくシフトの確定で承認上限を超える場合などは、DBが返す日本語のメッセージをそのまま表示する
+      toast.error(vacantSlotRpcErrorMessage(error, '更新に失敗しました', roomLabel))
       return
     }
     setShifts(shifts.map(s => s.id === shift.id ? { ...s, ...update } : s))
-    toast.success(status === 'confirmed' ? 'シフトを確定しました' : status === 'rejected' ? '差し戻しました' : '確定を取り消しました')
+    const successMessage = status === 'confirmed' ? 'シフトを確定しました' : status === 'rejected' ? '差し戻しました' : '確定を取り消しました'
     setDetailShift(null)
 
-    if (status !== shift.status) {
-      const dateLabel = format(new Date(shift.date), 'M/d(E)', { locale: ja })
-      const title = status === 'confirmed' ? 'シフトが確定されました' : status === 'rejected' ? 'シフトが差し戻されました' : 'シフトの確定が取り消されました'
-      const body = `${dateLabel} ${shift.start_time.slice(0, 5)}〜${shift.end_time.slice(0, 5)} のシフト`
-      await supabase.from('notifications').insert({ user_id: shift.cast_id, title, body, link: '/cast/shifts' })
-      sendPushNotification(shift.cast_id, title, body, '/cast/shifts')
+    // 通知（承認は空き枠申請の承認通知を含む）はDBトリガーが作成済み。Web Pushだけをサーバーへ依頼する
+    // （ステータスが実際に変わらない場合は通知自体が作られないため、Pushも試みない）
+    if (status === shift.status) { toast.success(successMessage); return }
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
     }
   }
 

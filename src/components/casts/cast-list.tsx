@@ -630,11 +630,11 @@ export function CastList({ casts: initialCasts, storeId, profileFields, stageNam
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
                   <Label required>銀行名</Label>
-                  <Input value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} placeholder="例: 三菱UFJ銀行" />
+                  <Input value={form.bank_name} onChange={e => setForm({ ...form, bank_name: e.target.value })} placeholder="銀行名を入力" />
                 </div>
                 <div className="space-y-1.5">
                   <Label required>支店名</Label>
-                  <Input value={form.bank_branch} onChange={e => setForm({ ...form, bank_branch: e.target.value })} placeholder="例: 青葉台支店" />
+                  <Input value={form.bank_branch} onChange={e => setForm({ ...form, bank_branch: e.target.value })} placeholder="支店名を入力" />
                 </div>
                 <div className="space-y-1.5">
                   <Label required>口座番号</Label>
@@ -643,7 +643,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, stageNam
                     maxLength={7}
                     inputMode="numeric"
                     onChange={e => setForm({ ...form, bank_account_number: toHalfWidthDigits(e.target.value).replace(/\D/g, '').slice(0, 7) })}
-                    placeholder="7桁の数字"
+                    placeholder="7桁の口座番号を入力"
                   />
                   {form.bank_account_number.length > 0 && form.bank_account_number.length < 7 && (
                     <p className="text-xs text-destructive">口座番号は7桁で入力してください</p>
@@ -651,7 +651,7 @@ export function CastList({ casts: initialCasts, storeId, profileFields, stageNam
                 </div>
                 <div className="space-y-1.5">
                   <Label required>名義人（カナ）</Label>
-                  <Input value={form.bank_account_holder} onChange={e => setForm({ ...form, bank_account_holder: e.target.value })} placeholder="例: ヨコタ マナミ" />
+                  <Input value={form.bank_account_holder} onChange={e => setForm({ ...form, bank_account_holder: e.target.value })} placeholder="例: ヤマダ ハナコ" />
                 </div>
               </div>
             </div>

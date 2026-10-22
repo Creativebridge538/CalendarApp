@@ -18,11 +18,24 @@ import { Switch } from '@/components/ui/switch'
 import { TimeSelect } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
 import { Plus, Check, X, ChevronDown, Trash2, Loader2 } from 'lucide-react'
-import { sendPushNotification } from '@/lib/push'
-import { shiftConflictMessage } from '@/lib/shift-conflict'
+import { dispatchPush } from '@/lib/push'
+import { describeNotifySlotsResult, type NotifySlotsResultDescription } from '@/lib/vacant-slot-notification'
+import { describeOperationPushResult } from '@/lib/push-dispatch'
+import { broadcastVacantSlotsChanged } from '@/lib/vacant-slot-broadcast'
+import { vacantSlotRpcErrorMessage, publishToggleToast } from '@/lib/vacant-slot-errors'
 import { usePagination } from '@/hooks/use-pagination'
+import { resolveRequestedRange, formatTimeRange, isValidTimeOfDay } from '@/lib/vacant-slot-request-time'
+import { isVacantSlotEnded } from '@/lib/vacant-slot-window'
+import { nowJST } from '@/lib/jst'
 
-interface Application { id: string; status: string; cast_id: string; shift_id: string | null; cast: { display_name: string | null } | null }
+// 申請行の取得列（サーバー側の初期取得・作成直後・公開切替後の再取得で同じ形にする）
+const APPLICATION_SELECT = 'id, status, cast_id, shift_id, requested_start_time, requested_end_time, cast:users!vacant_slot_applications_cast_id_fkey(display_name)'
+
+interface Application {
+  id: string; status: string; cast_id: string; shift_id: string | null
+  requested_start_time: string | null; requested_end_time: string | null
+  cast: { display_name: string | null } | null
+}
 interface Slot {
   id: string; date: string; start_time: string; end_time: string; notes: string | null; is_published: boolean
   room_id: string | null; area_id: string | null; capacity: number
@@ -36,18 +49,21 @@ interface Props {
   rooms: { id: string; name: string; area_id: string | null; capacity: number | null }[]
   areas: { id: string; name: string }[]
   storeId: string
-  userId: string
   locationMode: string
   areaLabel: string
   roomLabel: string
 }
 
-export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, userId, locationMode, areaLabel, roomLabel }: Props) {
+export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, locationMode, areaLabel, roomLabel }: Props) {
   const [slots, setSlots] = useState(initialSlots)
   const [open, setOpen] = useState(false)
   const [dateCalendarOpen, setDateCalendarOpen] = useState(false)
   const [form, setForm] = useState({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', capacity: '1' })
   const [creating, setCreating] = useState(false)
+  const [notifying, setNotifying] = useState(false)
+  const [notifyResult, setNotifyResult] = useState<NotifySlotsResultDescription | null>(null)
+  const [lastNotify, setLastNotify] = useState<{ notified_count: number; already_sent: boolean } | null>(null)
+  const [retryingPush, setRetryingPush] = useState(false)
   const [savingSlotId, setSavingSlotId] = useState<string | null>(null)
   const [savingAppId, setSavingAppId] = useState<string | null>(null)
   const supabase = createClient()
@@ -87,6 +103,17 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
   }
 
   async function handleCreate() {
+    // 開始=終了は24時間枠として扱わず、無効な空き枠として作成前に拒否する
+    // （終了<開始は日またぎ枠として許可、終了>開始は同日枠として許可）
+    if (form.start_time === form.end_time) {
+      toast.error('開始時刻と終了時刻に同じ時刻は指定できません')
+      return
+    }
+    // time型のカラムへ24:00以上・不正な時刻を送らない（翌日は00:00〜05:00等の通常時刻で指定する）
+    if (!isValidTimeOfDay(form.start_time) || !isValidTimeOfDay(form.end_time)) {
+      toast.error('時刻は00:00〜23:45の範囲で指定してください（翌日にまたがる場合は終了時刻を開始より前にしてください）')
+      return
+    }
     const capacity = Math.max(1, parseInt(form.capacity) || 1)
     if (selectedRoom?.capacity != null && capacity > selectedRoom.capacity) {
       toast.error(`この${roomLabel}の定員は${selectedRoom.capacity}人です`)
@@ -98,27 +125,99 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
     }
 
     setCreating(true)
-    const { data, error } = await supabase.from('vacant_slots').insert({
-      store_id: storeId, created_by: userId,
-      date: form.date, start_time: form.start_time, end_time: form.end_time,
-      area_id: (locationMode === 'area_only' || locationMode === 'area_and_room') ? (form.area_id || null) : null,
-      room_id: form.room_id || null, notes: form.notes || null, is_published: true, capacity,
-    }).select('*, rooms(name), areas(name), vacant_slot_applications(id, status, cast_id, shift_id, cast:users!vacant_slot_applications_cast_id_fkey(display_name))').single()
+    // 空き枠の作成と、キャストへの通知は分離されている（通知は管理者が「空き枠をまとめて通知」ボタンで
+    // 任意のタイミングで送る）。ここでは空き枠の作成のみを行い、通知は一切作成・送信しない。
+    const { data: created, error } = await supabase.rpc('create_vacant_slot', {
+      p_date: form.date, p_start_time: form.start_time, p_end_time: form.end_time,
+      p_area_id: (locationMode === 'area_only' || locationMode === 'area_and_room') ? (form.area_id || undefined) : undefined,
+      p_room_id: form.room_id || undefined, p_notes: form.notes || undefined, p_capacity: capacity,
+    })
     setCreating(false)
-    if (error) { toast.error('登録に失敗しました'); return }
-    setSlots([data, ...slots])
-    toast.success('空き枠を登録しました')
+    if (error) { toast.error(vacantSlotRpcErrorMessage(error, '登録に失敗しました', roomLabel)); return }
+    const { slot_id: slotId } = created as { slot_id: string }
+
     setOpen(false)
     setForm({ date: '', start_time: '18:00', end_time: '23:00', area_id: '', room_id: '', notes: '', capacity: '1' })
+    const { data: newSlot, error: fetchError } = await supabase.from('vacant_slots')
+      .select(`*, rooms(name), areas(name), vacant_slot_applications(${APPLICATION_SELECT})`).eq('id', slotId).single()
+    if (fetchError || !newSlot) {
+      toast.warning('空き枠は登録しました。一覧の更新に失敗したため、ページを再読み込みしてください')
+    } else {
+      setSlots(prev => [newSlot, ...prev.filter(s => s.id !== newSlot.id)])
+      toast.success('空き枠を登録しました（キャストへの通知は未送信です。通知する場合は「空き枠をまとめて通知」を押してください）')
+    }
+  }
 
-    const { data: activeCasts } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'cast').eq('is_active', true)
-    if (activeCasts?.length) {
-      const title = '空き枠が追加されました'
-      const body = `${format(new Date(data.date), 'M/d(E)', { locale: ja })} ${data.start_time.slice(0, 5)}〜${data.end_time.slice(0, 5)} の空き枠`
-      await supabase.from('notifications').insert(
-        activeCasts.map(c => ({ user_id: c.id, title, body, link: '/cast/vacant-slots' }))
-      )
-      activeCasts.forEach(c => sendPushNotification(c.id, title, body, '/cast/vacant-slots'))
+  function showNotifyResult(result: NotifySlotsResultDescription) {
+    if (result.level === 'warning') toast.warning(result.message, { duration: 5000 })
+    else toast.success(result.message, { duration: 5000 })
+    setNotifyResult(result)
+  }
+
+  // 公開中の空き枠を対象に、同店舗の有効なキャストへまとめて通知する（空き枠の作成とは別操作）。
+  // 1回目はp_force無し（既定false）で呼ぶ。直前に同じ公開中の空き枠の組み合わせへ送信済みなら、
+  // サーバーは新規作成せず「送信済み」を返すだけなので、ここで「もう一度通知しますか？」と
+  // 明示的に確認してから、確認が取れた場合だけp_force=trueで再送する（空き枠を編集しなくても
+  // 意図的な再送ができる）。通常の連打・通信再試行は、サーバー側の直近5秒ガード（p_forceの値に
+  // よらず適用）で防がれる。
+  // アプリ内通知の結果とPush配信の結果は、別々のポップアップで即座に切り替えて表示すると、
+  // 先に出た方を読み切る前に変わってしまい「送信できなかった」と誤認されうるため、
+  // 両方が確定してから1つの結果としてまとめて表示する（ボタン下に常時表示も残す）
+  async function handleNotifySlots() {
+    // v18レビュー対応（Push不具合③）: is_publishedだけでなく、キャスト画面と同じ終了時刻判定
+    // （日またぎ対応）も満たす枠が無ければ、サーバーへ問い合わせる前に止める（UXの事前チェック。
+    // 実際の判定・通知作成の可否はnotify_vacant_slots側のSQLで最終的に決まる）
+    if (!slots.some(s => s.is_published && !isVacantSlotEnded(s, nowJST()))) {
+      toast.error('通知できる公開中の空き枠がありません')
+      return
+    }
+    if (!confirm('公開中の空き枠について、キャストへ通知しますか？')) return
+    setNotifying(true)
+    setNotifyResult(null)
+    setLastNotify(null)
+    try {
+      const { data, error } = await supabase.rpc('notify_vacant_slots', {})
+      if (error) {
+        const message = vacantSlotRpcErrorMessage(error, '通知の送信に失敗しました', roomLabel)
+        toast.error(message, { duration: 5000 })
+        setNotifyResult({ level: 'warning', message, canRetryPush: false })
+        return
+      }
+      let notify = data as { notified_count: number; already_sent: boolean }
+      if (notify.already_sent) {
+        const resend = confirm(`送信済みです（${notify.notified_count}人へ送信済み）。もう一度通知しますか？`)
+        if (!resend) {
+          setLastNotify(notify)
+          setNotifyResult({ level: 'success', message: `アプリ内通知：直前に送信済みです（${notify.notified_count}人）。再送はしていません`, canRetryPush: false })
+          return
+        }
+        const retry = await supabase.rpc('notify_vacant_slots', { p_force: true })
+        if (retry.error) {
+          const message = vacantSlotRpcErrorMessage(retry.error, '通知の送信に失敗しました', roomLabel)
+          toast.error(message, { duration: 5000 })
+          setNotifyResult({ level: 'warning', message, canRetryPush: false })
+          return
+        }
+        notify = retry.data as { notified_count: number; already_sent: boolean }
+      }
+      setLastNotify(notify)
+      const push = await dispatchPush()
+      showNotifyResult(describeNotifySlotsResult(notify, push))
+    } finally {
+      setNotifying(false)
+    }
+  }
+
+  // アプリ内通知は増やさず、Web Pushの配信だけをやり直す（dispatchPushは「自分が作成した
+  // 未送信の通知」だけを対象にする既存の仕組みのため、何度呼んでも通知は増えない）
+  async function handleRetryPush() {
+    if (!lastNotify) return
+    setRetryingPush(true)
+    try {
+      const push = await dispatchPush()
+      showNotifyResult(describeNotifySlotsResult(lastNotify, push))
+    } finally {
+      setRetryingPush(false)
     }
   }
 
@@ -136,146 +235,118 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
     setSlots(slots.map(s => s.id === slot.id ? { ...s, capacity } : s))
   }
 
+  // 公開/非公開の切替と、紐づく仮予定shiftの削除・復元は1つのDB関数（単一トランザクション）で行う。
+  // 途中で失敗した場合（復元できないshiftが1件でもある場合を含む）は空き枠の公開状態も含めて全体が取り消され、
+  // 非公開のまま・shiftも何も復元されず、孤立したshiftや不整合は残らない。エラー時は成功toastを出さない
   async function togglePublish(slot: Slot) {
     const nextPublished = !slot.is_published
     setSavingSlotId(slot.id)
-    const { error } = await supabase.from('vacant_slots').update({ is_published: nextPublished }).eq('id', slot.id)
-    if (error) { setSavingSlotId(null); toast.error('更新に失敗しました'); return }
+    try {
+      const { error } = await supabase.rpc('set_vacant_slot_published', { p_slot_id: slot.id, p_published: nextPublished })
+      const result = publishToggleToast(error, nextPublished, roomLabel)
+      if (result.kind === 'error') { toast.error(result.message); return }
+      // 非公開化はキャスト側のRealtime(postgres_changes)には届かないため、「一覧が変わった」ことを別途知らせる（失敗しても切替自体は成功）
+      void broadcastVacantSlotsChanged(supabase, storeId)
 
-    let apps = slot.vacant_slot_applications
-    if (!nextPublished) {
-      // 非公開にする: 保留中・承認済みの申請に紐づく仮予定シフトを一時的に消す（申請自体は残す）
-      const activeShiftIds = apps.filter(a => (a.status === 'pending' || a.status === 'approved') && a.shift_id).map(a => a.shift_id!)
-      if (activeShiftIds.length > 0) {
-        await supabase.from('shifts').delete().in('id', activeShiftIds)
+      // 復元・削除後の申請のshift_idを、DBの実際の状態で取り直す（ローカルで推測しない）
+      const { data: freshApps, error: appsError } = await supabase.from('vacant_slot_applications')
+        .select(APPLICATION_SELECT).eq('vacant_slot_id', slot.id)
+      if (appsError || !freshApps) {
+        toast.error('公開状態は更新しましたが、最新の申請状況の取得に失敗しました。ページを再読み込みしてください')
+        setSlots(slots.map(s => s.id === slot.id ? { ...s, is_published: nextPublished } : s))
+        return
       }
-      apps = apps.map(a => (a.status === 'pending' || a.status === 'approved') ? { ...a, shift_id: null } : a)
-    } else {
-      // 公開に戻す: 非公開時に消えた仮予定シフトを、同じ内容で作り直す
-      const appsNeedingShift = apps.filter(a => (a.status === 'pending' || a.status === 'approved') && !a.shift_id)
-      const restoredShiftIds: Record<string, string> = {}
-      let restoreFailed = false
-      for (const a of appsNeedingShift) {
-        const { data: newShift, error: shiftErr } = await supabase.from('shifts').insert({
-          cast_id: a.cast_id, store_id: storeId, room_id: slot.room_id ?? null, area_id: slot.area_id ?? null,
-          date: slot.date, start_time: slot.start_time, end_time: slot.end_time,
-          status: a.status === 'approved' ? 'confirmed' : 'submitted',
-        }).select('id').single()
-        if (shiftErr || !newShift) { restoreFailed = true; continue }
-        restoredShiftIds[a.id] = newShift.id
-        await supabase.from('vacant_slot_applications').update({ shift_id: newShift.id }).eq('id', a.id)
-      }
-      if (restoreFailed) toast.error('一部の仮予定は時間帯が重複しているため復元できませんでした')
-      apps = apps.map(a => restoredShiftIds[a.id] ? { ...a, shift_id: restoredShiftIds[a.id] } : a)
+      setSlots(slots.map(s => s.id === slot.id ? { ...s, is_published: nextPublished, vacant_slot_applications: freshApps } : s))
+      toast.success(result.message)
+    } finally {
+      setSavingSlotId(null)
     }
-
-    setSlots(slots.map(s => s.id === slot.id ? { ...s, is_published: nextPublished, vacant_slot_applications: apps } : s))
-    setSavingSlotId(null)
-    toast.success(nextPublished ? '公開しました' : '非公開にしました')
   }
 
   async function deleteSlot(slot: Slot) {
     if (!confirm('この空き枠を削除しますか？申請中の仮予定もあわせて削除されます。')) return
     setSavingSlotId(slot.id)
-    // 承認待ちの申請に紐づく仮予定（提出済みシフト）は空き枠と一緒に消す
-    const pendingShiftIds = slot.vacant_slot_applications
-      .filter(a => a.status === 'pending' && a.shift_id)
-      .map(a => a.shift_id!)
-    if (pendingShiftIds.length > 0) {
-      await supabase.from('shifts').delete().in('id', pendingShiftIds)
-    }
-    const { error } = await supabase.from('vacant_slots').delete().eq('id', slot.id)
+    // 保留中の申請に紐づく仮予定shiftの削除と空き枠の削除は1つのDB関数（単一トランザクション）で行う
+    const { error } = await supabase.rpc('delete_vacant_slot', { p_slot_id: slot.id })
     setSavingSlotId(null)
-    if (error) { toast.error('削除に失敗しました'); return }
+    if (error) { toast.error(vacantSlotRpcErrorMessage(error, '削除に失敗しました', roomLabel)); return }
     setSlots(slots.filter(s => s.id !== slot.id))
     toast.success('空き枠を削除しました')
   }
 
-  // 店舗設定でシフトの直接確定は同じルームの重複を許可できるようにしたが、
-  // 空き枠の承認だけは設定に関わらず常に重複を禁止したいため、アプリ側で個別にチェックする
-  async function hasRoomConflict(roomId: string, date: string, startTime: string, endTime: string, excludeShiftId?: string) {
-    const prevDay = format(addDays(new Date(`${date}T00:00:00`), -1), 'yyyy-MM-dd')
-    const nextDay = format(addDays(new Date(`${date}T00:00:00`), 1), 'yyyy-MM-dd')
-    let query = supabase.from('shifts').select('id, date, start_time, end_time')
-      .eq('store_id', storeId).eq('room_id', roomId).eq('status', 'confirmed')
-      .gte('date', prevDay).lte('date', nextDay)
-    if (excludeShiftId) query = query.neq('id', excludeShiftId)
-    const { data } = await query
-    if (!data) return false
-
-    const toRange = (d: string, s: string, e: string) => {
-      const start = new Date(`${d}T${s}`)
-      let end = new Date(`${d}T${e}`)
-      if (end <= start) end = new Date(end.getTime() + 24 * 60 * 60 * 1000)
-      return [start.getTime(), end.getTime()] as const
-    }
-    const [newStart, newEnd] = toRange(date, startTime, endTime)
-    return data.some(s => {
-      const [start, end] = toRange(s.date, s.start_time.slice(0, 5), s.end_time.slice(0, 5))
-      return newStart < end && start < newEnd
-    })
-  }
-
-  async function handleApplication(appId: string, slotId: string, castId: string, nextStatus: 'approved' | 'rejected' | 'pending') {
-    const slot = slots.find(s => s.id === slotId)
-    const app = slot?.vacant_slot_applications.find(a => a.id === appId)
-
-    if (nextStatus === 'approved' && slot) {
-      const approvedCount = slot.vacant_slot_applications.filter(a => a.status === 'approved').length
-      if (approvedCount >= slot.capacity) { toast.error(`募集人数（${slot.capacity}人）に達しています`); return }
-      if (slot.room_id) {
-        const conflict = await hasRoomConflict(slot.room_id, slot.date, slot.start_time, slot.end_time, app?.shift_id ?? undefined)
-        if (conflict) { toast.error(`この時間帯は同じ${roomLabel}に既に確定シフトがあります`); return }
-      }
-    }
-
+  // 承認・不承認・承認取消は、申請とshiftの更新を1つのDB関数（単一トランザクション）で行う。
+  // 承認上限（同時承認の直列化を含む）・同じルームの確定シフトとの重複・shift確定/新規作成
+  // （新規作成したshiftのIDは申請へ保存）・申請の状態更新のどこで失敗しても、全体が取り消される
+  // 承認・不承認・承認取消は、申請とshiftの更新を1つのDB関数（単一トランザクション）で行う。
+  // 承認上限（同時承認の直列化を含む）・同じルームの確定シフトとの重複・shift確定/新規作成
+  // （新規作成したshiftのIDは申請へ保存）・申請の状態更新・キャストへのアプリ内通知（承認/不承認のみ）の
+  // どこで失敗しても、全体が取り消される。Web Push（外部処理）だけがコミット後にここで送られる
+  async function handleApplication(appId: string, slotId: string, nextStatus: 'approved' | 'rejected' | 'pending') {
     setSavingAppId(appId)
-    const updates: { status: 'approved' | 'rejected' | 'pending'; reviewed_at: string | null } =
-      { status: nextStatus, reviewed_at: nextStatus === 'pending' ? null : new Date().toISOString() }
-    const { error: e1 } = await supabase.from('vacant_slot_applications').update(updates).eq('id', appId)
-    if (e1) { setSavingAppId(null); toast.error('処理に失敗しました'); return }
-
-    if (nextStatus === 'approved') {
-      const { error: e2 } = app?.shift_id
-        // 申請時に作成済みの仮予定（提出済み）を確定に切り替える
-        ? await supabase.from('shifts').update({ status: 'confirmed' }).eq('id', app.shift_id)
-        : slot
-        ? await supabase.from('shifts').insert({
-            cast_id: castId, store_id: storeId, room_id: slot.room_id ?? null, area_id: slot.area_id ?? null,
-            date: slot.date, start_time: slot.start_time, end_time: slot.end_time, status: 'confirmed',
-          })
-        : { error: null }
-      if (e2) {
-        setSavingAppId(null)
-        toast.error(shiftConflictMessage(e2, '承認に失敗しました', roomLabel))
+    try {
+      const { data, error } = await supabase.rpc('review_vacant_slot_application', { p_application_id: appId, p_next_status: nextStatus })
+      if (error || !data) {
+        toast.error(error ? vacantSlotRpcErrorMessage(error, '処理に失敗しました', roomLabel) : '処理に失敗しました')
         return
       }
-    } else if (nextStatus === 'rejected' && app?.shift_id) {
-      await supabase.from('shifts').delete().eq('id', app.shift_id)
-    } else if (nextStatus === 'pending' && app?.shift_id) {
-      // 承認取消: 確定済みの仮予定を、キャストが再提出したのと同じ「提出済み」の状態に戻す
-      await supabase.from('shifts').update({ status: 'submitted' }).eq('id', app.shift_id)
-    }
-    setSlots(slots.map(s => s.id === slotId ? {
-      ...s,
-      vacant_slot_applications: s.vacant_slot_applications.map(a => a.id === appId ? { ...a, status: nextStatus } : a),
-    } : s))
-    setSavingAppId(null)
-    toast.success(nextStatus === 'approved' ? '承認しました' : nextStatus === 'rejected' ? '不承認にしました' : '承認を取り消しました')
+      const updated = data as unknown as { status: string; shift_id: string | null }
 
-    if (slot && nextStatus !== 'pending') {
-      const title = nextStatus === 'approved' ? '空き枠申請が承認されました' : '空き枠申請が不承認になりました'
-      const body = `${format(new Date(slot.date), 'M/d(E)', { locale: ja })} ${slot.start_time.slice(0, 5)}〜${slot.end_time.slice(0, 5)} の空き枠`
-      await supabase.from('notifications').insert({ user_id: castId, title, body, link: '/cast/vacant-slots' })
-      sendPushNotification(castId, title, body, '/cast/vacant-slots')
+      // DBが返した確定後の状態（status・shift_id）をそのまま反映する
+      setSlots(prev => prev.map(s => s.id === slotId ? {
+        ...s,
+        vacant_slot_applications: s.vacant_slot_applications.map(a => a.id === appId ? { ...a, status: updated.status, shift_id: updated.shift_id } : a),
+      } : s))
+      const successMessage = nextStatus === 'approved' ? '承認しました' : nextStatus === 'rejected' ? '不承認にしました' : '承認を取り消しました'
+
+      // アプリ内通知はDB関数の中で作成済み。Web Pushだけをサーバーが送る（自分が作成した未送信の通知のみ）。
+      // 業務処理（承認/不承認）は既に成功しているため、まず結果を表示し、Push配信の結果が分かり次第、
+      // 同じトースト（id指定）を更新する。別々のポップアップを連続表示しない（先に出た方が読み切れない問題の対策）
+      if (nextStatus !== 'pending') {
+        let dismissed = false
+        const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+        const push = await dispatchPush()
+        if (!dismissed) {
+          const result = describeOperationPushResult(successMessage, push)
+          if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+          else toast.success(result.message, { id: toastId, duration: 5000 })
+        }
+      } else {
+        toast.success(successMessage)
+      }
+    } finally {
+      setSavingAppId(null)
     }
   }
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <CardTitle>空き枠管理</CardTitle>
-        <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />空き枠追加</Button>
+      <CardHeader className="flex flex-col gap-1.5">
+        <div className="flex flex-row items-center justify-between gap-2">
+          <CardTitle>空き枠管理</CardTitle>
+          <div className="flex items-center gap-2">
+            <Button
+              size="sm" variant="outline" onClick={handleNotifySlots}
+              disabled={notifying || !slots.some(s => s.is_published && !isVacantSlotEnded(s, nowJST()))}
+            >
+              {notifying ? <Loader2 className="h-4 w-4 mr-1 animate-spin" /> : null}
+              空き枠をまとめて通知
+            </Button>
+            <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-4 w-4 mr-1" />空き枠追加</Button>
+          </div>
+        </div>
+        {notifyResult && (
+          <div className="flex items-center justify-end gap-2">
+            <p className={`text-sm text-right ${notifyResult.level === 'warning' ? 'text-destructive' : 'text-muted-foreground'}`}>
+              {notifyResult.message}
+            </p>
+            {notifyResult.canRetryPush && (
+              <Button size="sm" variant="ghost" className="h-6 px-2 text-xs" onClick={handleRetryPush} disabled={retryingPush}>
+                {retryingPush ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : null}
+                プッシュを再送
+              </Button>
+            )}
+          </div>
+        )}
       </CardHeader>
       <CardContent>
         <Table>
@@ -302,7 +373,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
               <Fragment key={slot.id}>
                 <TableRow>
                   <TableCell>{format(new Date(slot.date), 'M/d(E)', { locale: ja })}</TableCell>
-                  <TableCell>{slot.start_time.slice(0, 5)} 〜 {slot.end_time.slice(0, 5)}</TableCell>
+                  <TableCell>{formatTimeRange(slot.start_time, slot.start_time, slot.end_time)}</TableCell>
                   <TableCell>{locationText(slot)}</TableCell>
                   <TableCell>
                     <Input
@@ -328,10 +399,12 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
                 </TableRow>
                 {slot.vacant_slot_applications.map(app => {
                   const appSaving = savingAppId === app.id
+                  const appRange = resolveRequestedRange(app, slot)
                   return (
                   <TableRow key={app.id} className={app.status === 'pending' ? 'bg-primary/10' : ''}>
                     <TableCell colSpan={3} className="pl-8 text-sm">
                       申請: {app.cast?.display_name ?? '—'}
+                      <span className="text-muted-foreground"> （{formatTimeRange(slot.start_time, appRange.start_time, appRange.end_time)}）</span>
                     </TableCell>
                     <TableCell>
                       <Badge variant={app.status === 'approved' ? 'default' : app.status === 'rejected' ? 'destructive' : 'outline'}>
@@ -341,19 +414,19 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
                     <TableCell colSpan={2} className="text-right space-x-1">
                       {app.status !== 'approved' && (
                         <Button size="sm" variant="outline" className="text-positive h-7" disabled={appSaving || (app.status === 'pending' && isFull)}
-                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'approved')}>
+                          onClick={() => handleApplication(app.id, slot.id, 'approved')}>
                           {appSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <Check className="h-3 w-3 mr-1" />}承認
                         </Button>
                       )}
                       {app.status === 'approved' && (
                         <Button size="sm" variant="outline" className="h-7" disabled={appSaving}
-                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'pending')}>
+                          onClick={() => handleApplication(app.id, slot.id, 'pending')}>
                           {appSaving && <Loader2 className="h-3 w-3 mr-1 animate-spin" />}承認を取消
                         </Button>
                       )}
                       {app.status !== 'rejected' && (
                         <Button size="sm" variant="destructive" className="h-7" disabled={appSaving}
-                          onClick={() => handleApplication(app.id, slot.id, app.cast_id, 'rejected')}>
+                          onClick={() => handleApplication(app.id, slot.id, 'rejected')}>
                           {appSaving ? <Loader2 className="h-3 w-3 mr-1 animate-spin" /> : <X className="h-3 w-3 mr-1" />}不承認
                         </Button>
                       )}
@@ -397,9 +470,15 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
               )}
             </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5"><Label>開始</Label><TimeSelect value={form.start_time} onChange={v => setForm({ ...form, start_time: v })} /></div>
-              <div className="space-y-1.5"><Label>終了</Label><TimeSelect value={form.end_time} onChange={v => setForm({ ...form, end_time: v })} /></div>
+              <div className="space-y-1.5"><Label>開始</Label><TimeSelect value={form.start_time} onChange={v => setForm({ ...form, start_time: v })} maxHour={23} /></div>
+              <div className="space-y-1.5">
+                <Label>終了{form.end_time < form.start_time && <span className="text-muted-foreground font-normal">（翌日）</span>}</Label>
+                <TimeSelect value={form.end_time} onChange={v => setForm({ ...form, end_time: v })} maxHour={23} />
+              </div>
             </div>
+            {form.start_time === form.end_time && (
+              <p className="text-xs text-destructive">開始時刻と終了時刻に同じ時刻は指定できません</p>
+            )}
             <div className="space-y-1.5">
               <Label>募集人数</Label>
               <Input type="number" min="1" value={form.capacity} onChange={e => setForm({ ...form, capacity: e.target.value })} />
@@ -442,7 +521,7 @@ export function VacantSlotManager({ slots: initialSlots, rooms, areas, storeId, 
             <div className="space-y-1.5"><Label>備考</Label><Input value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} /></div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="outline" onClick={() => setOpen(false)}>キャンセル</Button>
-              <Button onClick={handleCreate} disabled={!form.date || creating}>
+              <Button onClick={handleCreate} disabled={!form.date || form.start_time === form.end_time || creating}>
                 {creating && <Loader2 className="h-3.5 w-3.5 mr-1 animate-spin" />}登録
               </Button>
             </div>

@@ -38,6 +38,8 @@ export interface NoticeContent {
   itemConfig: NoticeItemConfigEntry[]
   headerText: string | null
   footerText: string | null
+  /** 為替列を表示するかどうか（発行時点の店舗設定のスナップショット。発行後の店舗設定変更の影響を受けない） */
+  fxVisible: boolean
   /** 管理者が「編集」機能で内容を補正済みかどうか（一覧でのバッジ表示用） */
   manuallyEdited: boolean
 }
@@ -47,7 +49,7 @@ export interface NoticeContent {
 export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId: string, castId: string, from: string, to: string): Promise<NoticeContent | null> {
   const [{ data: store }, { data: settings }, { data: cast }, { data: sales }, { data: itemTemplates }] = await Promise.all([
     supabase.from('stores').select('name').eq('id', storeId).single(),
-    supabase.from('store_settings').select('logo_url, notice_item_config, notice_header_text, notice_footer_text').eq('store_id', storeId).single(),
+    supabase.from('store_settings').select('logo_url, notice_item_config, notice_header_text, notice_footer_text, notice_fx_visible').eq('store_id', storeId).single(),
     supabase.from('users').select('display_name, real_name, reward_rate, platform_reward_rates, daily_payment_reward_rate, platform_daily_payment_reward_rates, bank_name, bank_branch, bank_account_number, bank_account_holder').eq('id', castId).eq('store_id', storeId).single(),
     supabase.from('sales').select('date, platform, amount, sales_amount, is_daily_payment, daily_payment_at, reward_rate_override, bonus, deduction, fx_rate_snapshot, usd_amount, custom_items')
       .eq('cast_id', castId).eq('store_id', storeId)
@@ -119,6 +121,7 @@ export async function fetchNoticeContent(supabase: SupabaseClient<any>, storeId:
     itemConfig: parseNoticeItemConfig(settings?.notice_item_config),
     headerText: settings?.notice_header_text ?? null,
     footerText: settings?.notice_footer_text ?? null,
+    fxVisible: settings?.notice_fx_visible ?? true,
   }
 }
 
@@ -133,6 +136,7 @@ function mapNoticeRow(data: {
   sales_custom_items: unknown
   total_reward: number
   item_config: unknown; header_text: string | null; footer_text: string | null
+  fx_visible: boolean
   manually_edited: boolean
 }): NoticeContent {
   // 古い発行済み通知書には fxRate/usdAmount/rowTotal が保存されていないため、欠けている場合はフォールバックする
@@ -158,6 +162,7 @@ function mapNoticeRow(data: {
     totalReward: Number(data.total_reward),
     itemConfig: parseNoticeItemConfig(data.item_config),
     headerText: data.header_text, footerText: data.footer_text,
+    fxVisible: data.fx_visible ?? true,
   }
 }
 
@@ -202,6 +207,7 @@ export async function createNoticeSnapshot(supabase: SupabaseClient<any>, storeI
     bonus: content.bonus, deduction: content.deduction,
     custom_items: content.customItems, sales_custom_items: content.salesCustomItems, total_reward: content.totalReward,
     item_config: content.itemConfig as unknown as Json, header_text: content.headerText, footer_text: content.footerText,
+    fx_visible: content.fxVisible,
   }).select('id').single()
 }
 

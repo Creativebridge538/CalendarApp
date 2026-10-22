@@ -48,12 +48,14 @@ export default async function PaymentNoticePage({
 
   const {
     castName, castRealName, logoUrl, salesRows, totalReward,
-    bankName, bankBranch, bankAccountNumber, bankAccountHolder, headerText, footerText,
+    bankName, bankBranch, bankAccountNumber, bankAccountHolder, headerText, footerText, fxVisible,
   } = content
   const store = { name: content.storeName }
   const settings = { logo_url: logoUrl }
 
-  const hasFxRow = salesRows.some(s => s.fxRate != null)
+  // fxVisibleは発行時点の店舗設定のスナップショット（店舗設定を後から変更しても過去の発行済み通知書は変わらない）。
+  // 為替データが無い行しか無ければ、設定がONでも従来どおり列自体を出さない
+  const hasFxRow = fxVisible && salesRows.some(s => s.fxRate != null)
   const periodLabel = `${format(new Date(`${from}T00:00:00`), 'yyyy年M月d日', { locale: ja })}〜${format(new Date(`${to}T00:00:00`), 'M月d日', { locale: ja })}`
   const { itemRows, subtotalRows, settlementRows } = buildNoticeSummaryRows(content)
 

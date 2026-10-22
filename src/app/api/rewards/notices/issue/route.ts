@@ -41,7 +41,8 @@ export async function POST(request: Request) {
     const title = '支払通知書が届きました'
     const body = `${periodLabel} の支払通知書: ¥${content.totalReward.toLocaleString()}`
     const link = `/admin/rewards/notice?cast_id=${t.cast_id}&from=${from}&to=${to}&notice_id=${noticeId}`
-    const { error: notifyError } = await admin.from('notifications').insert({ user_id: t.cast_id, title, body, link })
+    // 通知の作成者(created_by)・所属店舗(store_id)も記録する。Web Pushは /api/push/dispatch が「作成者が自分の未送信の通知」だけを送る
+    const { error: notifyError } = await admin.from('notifications').insert({ user_id: t.cast_id, title, body, link, created_by: user.id, store_id: storeId })
     if (notifyError) {
       console.error('[notices/issue] notification failed', t.cast_id, notifyError)
       return { cast_id: t.cast_id, ok: false, error: '通知の送信に失敗しました' }

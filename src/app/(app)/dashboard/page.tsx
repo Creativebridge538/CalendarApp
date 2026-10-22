@@ -6,6 +6,7 @@ import { ja } from 'date-fns/locale'
 import { AdminAnalytics } from '@/components/dashboard/admin-analytics'
 import { includedInSalesTotal } from '@/lib/reward-rate'
 import { nowJST } from '@/lib/jst'
+import { isVacantSlotListedForAdmin, vacantSlotQueryFromDate } from '@/lib/vacant-slot-window'
 
 export default async function DashboardPage({
   searchParams,
@@ -44,18 +45,20 @@ async function AdminDashboard({ storeId, yearParam, monthParam }: { storeId: str
   const prevMonthStart = format(startOfMonth(prevMonthDate), 'yyyy-MM-dd')
   const nextMonthDate = addMonths(targetMonthDate, 1)
 
-  const [{ count: pendingShifts }, { count: pendingRequests }, { count: pendingVacantApplications }, { data: todayShifts }, { data: sales }, { data: casts }, { data: includedInSalesTemplates }] =
+  const [{ count: pendingShifts }, { count: pendingRequests }, { data: pendingVacantRows }, { data: todayShifts }, { data: sales }, { data: casts }, { data: includedInSalesTemplates }] =
     await Promise.all([
       supabase.from('shifts').select('*', { count: 'exact', head: true })
         .eq('store_id', storeId).eq('status', 'submitted'),
       supabase.from('shift_modification_requests').select('shifts!inner(store_id)', { count: 'exact', head: true })
         .eq('status', 'pending')
         .eq('shifts.store_id', storeId),
-      // 日付が過ぎた空き枠への申請は、管理画面の一覧からも消えて対応しようがないため件数に含めない
-      supabase.from('vacant_slot_applications').select('vacant_slots!inner(store_id, date)', { count: 'exact', head: true })
+      // 管理画面の一覧から消えた（対応しようがない）空き枠への申請は件数に含めない。
+      // 日またぎ枠は前日の日付のまま進行中になり得るため、昨日以降の枠を取得して、
+      // 管理画面と同じ規則（isVacantSlotListedForAdmin）で下で絞り込んで数える
+      supabase.from('vacant_slot_applications').select('id, vacant_slots!inner(store_id, date, start_time, end_time)')
         .eq('status', 'pending')
         .eq('vacant_slots.store_id', storeId)
-        .gte('vacant_slots.date', today),
+        .gte('vacant_slots.date', vacantSlotQueryFromDate(now)),
       supabase.from('shifts')
         .select('*, cast:users!shifts_cast_id_fkey(display_name), rooms(name)')
         .eq('store_id', storeId)
@@ -124,7 +127,7 @@ async function AdminDashboard({ storeId, yearParam, monthParam }: { storeId: str
     <AdminAnalytics
       pendingShifts={pendingShifts ?? 0}
       pendingRequests={pendingRequests ?? 0}
-      pendingVacantApplications={pendingVacantApplications ?? 0}
+      pendingVacantApplications={(pendingVacantRows ?? []).filter(row => isVacantSlotListedForAdmin(row.vacant_slots, now)).length}
       todayShifts={(todayShifts ?? []).map(s => ({
         id: s.id,
         castName: (s.cast as { display_name: string | null } | null)?.display_name ?? '—',

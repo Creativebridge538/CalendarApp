@@ -21,7 +21,9 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { TimeSelect, normalizeTime } from '@/components/ui/time-select'
 import { Plus, Pencil, FileEdit, CalendarDays, CalendarRange, CalendarClock, CalendarPlus, List, Trash2, ChevronLeft, ChevronRight, MapPin, StickyNote, Menu, X, Check, Search, Bell, BellRing, LogOut, Smartphone, AlertTriangle } from 'lucide-react'
 import type { Database } from '@/lib/supabase/database.types'
-import { sendPushNotification, getPushSubscriptionState, subscribeToPush, clearAppBadge, listenForBadgeUpdates } from '@/lib/push'
+import { getPushSubscriptionState, subscribeToPush, clearAppBadge, listenForBadgeUpdates, dispatchPush } from '@/lib/push'
+import { vacantSlotRpcErrorMessage } from '@/lib/vacant-slot-errors'
+import { describeOperationPushResult } from '@/lib/push-dispatch'
 import { ShiftCalendar } from './shift-calendar'
 import { MonthYearPicker } from './month-year-picker'
 import { Logo } from '@/components/logo'
@@ -74,7 +76,6 @@ interface Props {
   rooms: { id: string; name: string; area_id: string | null }[]
   areas: { id: string; name: string }[]
   castId: string
-  castName: string | null
   storeId: string
   storeName: string | null
   settings: Settings | null
@@ -203,7 +204,7 @@ function ShiftTimeGrid({
   )
 }
 
-export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, castName, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId, unreadNotificationCount: initialUnreadNotificationCount, rejectedModificationReasonByShiftId }: Props) {
+export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, storeId, storeName, settings, userId, checklistItems, rewardSummary, amountByDate, salesByShiftId, unreadNotificationCount: initialUnreadNotificationCount, rejectedModificationReasonByShiftId }: Props) {
   const [unreadNotificationCount, setUnreadNotificationCount] = useState(initialUnreadNotificationCount)
   const [shifts, setShifts] = useState(initialShifts)
   const [view, setView] = useState<'list' | 'month' | 'week' | 'day'>('month')
@@ -606,16 +607,19 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
         rooms: rooms.find(r => r.id === form.room_id) ?? null,
         areas: areas.find(a => a.id === form.area_id) ?? null,
       } : s))
-      toast.success('シフトを更新しました')
-      if (wasRejected) {
-        const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
-        if (admins?.length) {
-          const title = 'シフトが再提出されました'
-          const body = `${castName ?? 'キャスト'} ／ ${format(new Date(`${form.date}T00:00:00`), 'M/d(E)', { locale: ja })} ${form.start_time}〜${form.end_time}`
-          await supabase.from('notifications').insert(
-            admins.map(a => ({ user_id: a.id, title, body, link: '/admin/shifts' }))
-          )
-          admins.forEach(a => sendPushNotification(a.id, title, body, '/admin/shifts'))
+      // 差し戻されたシフトの再提出は、DBトリガーが同店舗の管理者へ通知を作成する（キャストは管理者を検索できないため、宛先もDBが決める）。
+      // Web Pushだけをサーバーへ依頼する（差し戻し以外の更新では通知自体が作られないため、Pushも試みない）
+      if (!wasRejected) {
+        toast.success('シフトを更新しました')
+      } else {
+        const successMessage = 'シフトを更新しました'
+        let dismissed = false
+        const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+        const push = await dispatchPush()
+        if (!dismissed) {
+          const result = describeOperationPushResult(successMessage, push)
+          if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+          else toast.success(result.message, { id: toastId, duration: 5000 })
         }
       }
     } else {
@@ -683,26 +687,27 @@ export function CastShiftView({ shifts: initialShifts, rooms, areas, castId, cas
 
   async function handleModification() {
     if (!modTarget || !modForm.reason) { toast.error('理由を入力してください'); return }
-    const [{ error }, { error: statusError }] = await Promise.all([
-      supabase.from('shift_modification_requests').insert({
-        shift_id: modTarget.id, requested_by: userId,
-        new_date: modForm.new_date || null, new_start_time: modForm.new_start_time || null, new_end_time: modForm.new_end_time || null,
-        reason: modForm.reason,
-      }),
-      supabase.from('shifts').update({ status: 'modification_requested' }).eq('id', modTarget.id),
-    ])
-    if (error || statusError) { toast.error('申請に失敗しました'); return }
+    // shiftのstatus変更・shift_modification_requestsの作成・管理者への通知は、1つのDB関数（単一トランザクション）で行う。
+    // 途中で失敗すれば（通知作成の失敗を含めて）全体がロールバックされ、片方だけ成功する不整合は起きない。
+    const { error } = await supabase.rpc('create_shift_modification_request', {
+      p_shift_id: modTarget.id,
+      p_new_date: modForm.new_date || undefined,
+      p_new_start_time: modForm.new_start_time || undefined,
+      p_new_end_time: modForm.new_end_time || undefined,
+      p_reason: modForm.reason,
+    })
+    if (error) { toast.error(vacantSlotRpcErrorMessage(error, '申請に失敗しました', roomLabel)); return }
     setShifts(shifts.map(s => s.id === modTarget.id ? { ...s, status: 'modification_requested' as ShiftStatus } : s))
-    toast.success('修正申請を送信しました')
     setModOpen(false)
-    const { data: admins } = await supabase.from('users').select('id').eq('store_id', storeId).eq('role', 'admin')
-    if (admins?.length) {
-      const title = 'シフト修正申請が届きました'
-      const body = `${format(new Date(modTarget.date), 'M/d(E)', { locale: ja })} のシフトへの修正申請`
-      await supabase.from('notifications').insert(
-        admins.map(a => ({ user_id: a.id, title, body, link: '/admin/modification-requests' }))
-      )
-      admins.forEach(a => sendPushNotification(a.id, title, body, '/admin/modification-requests'))
+    // 通知はDB関数が作成済み。Web Pushだけをサーバーへ依頼する
+    const successMessage = '修正申請を送信しました'
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
     }
   }
 

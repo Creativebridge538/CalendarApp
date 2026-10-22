@@ -15,10 +15,12 @@ import { Pagination } from '@/components/ui/pagination'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
-import { TimeSelect } from '@/components/ui/time-select'
+import { TimeSelect, normalizeTime } from '@/components/ui/time-select'
 import { ShiftCalendar } from '@/components/shifts/shift-calendar'
 import { Check, X, ChevronDown, Pencil, Ban, Loader2 } from 'lucide-react'
-import { sendPushNotification } from '@/lib/push'
+import { dispatchPush } from '@/lib/push'
+import { vacantSlotRpcErrorMessage } from '@/lib/vacant-slot-errors'
+import { describeOperationPushResult } from '@/lib/push-dispatch'
 import { usePagination } from '@/hooks/use-pagination'
 
 interface Request {
@@ -69,82 +71,86 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
     })
   }
 
+  // 承認・承認してキャンセル・却下は、修正申請・シフト・申請者への通知を1つのDB関数（単一トランザクション）で行う。
+  // 宛先・文面・リンクはDBが決める（ブラウザは通知を作らない）。通知の作成や途中の処理に失敗すれば全体が取り消される。
+  // 空き枠申請に紐づくシフトの場合も、シフトのガードトリガーが申請との整合性を同じトランザクションで保つ。
+  // Web Push（外部処理）だけを、成功後にサーバー（自分が作成した未送信の通知のみ）へ依頼する。
   async function handleApprove() {
     if (!approveTarget) return
     const req = approveTarget
-    const updateShift = {
-      status: 'confirmed' as const, confirmed_at: new Date().toISOString(),
-      date: approveForm.date, start_time: approveForm.start_time, end_time: approveForm.end_time,
-    }
-
+    // TimeSelectは深夜シフト向けに24:00〜29:45も選べる（DBのtime列には24:00以上を保存できないため、
+    // 既存の深夜時刻ルール（admin-shift-view.tsx等）と同じくnormalizeTimeで00:00〜23:45へ正規化してから渡す
+    const start_time = normalizeTime(approveForm.start_time)
+    const end_time = normalizeTime(approveForm.end_time)
+    // 開始=終了は空き枠(create_vacant_slot)と同じ規則で入力ミス扱いとする（24時間勤務の表現には使わない）。
+    // DB側（review_shift_modification_request）でも同じ検証をしており、ここはユーザーへ早く知らせるためのもの
+    if (start_time === end_time) { toast.error('開始時刻と終了時刻に同じ時刻は指定できません'); return }
     setProcessingId(req.id)
-    const [{ error: e1 }, { error: e2 }] = await Promise.all([
-      supabase.from('shift_modification_requests').update({
-        status: 'approved', reviewed_at: new Date().toISOString(),
-      }).eq('id', req.id),
-      supabase.from('shifts').update(updateShift).eq('id', req.shift_id),
-    ])
-    if (e1 || e2) {
+    const { error } = await supabase.rpc('review_shift_modification_request', {
+      p_request_id: req.id, p_action: 'approve',
+      p_date: approveForm.date, p_start_time: start_time, p_end_time: end_time,
+    })
+    if (error) {
       setProcessingId(null)
-      // 23P01 = exclusion_violation。変更後の時間帯に別の確定シフトが割り込んでいた場合
-      toast.error((e2 as { code?: string } | null)?.code === '23P01' ? `この時間帯は同じ${roomLabel}に既に確定シフトがあります` : '承認に失敗しました')
+      toast.error(vacantSlotRpcErrorMessage(error, '承認に失敗しました', roomLabel))
       return
     }
     setRequests(requests.filter(r => r.id !== req.id))
     setProcessingId(null)
-    toast.success('承認して確定しました')
     setApproveTarget(null)
-    const title = 'シフト修正申請が承認されました'
-    const body = `${format(new Date(`${approveForm.date}T00:00:00`), 'M/d(E)', { locale: ja })} ${approveForm.start_time}〜${approveForm.end_time} のシフト修正申請`
-    await supabase.from('notifications').insert({ user_id: req.requested_by, title, body, link: '/cast/shifts' })
-    sendPushNotification(req.requested_by, title, body, '/cast/shifts')
+    const successMessage = '承認して確定しました'
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
+    }
   }
 
   async function handleApproveAndCancel(req: Request) {
     if (!confirm('この申請を承認し、シフトをキャンセル（削除）しますか？この操作は元に戻せません。')) return
     setProcessingId(req.id)
-    const [{ error: e1 }, { error: e2 }] = await Promise.all([
-      supabase.from('shift_modification_requests').update({
-        status: 'approved', reviewed_at: new Date().toISOString(),
-      }).eq('id', req.id),
-      supabase.from('shifts').delete().eq('id', req.shift_id),
-    ])
-    if (e1 || e2) { setProcessingId(null); toast.error('処理に失敗しました'); return }
+    const { error } = await supabase.rpc('review_shift_modification_request', { p_request_id: req.id, p_action: 'approve_cancel' })
+    if (error) { setProcessingId(null); toast.error(vacantSlotRpcErrorMessage(error, '処理に失敗しました', roomLabel)); return }
     setRequests(requests.filter(r => r.id !== req.id))
     setProcessingId(null)
-    toast.success('承認してシフトをキャンセルしました')
-    const title = 'シフトがキャンセルされました'
-    const body = req.shifts
-      ? `${format(new Date(req.shifts.date), 'M/d(E)', { locale: ja })} ${req.shifts.start_time.slice(0, 5)}〜${req.shifts.end_time.slice(0, 5)} のシフトがキャンセルされました`
-      : 'シフトがキャンセルされました'
-    await supabase.from('notifications').insert({ user_id: req.requested_by, title, body, link: '/cast/shifts' })
-    sendPushNotification(req.requested_by, title, body, '/cast/shifts')
+    const successMessage = '承認してシフトをキャンセルしました'
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
+    }
   }
 
   async function handleReject() {
     if (!rejectTarget || !rejectReason.trim()) return
     setProcessingId(rejectTarget.id)
-    const [{ error }, { error: statusError }] = await Promise.all([
-      supabase.from('shift_modification_requests').update({
-        status: 'rejected', reject_reason: rejectReason, reviewed_at: new Date().toISOString(),
-      }).eq('id', rejectTarget.id),
-      supabase.from('shifts').update({ status: 'confirmed' }).eq('id', rejectTarget.shift_id),
-    ])
-    if (error || statusError) {
+    const { error } = await supabase.rpc('review_shift_modification_request', {
+      p_request_id: rejectTarget.id, p_action: 'reject', p_reject_reason: rejectReason,
+    })
+    if (error) {
       setProcessingId(null)
-      // 23P01 = exclusion_violation。元の時間帯に別の確定シフトが割り込んでいた場合
-      toast.error(statusError?.code === '23P01' ? `この時間帯は同じ${roomLabel}に既に確定シフトがあります` : '却下に失敗しました')
+      toast.error(vacantSlotRpcErrorMessage(error, '却下に失敗しました', roomLabel))
       return
     }
     setRequests(requests.filter(r => r.id !== rejectTarget.id))
     setProcessingId(null)
-    toast.success('却下しました')
-    const title = 'シフト修正申請が却下されました'
-    const body = `却下理由: ${rejectReason}`
-    await supabase.from('notifications').insert({ user_id: rejectTarget.requested_by, title, body, link: '/cast/shifts' })
-    sendPushNotification(rejectTarget.requested_by, title, body, '/cast/shifts')
     setRejectTarget(null)
     setRejectReason('')
+    const successMessage = '却下しました'
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const result = describeOperationPushResult(successMessage, push)
+      if (result.level === 'warning') toast.warning(result.message, { id: toastId, duration: 5000 })
+      else toast.success(result.message, { id: toastId, duration: 5000 })
+    }
   }
 
   return (

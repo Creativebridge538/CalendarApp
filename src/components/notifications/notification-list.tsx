@@ -12,7 +12,9 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { cn } from '@/lib/utils'
 import { Bell, BellRing, BellOff, CheckCheck, Send, ChevronLeft } from 'lucide-react'
-import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush, clearAppBadge, sendPushNotification } from '@/lib/push'
+import { getPushSubscriptionState, subscribeToPush, unsubscribeFromPush, clearAppBadge, dispatchPush } from '@/lib/push'
+import { describeOperationPushResult, describePushDispatchResult } from '@/lib/push-dispatch'
+import { sendSelfTestNotification, sendCastTestNotification, resolveShiftReminderTargets, runSendShiftReminder } from '@/lib/notification-list-actions'
 
 interface Notification {
   id: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string
@@ -65,79 +67,55 @@ export function NotificationList({ notifications: initial, userId, casts }: Prop
     }
   }
 
-  // プッシュ送信の結果をその場で確認できるよう、テスト時だけ結果を待って表示する
-  // （通常のsendPushNotificationは呼び出し元をブロックしないよう握りつぶす設計のため、ここでは使わない）
-  async function sendAndReportPush(targetUserId: string, title: string, body: string | null, link: string | null, targetLabel: string, isSelf: boolean) {
-    try {
-      const res = await fetch('/api/push/send', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ user_id: targetUserId, title, body, link }),
-      })
-      const result = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        toast.error(`${targetLabel}へのプッシュ送信エラー: ${result.error ?? res.status}`)
-      } else if (result.sent === 0 && result.total > 0) {
-        const detail = (result.failures ?? [])
-          .map((f: { statusCode?: number; message?: string; body?: string }) => `${f.statusCode ?? '?'} ${f.message ?? f.body ?? ''}`.trim())
-          .join(' / ')
-        toast.error(`${targetLabel}へのプッシュ送信失敗（${result.total}件中0件成功）${detail ? `: ${detail}` : ''}`, { duration: 15000 })
-      } else if (result.total === 0) {
-        // 端末側は「オン」表示でもサーバーに登録が残っていないケース（VAPID鍵の更新などで発生）。
-        // 「端末で通知をオンにしてるか確認して」だと画面上すでにオンに見えて混乱するため、再登録を促す
-        toast.error(
-          isSelf
-            ? 'プッシュ通知の登録がサーバーに見つかりません。下の「オフにする」→「オンにする」を押し直して登録し直してください'
-            : `${targetLabel}のプッシュ通知の登録がサーバーに見つかりません。本人の端末で通知を一度「オフ」→「オン」にして登録し直してもらってください`,
-          { duration: 15000 }
-        )
-      } else {
-        toast.success(`${targetLabel}へテスト通知を送信しました（プッシュ ${result.sent}/${result.total}件成功）`)
-      }
-    } catch {
-      toast.error('プッシュ送信リクエストに失敗しました（ネットワークエラー）')
+  // プッシュ送信の結果をその場で確認できるよう、テスト時だけ結果を待って表示する。
+  // 通知そのもの（宛先・文面）はDB関数が作成済み。ここでは「自分が作成した未送信の通知」をサーバーに送らせるだけで、
+  // ブラウザから宛先・タイトル・本文・リンクを指定することはない。
+  async function reportPushResult(targetLabel: string, isSelf: boolean) {
+    const result = await dispatchPush()
+    const outcome = describePushDispatchResult(result, targetLabel, isSelf)
+    if (outcome.level === 'error') {
+      toast.error(outcome.message, outcome.duration !== undefined ? { duration: outcome.duration } : undefined)
+    } else {
+      toast.success(outcome.message)
     }
   }
 
   async function sendTestNotification() {
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({ user_id: userId, title: 'テスト通知', body: '通知の動作確認です' })
-      .select()
-      .single()
-    if (error || !data) { toast.error('送信に失敗しました'); return }
-    setNotifications([data, ...notifications])
-    await sendAndReportPush(userId, data.title, data.body, data.link, '自分', true)
+    const result = await sendSelfTestNotification(supabase, userId)
+    if (!result.ok) { toast.error('送信に失敗しました'); return }
+    // 作成された通知を一覧へ反映する
+    if (result.notifications) setNotifications(result.notifications)
+    await reportPushResult('自分', true)
   }
 
   async function sendTestToCast() {
     if (!testCastId) { toast.error('キャストを選択してください'); return }
     const castName = casts?.find(c => c.id === testCastId)?.display_name ?? 'キャスト'
     setSendingCastTest(true)
-    const { data, error } = await supabase
-      .from('notifications')
-      .insert({ user_id: testCastId, title: 'テスト通知', body: '管理者からの通知テストです' })
-      .select()
-      .single()
-    if (error || !data) { toast.error('送信に失敗しました'); setSendingCastTest(false); return }
-    await sendAndReportPush(testCastId, data.title, data.body, data.link, castName, false)
+    const result = await sendCastTestNotification(supabase, testCastId)
+    if (!result.ok) { toast.error('送信に失敗しました'); setSendingCastTest(false); return }
+    await reportPushResult(castName, false)
     setSendingCastTest(false)
   }
 
+  // 宛先（自店舗の有効なキャスト）・文面・リンクはDB関数が決める。ブラウザは対象キャスト（未指定=全員）だけを渡す
   async function sendShiftReminder() {
     if (!casts) return
-    const targets = remindCastId === 'all' ? casts : casts.filter(c => c.id === remindCastId)
-    if (targets.length === 0) { toast.error('キャストを選択してください'); return }
+    const targets = resolveShiftReminderTargets(remindCastId, casts)
+    if (!targets.ok) { toast.error('キャストを選択してください'); return }
     setSendingRemind(true)
-    const title = 'シフト提出のお願い'
-    const body = 'まだシフトを提出していない場合は、提出をお願いします'
-    const { error } = await supabase.from('notifications').insert(
-      targets.map(t => ({ user_id: t.id, title, body, link: '/cast/shifts' }))
-    )
+    const result = await runSendShiftReminder(supabase, targets.rpcArgs)
     setSendingRemind(false)
-    if (error) { toast.error('送信に失敗しました'); return }
-    for (const t of targets) sendPushNotification(t.id, title, body, '/cast/shifts')
-    toast.success(`${targets.length}人に送信しました`)
+    if (!result.ok) { toast.error('送信に失敗しました'); return }
+    const successMessage = `${result.count}人に送信しました`
+    let dismissed = false
+    const toastId = toast.success(successMessage, { duration: 5000, onDismiss: () => { dismissed = true } })
+    const push = await dispatchPush()
+    if (!dismissed) {
+      const outcome = describeOperationPushResult(successMessage, push)
+      if (outcome.level === 'warning') toast.warning(outcome.message, { id: toastId, duration: 5000 })
+      else toast.success(outcome.message, { id: toastId, duration: 5000 })
+    }
   }
 
   async function markRead(id: string) {

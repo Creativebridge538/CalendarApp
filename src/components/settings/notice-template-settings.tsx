@@ -21,12 +21,14 @@ interface Props {
   itemConfig: unknown
   headerText: string | null
   footerText: string | null
+  fxVisible: boolean
 }
 
-export function NoticeTemplateSettings({ settingsId, storeId, itemConfig, headerText, footerText }: Props) {
+export function NoticeTemplateSettings({ settingsId, storeId, itemConfig, headerText, footerText, fxVisible: initialFxVisible }: Props) {
   const [items, setItems] = useState<NoticeItemConfigEntry[]>(parseNoticeItemConfig(itemConfig))
   const [header, setHeader] = useState(headerText ?? '')
   const [footer, setFooter] = useState(footerText ?? '')
+  const [fxVisible, setFxVisible] = useState(initialFxVisible)
   const [saving, setSaving] = useState(false)
   const supabase = createClient()
 
@@ -51,6 +53,7 @@ export function NoticeTemplateSettings({ settingsId, storeId, itemConfig, header
     try {
       const payload = {
         notice_item_config: items as unknown as Json, notice_header_text: header.trim() || null, notice_footer_text: footer.trim() || null,
+        notice_fx_visible: fxVisible,
       }
       if (settingsId) {
         const { error } = await supabase.from('store_settings').update(payload).eq('id', settingsId)
@@ -112,6 +115,16 @@ export function NoticeTemplateSettings({ settingsId, storeId, itemConfig, header
             「合計お支払額」は常に最後に表示され、非表示・並び替えはできません。
           </p>
         </div>
+
+        <div className="flex items-center gap-2">
+          <Checkbox checked={fxVisible} onCheckedChange={() => setFxVisible(v => !v)} id="notice-fx-visible" />
+          <Label htmlFor="notice-fx-visible" className="font-normal cursor-pointer">
+            支払通知書に為替レート・USD金額を表示する
+          </Label>
+        </div>
+        <p className="text-xs text-muted-foreground -mt-4">
+          支払通知書の画面・PDFにのみ適用されます。売上入力・売上一覧の表示や金額計算には影響しません。設定変更は今後発行する通知書に適用され、発行済みの通知書は変わりません。為替データがない場合は、ONでも表示されません。
+        </p>
 
         <div className="space-y-1.5">
           <Label>ヘッダーの追加メッセージ（任意）</Label>

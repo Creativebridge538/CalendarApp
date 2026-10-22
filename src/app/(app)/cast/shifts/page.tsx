@@ -79,7 +79,6 @@ export default async function CastShiftsPage() {
         rooms={rooms ?? []}
         areas={areas ?? []}
         castId={user.id}
-        castName={profile.display_name}
         storeId={profile.store_id}
         storeName={store?.name ?? null}
         settings={settings}

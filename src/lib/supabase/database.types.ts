@@ -188,8 +188,10 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string
+          created_by: string | null
           id: string
           link: string | null
+          push_sent_at: string | null
           read_at: string | null
           store_id: string | null
           title: string
@@ -198,8 +200,10 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           link?: string | null
+          push_sent_at?: string | null
           read_at?: string | null
           store_id?: string | null
           title: string
@@ -208,8 +212,10 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           link?: string | null
+          push_sent_at?: string | null
           read_at?: string | null
           store_id?: string | null
           title?: string
@@ -246,6 +252,7 @@ export type Database = {
           custom_items: Json
           deduction: number
           footer_text: string | null
+          fx_visible: boolean
           header_text: string | null
           id: string
           issued_at: string
@@ -276,6 +283,7 @@ export type Database = {
           custom_items?: Json
           deduction: number
           footer_text?: string | null
+          fx_visible?: boolean
           header_text?: string | null
           id?: string
           issued_at?: string
@@ -306,6 +314,7 @@ export type Database = {
           custom_items?: Json
           deduction?: number
           footer_text?: string | null
+          fx_visible?: boolean
           header_text?: string | null
           id?: string
           issued_at?: string
@@ -880,6 +889,7 @@ export type Database = {
           location_mode: string
           logo_url: string | null
           notice_footer_text: string | null
+          notice_fx_visible: boolean
           notice_header_text: string | null
           notice_item_config: Json
           platform_settings: Json
@@ -901,6 +911,7 @@ export type Database = {
           location_mode?: string
           logo_url?: string | null
           notice_footer_text?: string | null
+          notice_fx_visible?: boolean
           notice_header_text?: string | null
           notice_item_config?: Json
           platform_settings?: Json
@@ -922,6 +933,7 @@ export type Database = {
           location_mode?: string
           logo_url?: string | null
           notice_footer_text?: string | null
+          notice_fx_visible?: boolean
           notice_header_text?: string | null
           notice_item_config?: Json
           platform_settings?: Json
@@ -1142,6 +1154,8 @@ export type Database = {
           cast_id: string
           created_at: string
           id: string
+          requested_end_time: string | null
+          requested_start_time: string | null
           reviewed_at: string | null
           reviewed_by: string | null
           shift_id: string | null
@@ -1152,6 +1166,8 @@ export type Database = {
           cast_id: string
           created_at?: string
           id?: string
+          requested_end_time?: string | null
+          requested_start_time?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           shift_id?: string | null
@@ -1162,6 +1178,8 @@ export type Database = {
           cast_id?: string
           created_at?: string
           id?: string
+          requested_end_time?: string | null
+          requested_start_time?: string | null
           reviewed_at?: string | null
           reviewed_by?: string | null
           shift_id?: string | null
@@ -1281,14 +1299,113 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      apply_vacant_slot: {
+        Args: {
+          p_requested_end_time?: string
+          p_requested_start_time?: string
+          p_vacant_slot_id: string
+        }
+        Returns: Json
+      }
+      cancel_vacant_slot_application: {
+        Args: { p_application_id: string }
+        Returns: undefined
+      }
+      claim_pending_push_notifications: {
+        Args: {
+          p_max_batch?: number
+          p_max_per_minute?: number
+          p_pending_window_minutes?: number
+          p_user_id: string
+        }
+        Returns: {
+          body: string | null
+          id: string
+          link: string | null
+          store_id: string
+          title: string
+          user_id: string
+        }[]
+      }
+      create_shift_modification_request: {
+        Args: {
+          p_new_date?: string
+          p_new_end_time?: string
+          p_new_start_time?: string
+          p_reason?: string
+          p_shift_id: string
+        }
+        Returns: Database["public"]["Tables"]["shift_modification_requests"]["Row"]
+      }
+      create_vacant_slot: {
+        Args: {
+          p_area_id?: string
+          p_capacity?: number
+          p_date: string
+          p_end_time: string
+          p_notes?: string
+          p_room_id?: string
+          p_start_time: string
+        }
+        Returns: Json
+      }
+      delete_vacant_slot: { Args: { p_slot_id: string }; Returns: undefined }
       my_role: {
         Args: never
         Returns: Database["public"]["Enums"]["user_role"]
       }
       my_store_id: { Args: never; Returns: string }
+      notify_vacant_slots: { Args: { p_force?: boolean }; Returns: Json }
+      review_shift_modification_request: {
+        Args: {
+          p_action: string
+          p_date?: string
+          p_end_time?: string
+          p_reject_reason?: string
+          p_request_id: string
+          p_start_time?: string
+        }
+        Returns: undefined
+      }
+      review_vacant_slot_application: {
+        Args: {
+          p_application_id: string
+          p_next_status: Database["public"]["Enums"]["request_status"]
+        }
+        Returns: Json
+      }
+      send_shift_reminder: {
+        Args: { p_cast_ids?: string[] }
+        Returns: number
+      }
+      send_test_notification: {
+        Args: { p_target_user_id?: string }
+        Returns: number
+      }
+      set_vacant_slot_published: {
+        Args: { p_published: boolean; p_slot_id: string }
+        Returns: undefined
+      }
       sync_vacant_slot_approved_count: {
         Args: { target_id: string }
         Returns: undefined
+      }
+      vacant_slot_format_date: { Args: { p_date: string }; Returns: string }
+      vacant_slot_format_range: {
+        Args: { p_anchor_start: string; p_end: string; p_start: string }
+        Returns: string
+      }
+      vacant_slot_effective_date: {
+        Args: {
+          p_requested_start_time: string
+          p_slot_date: string
+          p_slot_start_time: string
+        }
+        Returns: string
+      }
+      vacant_slot_ends_at: {
+        Args: { p_date: string; p_end_time: string; p_start_time: string }
+        Returns: string
       }
     }
     Enums: {
