@@ -200,7 +200,7 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
                       </p>
                     )}
                   </TableCell>
-                  <TableCell className="max-w-xs truncate">{req.reason}</TableCell>
+                  <TableCell className="max-w-[10rem] sm:max-w-xs whitespace-pre-wrap break-words">{req.reason}</TableCell>
                   <TableCell>{format(new Date(req.created_at), 'M/d', { locale: ja })}</TableCell>
                   <TableCell className="text-right space-x-1 whitespace-nowrap">
                     <Button size="sm" variant="outline" className="text-positive" disabled={processingId === req.id} onClick={() => openApprove(req)}>
@@ -227,9 +227,9 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
       <Dialog open={!!approveTarget} onOpenChange={open => { if (!open) { setApproveTarget(null); setDateCalendarOpen(false) } }}>
         <DialogContent>
           <DialogHeader><DialogTitle>承認内容を確認・編集</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-2 min-w-0">
             {approveTarget && (
-              <p className="text-sm text-muted-foreground">
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
                 {approveTarget.shifts?.cast?.display_name ?? '—'}／申請理由: {approveTarget.reason}
               </p>
             )}
@@ -276,7 +276,12 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
       <Dialog open={!!rejectTarget} onOpenChange={open => { if (!open) setRejectTarget(null) }}>
         <DialogContent>
           <DialogHeader><DialogTitle>却下理由</DialogTitle></DialogHeader>
-          <div className="space-y-4 mt-2">
+          <div className="space-y-4 mt-2 min-w-0">
+            {rejectTarget && (
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
+                {rejectTarget.shifts?.cast?.display_name ?? '—'}／申請理由: {rejectTarget.reason}
+              </p>
+            )}
             <div className="space-y-1.5">
               <Label required>理由</Label>
               <Textarea value={rejectReason} onChange={e => setRejectReason(e.target.value)} rows={3} placeholder="却下理由を入力してください" />
