@@ -41,7 +41,7 @@ interface Request {
   } | null
 }
 
-export function ModificationRequestList({ requests: initialRequests, roomLabel }: { requests: Request[]; roomLabel: string }) {
+export function ModificationRequestList({ requests: initialRequests, roomLabel, fetchError = false }: { requests: Request[]; roomLabel: string; fetchError?: boolean }) {
   const [requests, setRequests] = useState(initialRequests)
   const [rejectTarget, setRejectTarget] = useState<Request | null>(null)
   const [rejectReason, setRejectReason] = useState('')
@@ -53,14 +53,16 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
   const searchParams = useSearchParams()
   const highlightShiftId = searchParams.get('shift')
   const { page, setPage, pageSize, setPageSize, totalPages, paged, totalItems } = usePagination(requests)
+  // 一覧取得自体が失敗している間は対象の有無を判定できないため、見つからない案内は出さない（②を優先）。
+  const highlightNotFound = !fetchError && !!highlightShiftId && requests.findIndex(r => r.shift_id === highlightShiftId) < 0
 
   // シフト管理からのリンクで来た場合、該当申請があるページへ自動で移動する
   useEffect(() => {
-    if (!highlightShiftId) return
+    if (!highlightShiftId || fetchError) return
     const index = requests.findIndex(r => r.shift_id === highlightShiftId)
     if (index >= 0) setPage(Math.floor(index / pageSize) + 1)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [highlightShiftId])
+  }, [highlightShiftId, fetchError])
 
   function openApprove(req: Request) {
     setApproveTarget(req)
@@ -158,9 +160,19 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
       <Card>
         <CardHeader>
           <CardTitle>修正申請管理</CardTitle>
-          <p className="text-sm text-muted-foreground">未処理: {requests.length} 件</p>
+          <p className="text-sm text-muted-foreground">{fetchError ? '取得に失敗しました' : `未処理: ${requests.length} 件`}</p>
         </CardHeader>
         <CardContent>
+          {fetchError && (
+            <p className="mb-3 rounded-md border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+              一覧の取得に失敗しました。再読み込みしてください。
+            </p>
+          )}
+          {!fetchError && highlightNotFound && (
+            <p className="mb-3 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900 dark:border-amber-700 dark:bg-amber-950 dark:text-amber-200">
+              指定されたシフトの未処理の修正申請が見つかりません。
+            </p>
+          )}
           <Table>
             <TableHeader>
               <TableRow>
@@ -173,7 +185,7 @@ export function ModificationRequestList({ requests: initialRequests, roomLabel }
               </TableRow>
             </TableHeader>
             <TableBody>
-              {requests.length === 0 && (
+              {requests.length === 0 && !fetchError && (
                 <TableRow>
                   <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     未処理の申請はありません

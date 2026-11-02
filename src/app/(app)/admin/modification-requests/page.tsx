@@ -9,7 +9,7 @@ export default async function ModificationRequestsPage() {
   if (!user) redirect('/login')
   if (profile?.role !== 'admin') redirect('/dashboard')
 
-  const [{ data: requests }, { data: settings }] = await Promise.all([
+  const [{ data: requests, error: requestsError }, { data: settings }] = await Promise.all([
     supabase
       .from('shift_modification_requests')
       .select('*, shifts(date, start_time, end_time, store_id, cast:users!shifts_cast_id_fkey(display_name))')
@@ -24,7 +24,7 @@ export default async function ModificationRequestsPage() {
 
   return (
     <div className="p-6">
-      <ModificationRequestList requests={storeRequests} roomLabel={settings?.room_label || 'ルーム'} />
+      <ModificationRequestList requests={storeRequests} roomLabel={settings?.room_label || 'ルーム'} fetchError={!!requestsError} />
     </div>
   )
 }
